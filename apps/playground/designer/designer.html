@@ -3,121 +3,348 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ngx-pdf-studio — visual designer</title>
+    <title>PDF Studio — دیزاینر</title>
     <style>
+      /* ---------- design tokens ---------- */
       :root {
-        --bg: #eef2f7;
+        --bg: #f2f3f5;
+        --workspace: #e8eaee;
         --surface: #ffffff;
-        --ink: #0f172a;
-        --muted: #64748b;
-        --border: #e2e8f0;
-        --accent: #2563eb;
-        --accent-weak: #dbeafe;
-        --field: #ffffff;
+        --raised: #ffffff;
+        --ink: #1b1f27;
+        --muted: #6b7382;
+        --faint: #9aa2b1;
+        --border: #e2e5ea;
+        --border-strong: #d0d4db;
+        --accent: #3d7bfd;
+        --accent-ink: #ffffff;
+        --accent-weak: rgba(61, 123, 253, 0.12);
+        --danger: #d64545;
+        --field: #f6f7f9;
+        --shadow-page:
+          0 0 0 1px rgba(27, 31, 39, 0.08), 0 2px 6px rgba(27, 31, 39, 0.08),
+          0 24px 48px -12px rgba(27, 31, 39, 0.18);
+        --shadow-pop: 0 12px 40px -8px rgba(15, 20, 30, 0.35);
+        --dot: rgba(27, 31, 39, 0.1);
+        --guide: #f43f5e;
       }
       body[data-theme='dark'] {
-        --bg: #0b1220;
-        --surface: #101a2e;
-        --ink: #e2e8f0;
-        --muted: #8ea0b8;
-        --border: #24324b;
-        --accent: #3b82f6;
-        --accent-weak: #1e3a8a;
-        --field: #0d1626;
+        --bg: #14161b;
+        --workspace: #191c22;
+        --surface: #1e222a;
+        --raised: #242933;
+        --ink: #e8ebf1;
+        --muted: #939cad;
+        --faint: #5d6675;
+        --border: #2b303b;
+        --border-strong: #363d4a;
+        --accent: #5a93f5;
+        --accent-ink: #0d1117;
+        --accent-weak: rgba(90, 147, 245, 0.16);
+        --danger: #e06c5f;
+        --field: #171a20;
+        --shadow-page:
+          0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4),
+          0 28px 60px -12px rgba(0, 0, 0, 0.55);
+        --shadow-pop: 0 16px 48px -8px rgba(0, 0, 0, 0.6);
+        --dot: rgba(232, 235, 241, 0.07);
+        --guide: #fb7185;
       }
+
       * {
         box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
       }
       body {
         margin: 0;
         font-family:
+          'Vazirmatn',
           system-ui,
           -apple-system,
-          'Vazirmatn',
           sans-serif;
+        font-size: 13px;
         background: var(--bg);
         color: var(--ink);
-        height: 100vh;
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        transition:
+          background 0.25s,
+          color 0.25s;
       }
-      .toolbar {
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border-strong);
+        border-radius: 8px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      /* ---------- top bar ---------- */
+      .topbar {
         display: flex;
-        gap: 6px;
         align-items: center;
-        padding: 8px 12px;
+        gap: 4px;
+        height: 48px;
+        padding: 0 10px;
         background: var(--surface);
         border-bottom: 1px solid var(--border);
-        flex-wrap: wrap;
+        flex: none;
+        z-index: 60;
       }
-      .toolbar .sep {
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-inline-end: 10px;
+        user-select: none;
+      }
+      .brand .mark {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .brand .name {
+        font-weight: 600;
+        font-size: 13px;
+        letter-spacing: -0.01em;
+      }
+      .brand .tag {
+        font-size: 10px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 1px 7px;
+      }
+
+      .sep {
         width: 1px;
         height: 22px;
         background: var(--border);
-        margin: 0 4px;
+        margin: 0 6px;
+        flex: none;
       }
-      .toolbar .spacer {
+      .spacer {
         flex: 1;
       }
+
       button,
-      select {
+      select,
+      input,
+      textarea {
         font: inherit;
-        font-size: 13px;
-        padding: 6px 10px;
-        border: 1px solid var(--border);
-        border-radius: 7px;
-        background: var(--field);
+        color: inherit;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
         color: var(--ink);
         cursor: pointer;
+        white-space: nowrap;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          transform 0.05s;
       }
-      button:hover {
+      .btn:hover {
         background: var(--accent-weak);
       }
-      button.primary {
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn:disabled {
+        opacity: 0.38;
+        pointer-events: none;
+      }
+      .btn svg {
+        flex: none;
+      }
+      .btn.icon {
+        width: 32px;
+        padding: 0;
+      }
+      .btn.quiet {
+        color: var(--muted);
+      }
+      .btn.quiet:hover {
+        color: var(--ink);
+      }
+      .btn.outline {
+        border-color: var(--border);
+        background: var(--surface);
+      }
+      .btn.outline:hover {
+        border-color: var(--border-strong);
+        background: var(--raised);
+      }
+      .btn.primary {
         background: var(--accent);
         color: #fff;
-        border-color: var(--accent);
+        font-weight: 600;
+        padding: 0 14px;
       }
-      button.primary:hover {
-        filter: brightness(1.05);
+      .btn.primary:hover {
+        filter: brightness(1.08);
+        background: var(--accent);
       }
+      :is(button, input, select, textarea, [tabindex]):focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+        border-radius: 8px;
+      }
+
+      .zoomgroup {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--surface);
+      }
+      .zoomgroup .btn {
+        border-radius: 0;
+        height: 30px;
+      }
+      #zoomLabel {
+        min-width: 46px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        user-select: none;
+      }
+
+      /* ---------- layout ---------- */
       .main {
         flex: 1;
         display: flex;
         min-height: 0;
       }
+
+      /* tool rail (start side = right in RTL) */
+      .toolrail {
+        width: 52px;
+        flex: none;
+        background: var(--surface);
+        border-inline-end: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 8px 0;
+        z-index: 50;
+      }
+      .toolrail .rail-label {
+        font-size: 9.5px;
+        color: var(--faint);
+        margin: 6px 0 2px;
+        letter-spacing: 0.08em;
+      }
+      .tool {
+        width: 38px;
+        height: 38px;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        position: relative;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          transform 0.05s;
+      }
+      .tool:hover {
+        background: var(--accent-weak);
+        color: var(--accent);
+      }
+      .tool:active {
+        transform: scale(0.94);
+      }
+      .tool::after {
+        content: attr(data-tip);
+        position: absolute;
+        inset-inline-end: calc(100% + 10px);
+        top: 50%;
+        translate: 0 -50%;
+        background: var(--ink);
+        color: var(--bg);
+        font-size: 11px;
+        padding: 4px 9px;
+        border-radius: 6px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s;
+        z-index: 100;
+      }
+      .tool:hover::after {
+        opacity: 1;
+      }
+
+      /* canvas */
       .canvas-wrap {
         flex: 1;
         overflow: auto;
         display: flex;
         justify-content: center;
-        padding: 28px;
+        align-items: flex-start;
+        padding: 36px;
+        background: var(--workspace);
+        background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
+        background-size: 22px 22px;
       }
       #page {
         position: relative;
         background: #fff;
-        box-shadow: 0 8px 30px rgba(15, 23, 42, 0.15);
+        border-radius: 2px;
+        box-shadow: var(--shadow-page);
         flex: none;
       }
       #pageSvg {
         position: absolute;
         inset: 0;
         pointer-events: none;
+        border-radius: 2px;
+        overflow: hidden;
       }
       #pageSvg svg {
         display: block;
       }
       #margins {
         position: absolute;
-        border: 1px dashed #cbd5e1;
+        border: 1px dashed rgba(120, 130, 150, 0.4);
         pointer-events: none;
       }
       #guideV,
       #guideH {
         position: absolute;
         display: none;
-        background: #f43f5e;
+        background: var(--guide);
         pointer-events: none;
         z-index: 30;
       }
@@ -131,15 +358,25 @@
         right: 0;
         height: 1px;
       }
+      #marquee {
+        position: absolute;
+        display: none;
+        border: 1px solid var(--accent);
+        background: var(--accent-weak);
+        pointer-events: none;
+        z-index: 40;
+        border-radius: 2px;
+      }
       .el {
         position: absolute;
         border: 1px solid transparent;
         cursor: move;
         user-select: none;
         z-index: 20;
+        border-radius: 1px;
       }
       .el:hover {
-        border-color: #93c5fd;
+        border-color: color-mix(in srgb, var(--accent) 55%, transparent);
       }
       .el.selected {
         border-color: var(--accent);
@@ -149,65 +386,269 @@
         position: absolute;
         inset-inline-end: -5px;
         bottom: -5px;
-        width: 10px;
-        height: 10px;
-        background: var(--accent);
-        border: 1px solid #fff;
-        border-radius: 2px;
+        width: 9px;
+        height: 9px;
+        background: #fff;
+        border: 1.5px solid var(--accent);
+        border-radius: 3px;
         cursor: nwse-resize;
-      }
-      #marquee {
-        position: absolute;
-        display: none;
-        border: 1px dashed var(--accent);
-        background: rgba(37, 99, 235, 0.08);
-        pointer-events: none;
-        z-index: 40;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
       }
       .inline-edit {
         position: absolute;
         z-index: 50;
         font: inherit;
         font-size: 13px;
-        padding: 2px 4px;
-        border: 1px solid var(--accent);
-        border-radius: 4px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+        padding: 3px 6px;
+        border: 1.5px solid var(--accent);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--ink);
+        box-shadow: var(--shadow-pop);
+        outline: none;
       }
-      #fieldPicker {
+
+      /* preview strip */
+      #preview {
+        width: 400px;
+        flex: none;
+        background: var(--workspace);
+        border-inline-start: 1px solid var(--border);
+        overflow: auto;
+        padding: 20px;
+        display: none;
+      }
+      #preview.show {
+        display: block;
+      }
+      #preview .page-svg {
+        background: #fff;
+        border-radius: 2px;
+        box-shadow: var(--shadow-page);
+        margin-bottom: 18px;
+      }
+      #preview .page-svg svg {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      /* ---------- side panel ---------- */
+      aside {
+        width: 292px;
+        flex: none;
+        background: var(--surface);
+        border-inline-start: 1px solid var(--border);
+        overflow-y: auto;
+        overflow-x: hidden;
         display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
+        flex-direction: column;
       }
-      .fp-item {
+      .panel-section {
+        padding: 14px 14px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .panel-section > h2,
+      aside h2 {
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.07em;
+        color: var(--faint);
+        margin: 0 0 10px;
+        text-transform: uppercase;
+      }
+      #inspector h2 {
+        font-size: 12.5px;
+        font-weight: 600;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--ink);
+        margin: 0 0 12px;
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+      #inspector h2 small {
+        color: var(--muted);
+        font-weight: 400;
         font-size: 11px;
-        font-family: ui-monospace, monospace;
-        background: var(--accent-weak);
-        color: #1e40af;
-        border: 1px solid #bfdbfe;
-        border-radius: 999px;
-        padding: 2px 8px;
-        cursor: grab;
-        direction: ltr;
       }
-      .fp-item:active {
-        cursor: grabbing;
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .row label {
+        flex: 0 0 58px;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      .row input,
+      .row select,
+      aside textarea {
+        flex: 1;
+        min-width: 0;
+        font-size: 12.5px;
+        padding: 6px 8px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--field);
+        color: var(--ink);
+        transition: border-color 0.15s;
+      }
+      .row input:hover,
+      .row select:hover,
+      aside textarea:hover {
+        border-color: var(--border-strong);
+      }
+      .row input:focus,
+      .row select:focus,
+      aside textarea:focus {
+        border-color: var(--accent);
+        outline: none;
+        box-shadow: 0 0 0 2px var(--accent-weak);
+      }
+      .row input[type='number'] {
+        font-variant-numeric: tabular-nums;
+      }
+      .row input[type='color'] {
+        padding: 2px;
+        height: 30px;
+        cursor: pointer;
+      }
+      .row input[type='checkbox'] {
+        flex: none;
+        width: 16px;
+        height: 16px;
+        accent-color: var(--accent);
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 8px;
+        margin-bottom: 8px;
+      }
+      .grid2 .row {
+        margin-bottom: 0;
+      }
+      .grid2 .row label {
+        flex-basis: 16px;
+        text-align: center;
+        font-family: ui-monospace, monospace;
+        font-size: 10.5px;
       }
       .btnrow {
         display: flex;
-        gap: 4px;
+        gap: 6px;
         margin-bottom: 8px;
       }
       .btnrow button {
         flex: 1;
-        padding: 4px 6px;
+        height: 28px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--field);
+        color: var(--ink);
         font-size: 12px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
       }
+      .btnrow button:hover {
+        border-color: var(--accent);
+        background: var(--accent-weak);
+      }
+      #inspector {
+        padding: 14px 14px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      #inspector .empty {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 2;
+        text-align: center;
+        padding: 18px 6px;
+      }
+      #inspector .empty .glyph {
+        font-size: 22px;
+        display: block;
+        margin-bottom: 6px;
+        opacity: 0.5;
+      }
+      #deleteEl {
+        color: var(--danger) !important;
+      }
+      #deleteEl:hover {
+        border-color: var(--danger) !important;
+        background: color-mix(in srgb, var(--danger) 10%, transparent) !important;
+      }
+
+      aside textarea {
+        width: 100%;
+        min-height: 110px;
+        font-family: ui-monospace, 'Cascadia Code', monospace;
+        font-size: 11.5px;
+        line-height: 1.6;
+        direction: ltr;
+        resize: vertical;
+      }
+      #fieldPicker {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      .fp-item {
+        font-size: 10.5px;
+        font-family: ui-monospace, monospace;
+        background: var(--accent-weak);
+        color: var(--accent);
+        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+        border-radius: 6px;
+        padding: 3px 8px;
+        cursor: grab;
+        direction: ltr;
+        transition: background 0.15s;
+      }
+      .fp-item:hover {
+        background: color-mix(in srgb, var(--accent) 22%, transparent);
+      }
+      .fp-item:active {
+        cursor: grabbing;
+      }
+      .hint {
+        font-size: 10.5px;
+        color: var(--faint);
+        margin-top: 8px;
+        line-height: 1.9;
+      }
+      .hint kbd {
+        font-family: inherit;
+        font-size: 10px;
+        border: 1px solid var(--border);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        padding: 0 4px;
+        color: var(--muted);
+        background: var(--field);
+      }
+      .diag {
+        color: #c77d1e;
+        font-size: 11px;
+        margin-top: 8px;
+        white-space: pre-wrap;
+        direction: ltr;
+        text-align: left;
+      }
+
+      /* ---------- gallery ---------- */
       .gallery-backdrop {
         position: fixed;
         inset: 0;
         display: none;
-        background: rgba(15, 23, 42, 0.45);
+        background: rgba(10, 12, 16, 0.55);
+        backdrop-filter: blur(6px);
         z-index: 100;
         align-items: center;
         justify-content: center;
@@ -217,235 +658,423 @@
       }
       .gallery-panel {
         background: var(--surface);
-        border-radius: 14px;
-        width: min(860px, 92vw);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        width: min(880px, 94vw);
         max-height: 84vh;
         display: flex;
         flex-direction: column;
-        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+        box-shadow: var(--shadow-pop);
+        overflow: hidden;
       }
       .gallery-head {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 14px 18px;
+        padding: 14px 20px;
         border-bottom: 1px solid var(--border);
+      }
+      .gallery-head strong {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .gallery-head button {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .gallery-head button:hover {
+        background: var(--accent-weak);
+        color: var(--ink);
       }
       .gallery-cards {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
         gap: 14px;
-        padding: 18px;
+        padding: 18px 20px 22px;
         overflow: auto;
       }
       .tpl-card {
         border: 1px solid var(--border);
-        border-radius: 10px;
+        border-radius: 12px;
         overflow: hidden;
         cursor: pointer;
-        background: #fff;
-        transition: box-shadow 0.15s;
+        background: var(--raised);
         text-align: start;
         padding: 0;
+        transition:
+          box-shadow 0.18s,
+          border-color 0.18s,
+          transform 0.18s;
       }
       .tpl-card:hover {
-        box-shadow: 0 6px 22px rgba(37, 99, 235, 0.22);
         border-color: var(--accent);
+        box-shadow: 0 10px 30px -8px rgba(20, 30, 50, 0.3);
+        transform: translateY(-2px);
       }
       .tpl-thumb {
-        height: 170px;
+        height: 168px;
         overflow: hidden;
         display: flex;
         justify-content: center;
-        background: #f1f5f9;
+        background: var(--workspace);
         pointer-events: none;
+        border-bottom: 1px solid var(--border);
       }
       .tpl-thumb svg {
         transform-origin: top center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
       }
       .tpl-meta {
-        padding: 10px 12px;
+        padding: 10px 13px 12px;
       }
       .tpl-meta strong {
         display: block;
-        font-size: 13px;
+        font-size: 12.5px;
+        font-weight: 600;
+        margin-bottom: 2px;
       }
       .tpl-meta span {
         font-size: 11px;
         color: var(--muted);
       }
-      aside {
-        width: 300px;
-        background: var(--surface);
-        border-inline-start: 1px solid var(--border);
-        overflow: auto;
-        padding: 14px;
-      }
-      aside h2 {
-        font-size: 12px;
-        text-transform: uppercase;
-        color: var(--muted);
-        margin: 16px 0 8px;
-      }
-      aside h2:first-child {
-        margin-top: 0;
-      }
-      .row {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-        margin-bottom: 8px;
-      }
-      .row label {
-        flex: 0 0 70px;
-        font-size: 12px;
-        color: var(--muted);
-      }
-      .row input,
-      .row select,
-      aside textarea {
-        flex: 1;
-        font: inherit;
-        font-size: 13px;
-        padding: 5px 7px;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        width: 100%;
-        background: var(--field);
-        color: var(--ink);
-      }
-      aside textarea {
-        min-height: 120px;
-        font-family: ui-monospace, monospace;
-        font-size: 12px;
-      }
-      .grid2 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-      }
-      .empty {
-        color: var(--muted);
-        font-size: 13px;
-      }
-      #preview {
-        width: 420px;
-        background: #f8fafc;
-        border-inline-start: 1px solid var(--border);
-        overflow: auto;
-        padding: 16px;
-        display: none;
-      }
-      #preview.show {
-        display: block;
-      }
-      #preview .page-svg {
-        background: #fff;
-        box-shadow: 0 4px 18px rgba(15, 23, 42, 0.12);
-        margin-bottom: 16px;
-      }
-      .diag {
-        color: #b45309;
-        font-size: 12px;
-        margin-top: 8px;
-        white-space: pre-wrap;
-      }
-      .hint {
-        font-size: 11px;
-        color: var(--muted);
-        margin-top: 6px;
-        line-height: 1.5;
-      }
+
+      /* ---------- command palette ---------- */
       .palette-backdrop {
         position: fixed;
         inset: 0;
         display: none;
-        background: rgba(15, 23, 42, 0.45);
+        background: rgba(10, 12, 16, 0.45);
+        backdrop-filter: blur(4px);
         z-index: 120;
         align-items: flex-start;
         justify-content: center;
-        padding-top: 12vh;
+        padding-top: 14vh;
       }
       .palette-backdrop.show {
         display: flex;
       }
       .palette {
-        width: min(460px, 92vw);
+        width: min(480px, 92vw);
         background: var(--surface);
-        border-radius: 12px;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow-pop);
         overflow: hidden;
       }
       .palette input {
         width: 100%;
         border: 0;
         border-bottom: 1px solid var(--border);
-        padding: 12px 14px;
-        font: inherit;
+        padding: 14px 16px;
         font-size: 14px;
-        background: var(--field);
+        background: transparent;
         color: var(--ink);
         outline: none;
+      }
+      .palette input::placeholder {
+        color: var(--faint);
       }
       .palette ul {
         list-style: none;
         margin: 0;
         padding: 6px;
-        max-height: 46vh;
+        max-height: 44vh;
         overflow: auto;
       }
       .palette li {
-        padding: 8px 10px;
-        border-radius: 8px;
+        padding: 9px 12px;
+        border-radius: 9px;
         cursor: pointer;
         font-size: 13px;
         display: flex;
         justify-content: space-between;
+        align-items: center;
         color: var(--ink);
+        transition: background 0.1s;
       }
       .palette li.active,
       .palette li:hover {
         background: var(--accent-weak);
       }
       .palette li small {
-        color: var(--muted);
+        color: var(--faint);
+        font-size: 10.5px;
       }
     </style>
   </head>
   <body>
-    <div class="toolbar">
-      <strong style="margin-inline-end: 8px">PDF Studio</strong>
-      <button data-add="staticText">+ متن</button>
-      <button data-add="dataField">+ فیلد</button>
-      <button data-add="rectangle">+ مستطیل</button>
-      <button data-add="line">+ خط</button>
-      <button data-add="ellipse">+ بیضی</button>
-      <button data-add="image">+ تصویر</button>
-      <button data-add="barcode">+ بارکد</button>
-      <button data-add="qrcode">+ QR</button>
-      <button data-add="chart">+ چارت</button>
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark">P</span>
+        <span class="name">PDF Studio</span>
+        <span class="tag">دیزاینر</span>
+      </div>
+
+      <button id="undo" class="btn icon quiet" title="واگرد (Ctrl+Z)" aria-label="واگرد">
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M8 5 4 9l4 4" />
+          <path d="M4 9h8.5a3.5 3.5 0 0 1 0 7H10" />
+        </svg>
+      </button>
+      <button id="redo" class="btn icon quiet" title="ازنو (Ctrl+Y)" aria-label="ازنو">
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="m12 5 4 4-4 4" />
+          <path d="M16 9H7.5a3.5 3.5 0 0 0 0 7H10" />
+        </svg>
+      </button>
+
       <span class="sep"></span>
-      <button id="undo" title="Ctrl+Z">↶ Undo</button>
-      <button id="redo" title="Ctrl+Y">↷ Redo</button>
+
+      <span class="zoomgroup">
+        <button id="zoomOut" class="btn icon quiet" title="کوچک‌نمایی" aria-label="کوچک‌نمایی">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          >
+            <path d="M5 10h10" />
+          </svg>
+        </button>
+        <span id="zoomLabel">85%</span>
+        <button id="zoomIn" class="btn icon quiet" title="بزرگ‌نمایی" aria-label="بزرگ‌نمایی">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          >
+            <path d="M10 5v10M5 10h10" />
+          </svg>
+        </button>
+      </span>
+      <button id="zoomReset" class="btn quiet" title="اندازهٔ واقعی">۱:۱</button>
+
       <span class="sep"></span>
-      <button id="zoomOut" title="کوچک‌نمایی">−</button>
-      <span id="zoomLabel" style="min-width: 42px; text-align: center; font-size: 12px">85%</span>
-      <button id="zoomIn" title="بزرگ‌نمایی">+</button>
-      <button id="zoomReset" title="اندازهٔ واقعی">۱:۱</button>
-      <span class="sep"></span>
-      <button id="togglePreview">پیش‌نمایش</button>
-      <button id="toggleValues" title="نمایش مقدار نمونه یا نام فیلد روی بوم">🔢 مقادیر</button>
-      <button id="toggleTheme" title="تم روشن/تیره">🌙</button>
-      <button id="openPalette" title="Ctrl+K">⌘K</button>
+
+      <button id="togglePreview" class="btn quiet" title="پیش‌نمایش چندصفحه‌ای">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10Z" />
+          <circle cx="10" cy="10" r="2.4" />
+        </svg>
+        پیش‌نمایش
+      </button>
+      <button id="toggleValues" class="btn quiet" title="نمایش مقدار نمونه یا نام فیلد روی بوم">
+        🔢 مقادیر
+      </button>
+      <button id="toggleTheme" class="btn icon quiet" title="تم روشن/تیره">🌙</button>
+      <button id="openPalette" class="btn quiet" title="پالت فرمان (Ctrl+K)">⌘K</button>
+
       <span class="spacer"></span>
-      <button id="openGallery">🗂 قالب‌ها</button>
-      <button id="newDoc">سند نو</button>
-      <button id="importJson">ورود JSON</button>
-      <button id="exportJson">خروجی JSON</button>
-      <button id="downloadPdf" class="primary">دانلود PDF</button>
-    </div>
+
+      <button id="openGallery" class="btn outline">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+        >
+          <rect x="3" y="3" width="6" height="6" rx="1.5" />
+          <rect x="11" y="3" width="6" height="6" rx="1.5" />
+          <rect x="3" y="11" width="6" height="6" rx="1.5" />
+          <rect x="11" y="11" width="6" height="6" rx="1.5" />
+        </svg>
+        قالب‌ها
+      </button>
+      <button id="newDoc" class="btn quiet" title="سند نو">سند نو</button>
+      <button id="importJson" class="btn quiet" title="بارگذاری فایل طرح">ورود JSON</button>
+      <button id="exportJson" class="btn quiet" title="ذخیرهٔ فایل طرح">خروجی JSON</button>
+      <button id="downloadPdf" class="btn primary">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5" />
+          <path d="M4 16h12" />
+        </svg>
+        دانلود PDF
+      </button>
+    </header>
 
     <div class="main">
+      <nav class="toolrail" aria-label="جعبه‌ابزار">
+        <button class="tool" data-add="staticText" data-tip="متن" aria-label="افزودن متن">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          >
+            <path d="M4 5h12M10 5v10" />
+          </svg>
+        </button>
+        <button
+          class="tool"
+          data-add="dataField"
+          data-tip="فیلد داده"
+          aria-label="افزودن فیلد داده"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M7.5 4C5.5 4 6.5 10 4 10c2.5 0 1.5 6 3.5 6" />
+            <path d="M12.5 4c2 0 1 6 3.5 6-2.5 0-1.5 6-3.5 6" />
+          </svg>
+        </button>
+        <button class="tool" data-add="rectangle" data-tip="مستطیل" aria-label="افزودن مستطیل">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <rect x="3.5" y="5" width="13" height="10" rx="1.5" />
+          </svg>
+        </button>
+        <button class="tool" data-add="line" data-tip="خط" aria-label="افزودن خط">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          >
+            <path d="M4 16 16 4" />
+          </svg>
+        </button>
+        <button class="tool" data-add="ellipse" data-tip="بیضی" aria-label="افزودن بیضی">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <ellipse cx="10" cy="10" rx="7" ry="5" />
+          </svg>
+        </button>
+        <button class="tool" data-add="image" data-tip="تصویر" aria-label="افزودن تصویر">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+          >
+            <rect x="3.5" y="4" width="13" height="12" rx="2" />
+            <circle cx="8" cy="8.5" r="1.4" />
+            <path d="m4.5 14.5 4-4 3 3 2-2 2 2" />
+          </svg>
+        </button>
+        <button class="tool" data-add="barcode" data-tip="بارکد" aria-label="افزودن بارکد">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          >
+            <path d="M4 5v10M7 5v10M9.5 5v10M13 5v10M16 5v10M11 5v6" />
+          </svg>
+        </button>
+        <button class="tool" data-add="qrcode" data-tip="کد QR" aria-label="افزودن کد QR">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <rect x="3.5" y="3.5" width="5" height="5" rx="1" />
+            <rect x="11.5" y="3.5" width="5" height="5" rx="1" />
+            <rect x="3.5" y="11.5" width="5" height="5" rx="1" />
+            <path d="M11.5 11.5h2v2h-2zM14.5 14.5h2v2h-2z" />
+          </svg>
+        </button>
+        <button class="tool" data-add="chart" data-tip="چارت" aria-label="افزودن چارت">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          >
+            <path d="M4 4v12h12" />
+            <path d="M7.5 13V9M11 13V6.5M14.5 13v-3" />
+          </svg>
+        </button>
+      </nav>
+
       <div class="canvas-wrap">
         <div id="page">
           <div id="pageSvg"></div>
@@ -460,35 +1089,38 @@
 
       <aside>
         <div id="inspector">
-          <p class="empty">یک المان را انتخاب کن یا از نوار بالا اضافه کن.</p>
+          <p class="empty">یک المان را انتخاب کن یا از جعبه‌ابزار اضافه کن.</p>
         </div>
 
-        <h2>فیلدهای داده</h2>
-        <div id="fieldPicker"></div>
-        <div class="hint">
-          بکش و روی صفحه رها کن تا فیلد بایندشده ساخته شود؛ روی المان رها کنی، همان بایند می‌شود.
+        <div class="panel-section">
+          <h2>صفحه</h2>
+          <div class="row">
+            <label>جهت</label>
+            <select id="pageDir">
+              <option value="rtl">راست‌به‌چپ (RTL)</option>
+              <option value="ltr">چپ‌به‌راست (LTR)</option>
+            </select>
+          </div>
         </div>
 
-        <h2>صفحه</h2>
-        <div class="row">
-          <label>جهت</label>
-          <select id="pageDir">
-            <option value="rtl">RTL (راست‌چین)</option>
-            <option value="ltr">LTR</option>
-          </select>
+        <div class="panel-section">
+          <h2>فیلدهای داده</h2>
+          <div id="fieldPicker"></div>
+          <div class="hint">چیپ را بکش و روی بوم رها کن تا فیلد بایندشده ساخته شود.</div>
         </div>
 
-        <h2>دادهٔ نمونه</h2>
-        <textarea id="sampleData" spellcheck="false"></textarea>
-        <div class="hint">
-          JSON دادهٔ تست برای پیش‌نمایش/خروجی. فیلدها مثل <code>customer.name</code> به این بایند
-          می‌شوند؛ چارت به آرایهٔ <code>items</code>.
+        <div class="panel-section">
+          <h2>دادهٔ نمونه</h2>
+          <textarea id="sampleData" spellcheck="false"></textarea>
+          <div class="hint">
+            JSON دادهٔ تست برای پیش‌نمایش و خروجی؛ چارت به آرایهٔ <code>items</code> بایند می‌شود.
+          </div>
+          <div class="hint">
+            <kbd>Shift</kbd>+کلیک چندانتخابی · <kbd>Ctrl</kbd>+<kbd>K</kbd> فرمان‌ها ·
+            <kbd>Ctrl</kbd>+<kbd>D</kbd> کپی · فلش‌ها جابه‌جایی · <kbd>Alt</kbd> حین درگ = بدون snap
+          </div>
+          <div id="diag" class="diag"></div>
         </div>
-        <div class="hint">
-          میان‌برها: Shift+کلیک چندانتخابی · فلش‌ها جابه‌جایی (Shift=۱۰) · Ctrl+D کپی · Delete حذف ·
-          Ctrl+چرخ‌موس زوم · Alt هنگام درگ = بدون snap
-        </div>
-        <div id="diag" class="diag"></div>
       </aside>
     </div>
 
@@ -496,7 +1128,7 @@
       <div class="gallery-panel">
         <div class="gallery-head">
           <strong>گالری قالب‌ها</strong>
-          <button id="closeGallery">✕</button>
+          <button id="closeGallery" aria-label="بستن">✕</button>
         </div>
         <div id="galleryCards" class="gallery-cards"></div>
       </div>

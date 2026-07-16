@@ -140,10 +140,12 @@ try {
   if (!chips2.includes('invoice.number')) fail('field picker not refreshed for template data');
 
   // --- Phase 4A ergonomics ---
-  // dark theme toggle persists on <body data-theme>
+  // professional dark chrome is the default; the toggle flips to light & back
+  if (doc.body.dataset.theme !== 'dark') fail('default theme should be dark');
   doc.getElementById('toggleTheme').dispatchEvent(new window.Event('click', { bubbles: true }));
-  if (doc.body.dataset.theme !== 'dark') fail('dark theme not applied');
+  if (doc.body.dataset.theme !== 'light') fail('theme toggle did not switch to light');
   doc.getElementById('toggleTheme').dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (doc.body.dataset.theme !== 'dark') fail('theme toggle did not switch back to dark');
 
   // preview-values toggle: canvas shows binding names instead of sample values
   doc.getElementById('toggleValues').dispatchEvent(new window.Event('click', { bubbles: true }));

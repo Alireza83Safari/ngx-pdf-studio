@@ -823,7 +823,7 @@
     var loc = id ? P.findElement(t, id) : null;
     if (!loc) {
       inspectorEl.innerHTML =
-        '<p class="empty">یک المان را انتخاب کن یا از نوار بالا اضافه کن.<br>Shift+کلیک: چندانتخابی · فلش‌ها: جابه‌جایی · Ctrl+D: کپی</p>';
+        '<p class="empty"><span class="glyph">⬚</span>الِمانی انتخاب نشده.<br>از جعبه‌ابزار اضافه کن یا روی بوم کلیک کن.</p>';
       return;
     }
     var el = loc.element,
@@ -1225,11 +1225,13 @@
   document.getElementById('toggleTheme').addEventListener('click', function () {
     applyTheme(document.body.dataset.theme === 'dark' ? 'light' : 'dark');
   });
+  var storedTheme = null;
   try {
-    if (window.localStorage.getItem(THEME_KEY) === 'dark') applyTheme('dark');
+    storedTheme = window.localStorage.getItem(THEME_KEY);
   } catch (err) {
     /* ignore */
   }
+  applyTheme(storedTheme === 'light' ? 'light' : 'dark');
 
   document.getElementById('toggleValues').addEventListener('click', function () {
     showValues = !showValues;
