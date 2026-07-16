@@ -77,6 +77,31 @@ export function applyFormat(
       return { text };
     }
 
+    case 'money': {
+      const raw = typeof value === 'number' ? value : Number(value);
+      if (!Number.isFinite(raw)) return { text: applyDigits(String(value), locale) };
+      const negative = raw < 0;
+      let text = formatNumberValue(Math.abs(raw), {
+        digits: locale.digits,
+        useGrouping: options['useGrouping'] !== false,
+        minimumFractionDigits:
+          typeof options['minimumFractionDigits'] === 'number'
+            ? (options['minimumFractionDigits'] as number)
+            : 0,
+        maximumFractionDigits:
+          typeof options['maximumFractionDigits'] === 'number'
+            ? (options['maximumFractionDigits'] as number)
+            : 0,
+      });
+      if (negative) {
+        text = options['negativeParentheses'] ? `(${text})` : `-${text}`;
+      }
+      const unit = options['unit'];
+      const suffix =
+        unit === 'rial' || unit === undefined ? 'ریال' : unit === 'toman' ? 'تومان' : String(unit);
+      return { text: suffix ? `${text} ${suffix}` : text };
+    }
+
     case 'date': {
       const date = toDate(value);
       if (!date) return { text: applyDigits(String(value), locale) };

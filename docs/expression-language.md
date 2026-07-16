@@ -77,6 +77,7 @@ Declare running accumulators once on the template and read them anywhere as
 { "kind": "number", "minimumFractionDigits": 0 }
 { "kind": "currency", "currencyDisplay": "symbol" }
 { "kind": "percent" }
+{ "kind": "money", "options": { "unit": "toman", "negativeParentheses": true } }  // ۱٬۲۳۴ تومان
 { "kind": "date", "dateStyle": "medium" }   // Jalali or Gregorian per locale
 ```
 

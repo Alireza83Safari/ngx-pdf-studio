@@ -152,7 +152,7 @@ export const formatLocaleOverrideSchema = z
 
 export const formatDescriptorSchema = z
   .object({
-    kind: z.enum(['text', 'number', 'currency', 'percent', 'date', 'custom']),
+    kind: z.enum(['text', 'number', 'currency', 'percent', 'date', 'custom', 'money']),
     locale: formatLocaleOverrideSchema.optional(),
     options: z.record(z.unknown()).optional(),
   })

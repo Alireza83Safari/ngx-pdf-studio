@@ -262,6 +262,21 @@ try {
   if (doc.getElementById('canvasHint').classList.contains('show'))
     fail('canvas hint still visible after adding an element');
 
+  // money display format (ROADMAP 1.3): bind a numeric field, pick ریال
+  doc
+    .querySelector('[data-add="dataField"]')
+    .dispatchEvent(new window.Event('click', { bubbles: true }));
+  const srcInp = doc.querySelector('#inspector [data-prop="source"]');
+  if (!srcInp) fail('binding input missing for dataField');
+  srcInp.value = 'items[0].price';
+  srcInp.dispatchEvent(new window.Event('change', { bubbles: true }));
+  const fmtSel = doc.querySelector('#inspector [data-prop="fmt"]');
+  if (!fmtSel) fail('display-format select missing');
+  fmtSel.value = 'rial';
+  fmtSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+  if (!doc.querySelector('#pageSvg').innerHTML.includes('ریال'))
+    fail('money format did not render ریال on canvas');
+
   // --- help center + interactive tour ---
   doc.getElementById('openHelp').dispatchEvent(new window.Event('click', { bubbles: true }));
   if (!doc.getElementById('help').classList.contains('show')) fail('help did not open');

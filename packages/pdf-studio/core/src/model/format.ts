@@ -7,7 +7,7 @@
  */
 import type { Calendar, DigitSystem, Language } from './locale';
 
-export type FormatKind = 'text' | 'number' | 'currency' | 'percent' | 'date' | 'custom';
+export type FormatKind = 'text' | 'number' | 'currency' | 'percent' | 'date' | 'custom' | 'money';
 
 /** Per-format locale override (any subset; unset fields inherit the element). */
 export interface FormatLocaleOverride {
@@ -38,9 +38,22 @@ export interface CustomFormatOptions {
   mask: string;
 }
 
+/**
+ * Persian accounting money (§11, ROADMAP ۱.۳): thousands grouping, no
+ * decimals by default, a ریال/تومان (or custom) suffix, and optionally
+ * accounting-style parentheses for negatives.
+ */
+export interface MoneyFormatOptions extends NumberFormatOptions {
+  /** `'rial'` → ریال، `'toman'` → تومان، هر رشتهٔ دیگر عیناً پسوند می‌شود. */
+  unit?: string;
+  /** Render negatives as (۱٬۲۳۴) instead of a minus sign. */
+  negativeParentheses?: boolean;
+}
+
 export type FormatOptions =
   | NumberFormatOptions
   | CurrencyFormatOptions
+  | MoneyFormatOptions
   | DateFormatOptions
   | CustomFormatOptions
   | Record<string, never>;

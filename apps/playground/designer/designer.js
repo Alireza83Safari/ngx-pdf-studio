@@ -1170,6 +1170,37 @@
           esc(el.value ? el.value.source : '') +
           '">',
       );
+    if (el.type === 'dataField') {
+      var fmtVal = '';
+      if (el.format) {
+        if (el.format.kind === 'money')
+          fmtVal = el.format.options && el.format.options.unit === 'toman' ? 'toman' : 'rial';
+        else fmtVal = el.format.kind;
+      }
+      content += field(
+        'قالب نمایش',
+        '<select title="نحوهٔ نمایش مقدار: خام، عددی سه‌رقم جداکن، پول، درصد یا تاریخ" data-prop="fmt">' +
+          '<option value=""' +
+          (fmtVal === '' ? ' selected' : '') +
+          '>خام (بدون قالب)</option>' +
+          '<option value="number"' +
+          (fmtVal === 'number' ? ' selected' : '') +
+          '>عدد (۱٬۲۳۴)</option>' +
+          '<option value="rial"' +
+          (fmtVal === 'rial' ? ' selected' : '') +
+          '>پول — ریال</option>' +
+          '<option value="toman"' +
+          (fmtVal === 'toman' ? ' selected' : '') +
+          '>پول — تومان</option>' +
+          '<option value="percent"' +
+          (fmtVal === 'percent' ? ' selected' : '') +
+          '>درصد</option>' +
+          '<option value="date"' +
+          (fmtVal === 'date' ? ' selected' : '') +
+          '>تاریخ</option>' +
+          '</select>',
+      );
+    }
     if (el.type === 'barcode')
       content += field(
         'نوع بارکد',
@@ -1324,6 +1355,12 @@
     });
     bindProp('source', function (e, v) {
       e.value = { source: v };
+    });
+    bindProp('fmt', function (e, v) {
+      if (v === '') delete e.format;
+      else if (v === 'rial') e.format = { kind: 'money' };
+      else if (v === 'toman') e.format = { kind: 'money', options: { unit: 'toman' } };
+      else e.format = { kind: v };
     });
     bindProp('imgsource', function (e, v) {
       e.source = { source: v };
