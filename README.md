@@ -128,6 +128,7 @@ npm run designer:build
 
 ## Docs
 
+- [Designer guide (فارسی)](docs/designer-guide.md)
 - [Getting started](docs/getting-started.md)
 - [Expression language reference](docs/expression-language.md)
 - [RTL / Persian guide](docs/rtl-persian.md)
