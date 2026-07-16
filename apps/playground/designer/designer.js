@@ -1297,6 +1297,34 @@
       html += '<div class="sec"><div class="sec-title">ظاهر</div>' + looks + '</div>';
     }
 
+    // conditions (ROADMAP ۲.۳): engine-side visibleWhen + one style rule
+    var cond0 = (el.conditionalStyles || [])[0];
+    html +=
+      '<div class="sec"><div class="sec-title">شرط‌ها</div>' +
+      field(
+        'نمایش اگر',
+        '<input dir="ltr" title="عبارت شرطی — خالی یعنی همیشه نمایش. مثل total > 0" data-prop="viswhen" value="' +
+          esc(el.visibleWhen ? el.visibleWhen.source : '') +
+          '">',
+      ) +
+      field(
+        'استایل اگر',
+        '<input dir="ltr" title="اگر این شرط برقرار شود، رنگ زیر اعمال می‌شود. مثل amount < 0" data-prop="condwhen" value="' +
+          esc(cond0 && cond0.when ? cond0.when.source : '') +
+          '">',
+      ) +
+      field(
+        'رنگ شرطی',
+        '<input type="color" title="رنگ متن وقتی شرط بالا برقرار است" data-prop="condcolor" value="' +
+          rgbToHex(
+            cond0 && cond0.typography && cond0.typography.color
+              ? cond0.typography.color
+              : rgb(214, 69, 69),
+          ) +
+          '">',
+      ) +
+      '</div>';
+
     html +=
       '<div class="sec"><div class="btnrow">' +
       '<button id="dupEl" title="یک کپی با فاصلهٔ کم می‌سازد">کپی (Ctrl+D)</button>' +
@@ -1355,6 +1383,33 @@
     });
     bindProp('source', function (e, v) {
       e.value = { source: v };
+    });
+    bindProp('viswhen', function (e, v) {
+      if (v.trim()) e.visibleWhen = { source: v.trim() };
+      else delete e.visibleWhen;
+    });
+    bindProp('condwhen', function (e, v) {
+      var prev = (e.conditionalStyles || [])[0];
+      if (v.trim()) {
+        e.conditionalStyles = [
+          {
+            when: { source: v.trim() },
+            typography: prev && prev.typography ? prev.typography : { color: rgb(214, 69, 69) },
+          },
+        ];
+      } else {
+        delete e.conditionalStyles;
+      }
+    });
+    bindProp('condcolor', function (e, v) {
+      var prev = (e.conditionalStyles || [])[0];
+      if (!prev) return; // color only applies once a condition exists
+      e.conditionalStyles = [
+        {
+          when: prev.when,
+          typography: Object.assign({}, prev.typography, { color: hexToRgb(v) }),
+        },
+      ];
     });
     bindProp('fmt', function (e, v) {
       if (v === '') delete e.format;
@@ -2192,7 +2247,9 @@
     stateEl.classList.remove('saved');
     autosaveTimer = setTimeout(function () {
       try {
-        window.localStorage.setItem(DRAFT_KEY, P.serializeTemplate(store.getState()));
+        var json = P.serializeTemplate(store.getState());
+        window.localStorage.setItem(DRAFT_KEY, json);
+        recordHistory(json);
         stateEl.textContent = 'ذخیره شد ✓';
         stateEl.classList.add('saved');
       } catch (err) {
@@ -2200,6 +2257,150 @@
       }
     }, 400);
   }
+
+  // --- version history (ROADMAP ۲.۴) -----------------------------------------
+  var HISTORY_KEY = 'pdfstudio.history';
+  var HISTORY_MAX = 20;
+  function readHistory() {
+    try {
+      return JSON.parse(window.localStorage.getItem(HISTORY_KEY) || '[]');
+    } catch (err) {
+      return [];
+    }
+  }
+  function recordHistory(json) {
+    try {
+      var hist = readHistory();
+      if (hist.length && hist[0].json === json) return; // unchanged
+      hist.unshift({
+        ts: Date.now(),
+        name: store.getState().metadata.name || 'سند بی‌نام',
+        count: store.getState().bands[0].elements.length,
+        json: json,
+      });
+      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(hist.slice(0, HISTORY_MAX)));
+    } catch (err) {
+      /* storage unavailable — history is best-effort */
+    }
+  }
+  var historyEl = document.getElementById('history');
+  function renderHistory() {
+    var hist = readHistory();
+    var listEl = document.getElementById('historyList');
+    if (!hist.length) {
+      listEl.innerHTML =
+        '<div class="layers-empty">هنوز نسخه‌ای ذخیره نشده — چند تغییر بده و برگرد.</div>';
+      return;
+    }
+    listEl.innerHTML = hist
+      .map(function (h, i) {
+        var d = new Date(h.ts);
+        var hh = String(d.getHours()).padStart(2, '0');
+        var mm = String(d.getMinutes()).padStart(2, '0');
+        return (
+          '<div class="hist-row"><div><b>' +
+          esc(h.name) +
+          '</b><small>' +
+          hh +
+          ':' +
+          mm +
+          ' · ' +
+          h.count +
+          ' الِمان</small></div><span class="spacer"></span>' +
+          '<button data-hist="' +
+          i +
+          '">بازگردانی</button></div>'
+        );
+      })
+      .join('');
+  }
+  document.getElementById('openHistory').addEventListener('click', function () {
+    renderHistory();
+    historyEl.classList.add('show');
+  });
+  document.getElementById('closeHistory').addEventListener('click', function () {
+    historyEl.classList.remove('show');
+  });
+  historyEl.addEventListener('click', function (e) {
+    if (e.target === historyEl) return historyEl.classList.remove('show');
+    var btn = e.target.closest ? e.target.closest('[data-hist]') : null;
+    if (!btn) return;
+    var entry = readHistory()[Number(btn.dataset.hist)];
+    if (!entry) return;
+    var res = P.importTemplate(entry.json);
+    if (res.success) {
+      loadTemplate(res.value);
+      historyEl.classList.remove('show');
+      toast('نسخهٔ انتخابی بازگردانی شد');
+    } else {
+      toast('این نسخه قابل بازگردانی نیست');
+    }
+  });
+
+  // --- share as link (ROADMAP ۲.۱) --------------------------------------------
+  function toBase64Url(str) {
+    return window
+      .btoa(unescape(encodeURIComponent(str)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  }
+  function fromBase64Url(b64) {
+    var s = b64.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    return decodeURIComponent(escape(window.atob(s)));
+  }
+  document.getElementById('shareLink').addEventListener('click', function () {
+    var payload = toBase64Url(P.serializeTemplate(store.getState()));
+    var url = window.location.href.split('#')[0] + '#t=' + payload;
+    window.location.hash = 't=' + payload;
+    var done = function () {
+      toast('لینک اشتراک کپی شد (' + Math.round(url.length / 1024) + 'KB)');
+    };
+    if (window.navigator.clipboard && window.navigator.clipboard.writeText) {
+      window.navigator.clipboard.writeText(url).then(done, done);
+    } else {
+      done();
+    }
+  });
+  function tryLoadFromHash() {
+    var hash = window.location.hash || '';
+    if (hash.indexOf('#t=') !== 0) return false;
+    try {
+      var res = P.importTemplate(fromBase64Url(hash.slice(3)));
+      if (!res.success) return false;
+      loadTemplate(res.value);
+      toast('قالب از لینک اشتراک لود شد');
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+  window.addEventListener('hashchange', tryLoadFromHash);
+
+  // --- live data from a URL (ROADMAP ۲.۲) --------------------------------------
+  document.getElementById('liveFetch').addEventListener('click', function () {
+    var url = document.getElementById('liveUrl').value.trim();
+    if (!url) return toast('اول آدرس API را بنویس');
+    window
+      .fetch(url)
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (json) {
+        if (typeof json !== 'object' || json === null) throw new Error('پاسخ JSON نیست');
+        sampleData = json;
+        sampleEl.value = JSON.stringify(sampleData, null, 2);
+        renderFieldPicker();
+        renderCanvas();
+        renderPreview();
+        toast('دادهٔ زنده دریافت شد');
+      })
+      .catch(function (err) {
+        toast('دریافت داده ناموفق بود: ' + err.message);
+      });
+  });
   function restoreDraft() {
     try {
       var raw = window.localStorage.getItem(DRAFT_KEY);
@@ -2257,6 +2458,7 @@
     } else if (e.key === 'Escape') {
       if (tourEl.classList.contains('show')) return endTour();
       if (helpEl.classList.contains('show')) return helpEl.classList.remove('show');
+      if (historyEl.classList.contains('show')) return historyEl.classList.remove('show');
       selected = [];
       renderInspector();
       renderCanvas();
@@ -2338,7 +2540,7 @@
   });
   upgradeTooltips(document);
   renderFieldPicker();
-  if (!restoreDraft()) {
+  if (!tryLoadFromHash() && !restoreDraft()) {
     rerender();
     renderInspector();
   }

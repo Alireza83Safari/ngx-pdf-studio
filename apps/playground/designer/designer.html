@@ -1391,6 +1391,43 @@
         color: var(--faint);
       }
 
+      /* ================= version history rows ================= */
+      .hist-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        padding: 10px 14px;
+        background: var(--raised);
+      }
+      .hist-row b {
+        font-size: 12.5px;
+        display: block;
+      }
+      .hist-row small {
+        color: var(--muted);
+        font-size: 10.5px;
+        direction: ltr;
+      }
+      .hist-row .spacer {
+        flex: 1;
+      }
+      .hist-row button {
+        height: 28px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--field);
+        color: var(--accent);
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .hist-row button:hover {
+        border-color: var(--accent);
+        background: var(--accent-weak);
+      }
+
       /* ================= command palette ================= */
       .palette-backdrop {
         position: fixed;
@@ -1591,6 +1628,8 @@
           <button id="newDoc" class="btn quiet">سند نو</button>
           <button id="importJson" class="btn quiet">بارگذاری طرح (JSON)</button>
           <button id="exportJson" class="btn quiet">ذخیرهٔ طرح (JSON)</button>
+          <button id="shareLink" class="btn quiet">کپی لینک اشتراک</button>
+          <button id="openHistory" class="btn quiet">تاریخچهٔ نسخه‌ها</button>
         </div>
       </div>
 
@@ -1896,6 +1935,18 @@
             </div>
           </div>
           <div class="sec">
+            <div class="sec-title">دادهٔ زنده</div>
+            <div
+              class="row"
+              data-tip="آدرس یک API که JSON برمی‌گرداند — دادهٔ نمونه با پاسخ آن جایگزین می‌شود"
+            >
+              <input id="liveUrl" dir="ltr" placeholder="https://api.example.com/invoice/42" />
+              <button id="liveFetch" class="btn outline" style="flex: none; height: 30px">
+                دریافت
+              </button>
+            </div>
+          </div>
+          <div class="sec">
             <div class="sec-title">دادهٔ نمونه (JSON)</div>
             <textarea
               id="sampleData"
@@ -1971,6 +2022,19 @@
           <button id="closeGallery" aria-label="بستن">✕</button>
         </div>
         <div id="galleryCards" class="gallery-cards"></div>
+      </div>
+    </div>
+
+    <div id="history" class="gallery-backdrop">
+      <div class="gallery-panel" style="width: min(560px, 92vw)">
+        <div class="gallery-head">
+          <div>
+            <strong>تاریخچهٔ نسخه‌ها</strong>
+            <p>ذخیره‌های خودکار اخیر — روی «بازگردانی» بزن تا برگردی</p>
+          </div>
+          <button id="closeHistory" aria-label="بستن">✕</button>
+        </div>
+        <div id="historyList" class="gallery-cards" style="grid-template-columns: 1fr"></div>
       </div>
     </div>
 

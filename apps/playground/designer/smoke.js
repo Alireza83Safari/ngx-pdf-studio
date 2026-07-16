@@ -18,6 +18,15 @@ const { window } = dom;
 // jsdom lacks these occasionally-used APIs
 window.URL.createObjectURL = () => 'blob:x';
 window.URL.revokeObjectURL = () => {};
+// jsdom's opaque-origin localStorage throws — give the app a real in-memory one
+const mem = new Map();
+Object.defineProperty(window, 'localStorage', {
+  value: {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => mem.set(k, String(v)),
+    removeItem: (k) => mem.delete(k),
+  },
+});
 
 const ctx = dom.getInternalVMContext();
 function run(file) {
@@ -277,6 +286,21 @@ try {
   if (!doc.querySelector('#pageSvg').innerHTML.includes('ریال'))
     fail('money format did not render ریال on canvas');
 
+  // conditions UI (ROADMAP 2.3): visibleWhen 'false' hides the field from the canvas
+  const visInp = doc.querySelector('#inspector [data-prop="viswhen"]');
+  if (!visInp) fail('visibleWhen input missing');
+  visInp.value = 'false';
+  visInp.dispatchEvent(new window.Event('change', { bubbles: true }));
+  if (doc.querySelector('#pageSvg').innerHTML.includes('ریال'))
+    fail('visibleWhen=false did not hide the element');
+  const visInp2 = doc.querySelector('#inspector [data-prop="viswhen"]');
+  visInp2.value = '';
+  visInp2.dispatchEvent(new window.Event('change', { bubbles: true }));
+  if (!doc.querySelector('#pageSvg').innerHTML.includes('ریال'))
+    fail('clearing visibleWhen did not restore the element');
+  if (!doc.querySelector('#inspector [data-prop="condwhen"]'))
+    fail('conditional-style inputs missing');
+
   // --- help center + interactive tour ---
   doc.getElementById('openHelp').dispatchEvent(new window.Event('click', { bubbles: true }));
   if (!doc.getElementById('help').classList.contains('show')) fail('help did not open');
@@ -310,15 +334,63 @@ try {
     /* jsdom file:// has no localStorage — the designer guards this the same way */
   }
 
-  console.log(
-    'designer smoke OK — overlays:',
-    overlays.length,
-    '| chips:',
-    chips.length,
-    '| svg bytes:',
-    svgHtml.length,
-  );
-  process.exit(0);
+  (async () => {
+    // --- share as link (ROADMAP 2.1) ---
+    doc.getElementById('shareLink').dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (!/^#t=/.test(window.location.hash)) fail('share did not set the #t= hash');
+    // round-trip: craft a hash for the packing template and fire hashchange
+    const tpl = ctx.window.PDFSTUDIO_TEMPLATES.find((t) => t.id === 'packing');
+    const json = JSON.stringify(tpl.template);
+    const b64 = window
+      .btoa(unescape(encodeURIComponent(json)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    window.location.hash = 't=' + b64;
+    window.dispatchEvent(new window.HashChangeEvent('hashchange'));
+    if (!doc.querySelector('#pageSvg').innerHTML.includes('لیست بسته‌بندی'))
+      fail('template did not load from the share hash');
+
+    // --- live data from URL (ROADMAP 2.2) ---
+    window.fetch = async () => ({
+      ok: true,
+      json: async () => ({ live: { greeting: 'سلام زنده' }, items: [{ name: 'x', qty: 1 }] }),
+    });
+    doc.getElementById('liveUrl').value = 'https://api.example.com/data';
+    doc.getElementById('liveFetch').dispatchEvent(new window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    if (!doc.getElementById('sampleData').value.includes('سلام زنده'))
+      fail('live fetch did not replace sample data');
+    const liveChips = Array.from(doc.querySelectorAll('#fieldPicker .fp-item')).map(
+      (c) => c.dataset.path,
+    );
+    if (!liveChips.includes('live.greeting')) fail('field picker not refreshed from live data');
+
+    // --- version history (ROADMAP 2.4) ---
+    await new Promise((r) => setTimeout(r, 500)); // let the autosave debounce flush
+    doc.getElementById('openHistory').dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (!doc.getElementById('history').classList.contains('show')) fail('history did not open');
+    const histRows = doc.querySelectorAll('#historyList .hist-row');
+    if (histRows.length < 1) fail('no history snapshots recorded');
+    doc
+      .querySelector('#historyList [data-hist="0"]')
+      .dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (doc.getElementById('history').classList.contains('show'))
+      fail('history did not close after restore');
+
+    console.log(
+      'designer smoke OK — overlays:',
+      overlays.length,
+      '| chips:',
+      chips.length,
+      '| svg bytes:',
+      svgHtml.length,
+    );
+    process.exit(0);
+  })().catch((e) => {
+    console.error('ASYNC CRASH:', e && e.stack ? e.stack.split('\n').slice(0, 6).join('\n') : e);
+    process.exit(1);
+  });
 } catch (e) {
   console.error('CRASH:', e && e.stack ? e.stack.split('\n').slice(0, 6).join('\n') : e);
   process.exit(1);
