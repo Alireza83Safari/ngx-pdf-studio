@@ -1,0 +1,8 @@
+{
+  "$schema": "../../../node_modules/ng-packagr/ng-package.schema.json",
+  "dest": "../../../dist/packages/pdf-studio/angular",
+  "allowedNonPeerDependencies": ["@ngx-pdf-studio/core", "tslib"],
+  "lib": {
+    "entryFile": "src/public-api.ts"
+  }
+}

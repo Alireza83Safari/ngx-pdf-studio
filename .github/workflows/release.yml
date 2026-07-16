@@ -1,0 +1,39 @@
+# Release (§14A): tag `vX.Y.Z` → re-run every gate, build, smoke-test the
+# tarball, then publish the core dist to npm with provenance. Requires the
+# repo secret NPM_TOKEN (an npm automation token with publish rights).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # npm --provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npx eslint "packages/**/*.ts"
+      - run: npx tsc -p packages/pdf-studio/core/tsconfig.lib.json --noEmit
+      - run: npx jest --coverage
+      - run: npm audit --omit=dev --audit-level=high -w @ngx-pdf-studio/core
+      - name: Stamp version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version --workspace @ngx-pdf-studio/core
+      - run: npm run build:core
+      - run: npm run build:angular
+      - run: npm run smoke:tarball
+      - name: Publish @ngx-pdf-studio/core
+        run: npm publish packages/pdf-studio/core/dist --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,43 @@
+{
+  "name": "@ngx-pdf-studio/core",
+  "version": "0.0.0",
+  "description": "Framework-agnostic engine for ngx-pdf-studio: template model, expression engine, layout/pagination, binding, and PDF painter. Runs in the browser and Node with byte-identical output.",
+  "license": "MIT",
+  "keywords": [
+    "pdf",
+    "report",
+    "template",
+    "rtl",
+    "persian",
+    "jalali",
+    "invoice"
+  ],
+  "type": "commonjs",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./node": {
+      "types": "./src/node/index.ts",
+      "node": "./src/node/index.ts",
+      "default": "./src/node/index.ts"
+    }
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "bidi-js": "^1.0.3",
+    "date-fns": "4.1.0",
+    "date-fns-jalali": "4.1.0-0",
+    "pdf-lib": "^1.17.1",
+    "qrcode-generator": "^1.4.4",
+    "tslib": "^2.6.3",
+    "zod": "^3.23.8"
+  },
+  "engines": {
+    "node": ">=18.13.0"
+  }
+}

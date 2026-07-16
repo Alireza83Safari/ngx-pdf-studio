@@ -1,0 +1,34 @@
+# CI (§14A): every gate the repo enforces locally, on every push/PR —
+# lint, format, typecheck, the full Jest suite with the coverage gate,
+# the core dist build, and the consumer tarball smoke test.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      # Audit the tree of the publishable package (its runtime deps). The
+      # Angular toolchain at the root is dev/peer-only — consumers bring their
+      # own Angular version — so it is gated separately, not here.
+      - run: npm audit --omit=dev --audit-level=high -w @ngx-pdf-studio/core
+      - run: npx eslint "packages/**/*.ts"
+      - run: npx prettier --check "packages/**/*.{ts,md,json}" "*.{json,js,md}" "docs/**/*.md"
+      - run: npx tsc -p packages/pdf-studio/core/tsconfig.lib.json --noEmit
+      - run: npx jest --coverage
+      - run: npm run build:core
+      - run: npm run build:angular
+      - run: npm run smoke:tarball

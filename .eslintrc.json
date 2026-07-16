@@ -1,0 +1,27 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": ["./tsconfig.eslint.json"],
+    "tsconfigRootDir": "."
+  },
+  "plugins": ["@typescript-eslint"],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended", "prettier"],
+  "ignorePatterns": ["node_modules", "dist", "tmp", "coverage", "*.js"],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/explicit-module-boundary-types": "error",
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.name='eval']",
+        "message": "eval() is forbidden — the expression engine must be a sandboxed parser (§2.3)."
+      },
+      {
+        "selector": "NewExpression[callee.name='Function']",
+        "message": "new Function() is forbidden — no arbitrary code execution (§2.3)."
+      }
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`pagination engine (§6) produces a deterministic layout tree (snapshot) 1`] = `
+[
+  {
+    "elements": [
+      {
+        "bounds": {
+          "height": 16,
+          "width": 100,
+          "x": 20,
+          "y": 20,
+        },
+        "id": "n",
+        "text": "a",
+        "type": "dataField",
+      },
+      {
+        "bounds": {
+          "height": 16,
+          "width": 100,
+          "x": 20,
+          "y": 40,
+        },
+        "id": "n",
+        "text": "b",
+        "type": "dataField",
+      },
+    ],
+    "number": 1,
+  },
+]
+`;

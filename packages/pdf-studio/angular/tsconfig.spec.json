@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../../dist/out-tsc/angular-spec",
+    "module": "CommonJS",
+    "esModuleInterop": true,
+    "types": ["jest", "node"],
+    "lib": ["ES2020", "DOM"]
+  },
+  "include": ["src/**/*.ts"]
+}

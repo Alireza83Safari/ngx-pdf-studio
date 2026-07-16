@@ -1,0 +1,21 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../../dist/packages/pdf-studio/angular",
+    "declaration": true,
+    "declarationMap": true,
+    "inlineSources": true,
+    "types": [],
+    "lib": ["ES2020", "DOM"],
+    "paths": {
+      "@ngx-pdf-studio/core": ["packages/pdf-studio/core/dist/index.d.ts"]
+    }
+  },
+  "angularCompilerOptions": {
+    "compilationMode": "partial",
+    "strictTemplates": true,
+    "enableResourceInlining": true
+  },
+  "exclude": ["src/**/*.spec.ts", "src/test-setup.ts"],
+  "include": ["src/**/*.ts"]
+}

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+tmp/
+coverage/
+*.log
+.nx/cache
+.DS_Store
+.angular/
+apps/playground/output/
+apps/playground/designer/engine.global.js
+apps/playground/designer/vazirmatn.js
+*.tsbuildinfo
