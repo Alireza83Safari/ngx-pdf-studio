@@ -267,6 +267,20 @@ export interface CustomElement extends ElementBase {
   options?: Record<string, unknown>;
 }
 
+/**
+ * An automatic table of contents (§11A-D): one line per document bookmark
+ * (title, dot leader, page number), indented by bookmark level. Give it fixed
+ * bounds — entries that do not fit are clipped, which keeps the two-pass page
+ * numbering stable.
+ */
+export interface TocElement extends ElementBase {
+  type: 'toc';
+  /** Deepest bookmark level to include (0-based); default: all levels. */
+  maxDepth?: number;
+  /** Line height in pt; default 16. */
+  lineHeight?: number;
+}
+
 /** Discriminated union of every built-in element. */
 export type AnyElement =
   | StaticTextElement
@@ -288,4 +302,5 @@ export type AnyElement =
   | SpacerElement
   | PageBreakElement
   | FormFieldElement
-  | CustomElement;
+  | CustomElement
+  | TocElement;

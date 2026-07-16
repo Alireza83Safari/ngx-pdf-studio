@@ -21,13 +21,22 @@ import type { ImageResource } from '../model/resource';
 import type { BoxStyle, NamedStyle, Typography } from '../model/style';
 import type { Rect } from '../model/units';
 import { colorScaleColor, dataBarFraction, pickIcon } from './conditional-visuals';
+import { toPersianDigits } from '../expression/digits';
 import type { ElementRegistry } from './element-registry';
 import { resolveImage } from './image-resolve';
 import { resolveChart } from './chart-resolve';
 import { resolveRichText } from './richtext-layout';
 import { resolveQr } from './qr-resolve';
 import type { TextMeasurer } from './measure';
-import type { LaidChart, LaidImage, LaidOutElement, LaidQr, LaidRichText, VectorOp } from './page';
+import type {
+  BookmarkEntry,
+  LaidChart,
+  LaidImage,
+  LaidOutElement,
+  LaidQr,
+  LaidRichText,
+  VectorOp,
+} from './page';
 
 const DEFAULT_FONT_SIZE = 12;
 
@@ -42,6 +51,8 @@ export interface LeafDeps {
   elements: ElementRegistry;
   images: Map<string, ImageResource>;
   resolveRows: (datasetName: string, scope: Scope) => Record<string, unknown>[];
+  /** Document bookmarks from the first pagination pass, for `toc` elements (§11A-D). */
+  tocEntries: BookmarkEntry[];
 }
 
 export const mergeTypography = (a?: Typography, b?: Typography): Typography | undefined =>
@@ -85,7 +96,7 @@ export function layoutLeaf(
     }
   }
 
-  const text = resolveText(el, scope, locale, deps.ctx);
+  let text = resolveText(el, scope, locale, deps.ctx);
   const direction = resolveDirection(deps.pageDirection, locale, bandDirection, el.direction, text);
 
   let bounds: Rect = { ...el.bounds };
@@ -159,6 +170,25 @@ export function layoutLeaf(
     );
     lines = measured.lines;
     bounds = { ...el.bounds, height: Math.max(el.bounds.height, measured.height) };
+  }
+
+  // Auto table of contents (§11A-D): one clipped line per bookmark entry.
+  // Fixed bounds keep the second pagination pass byte-stable.
+  if (el.type === 'toc') {
+    const lh = el.lineHeight ?? 16;
+    const maxDepth = el.maxDepth ?? Number.POSITIVE_INFINITY;
+    const maxLines = Math.max(0, Math.floor(el.bounds.height / lh));
+    const fmtPage = (n: number): string =>
+      locale.digits === 'persian' ? toPersianDigits(String(n)) : String(n);
+    lines = deps.tocEntries
+      .filter((entry) => entry.level <= maxDepth)
+      .slice(0, maxLines)
+      .map(
+        (entry) =>
+          `${'    '.repeat(entry.level)}${entry.title}  ......  ${fmtPage(entry.pageIndex + 1)}`,
+      );
+    text = lines[0] !== undefined ? lines.join('\n') : '';
+    typography = mergeTypography(typography, { lineHeight: lh });
   }
 
   let bookmark: { title: string; level: number } | undefined;

@@ -324,7 +324,7 @@ async function paintElementBody(
       break;
     case 'chart':
       paintBox(page, el, layoutPage);
-      paintChart(page, el, layoutPage);
+      await paintChart(page, el, layoutPage, fonts, diagnostics);
       break;
     case 'ellipse':
       paintEllipse(page, el, layoutPage);
@@ -346,7 +346,7 @@ async function paintElementBody(
       break;
     case 'custom':
       paintBox(page, el, layoutPage);
-      paintCustom(page, el, layoutPage);
+      await paintCustom(page, el, layoutPage, fonts, diagnostics);
       break;
     case 'staticText':
     case 'dataField':
@@ -535,24 +535,45 @@ async function paintImage(
   page.drawImage(embedded, { x: dx, y: layoutPage.size.height - (dy + dh), width: dw, height: dh });
 }
 
-function paintChart(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): void {
+async function paintChart(
+  page: PDFPage,
+  el: LaidOutElement,
+  layoutPage: LayoutPage,
+  fonts: FontProvider,
+  diagnostics: ExpressionDiagnostic[],
+): Promise<void> {
   const chart = el.chart;
   if (!chart) return;
-  paintOps(page, chartOps(chart, el.bounds.width, el.bounds.height), el, layoutPage);
+  await paintOps(
+    page,
+    chartOps(chart, el.bounds.width, el.bounds.height),
+    el,
+    layoutPage,
+    fonts,
+    diagnostics,
+  );
 }
 
 /** Vector ops from a registered custom-element renderer (§12). */
-function paintCustom(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): void {
-  if (el.custom) paintOps(page, el.custom, el, layoutPage);
+async function paintCustom(
+  page: PDFPage,
+  el: LaidOutElement,
+  layoutPage: LayoutPage,
+  fonts: FontProvider,
+  diagnostics: ExpressionDiagnostic[],
+): Promise<void> {
+  if (el.custom) await paintOps(page, el.custom, el, layoutPage, fonts, diagnostics);
 }
 
 /** Draw neutral vector ops (element-local space) at the element's position (§7). */
-function paintOps(
+async function paintOps(
   page: PDFPage,
   ops: readonly VectorOp[],
   el: LaidOutElement,
   layoutPage: LayoutPage,
-): void {
+  fonts: FontProvider,
+  diagnostics: ExpressionDiagnostic[],
+): Promise<void> {
   const { x, y } = el.bounds;
   for (const c of ops) {
     if (c.op === 'rect') {
@@ -570,6 +591,28 @@ function paintOps(
         y: layoutPage.size.height - y,
         color: rgb(c.fill.r, c.fill.g, c.fill.b),
       });
+    } else if (c.op === 'text') {
+      const font = await fonts.resolve({ bold: false, italic: false });
+      try {
+        let tx = x + c.x;
+        if (c.align === 'middle' || c.align === 'end') {
+          const w = font.widthOfTextAtSize(c.text, c.size);
+          tx -= c.align === 'middle' ? w / 2 : w;
+        }
+        page.drawText(c.text, {
+          x: tx,
+          y: layoutPage.size.height - (y + c.y),
+          size: c.size,
+          font,
+          color: rgb(c.color.r, c.color.g, c.color.b),
+        });
+      } catch (err) {
+        // e.g. a WinAnsi fallback font cannot encode a Persian label (§9).
+        diagnostics.push({
+          severity: 'warning',
+          message: `Chart label '${truncate(c.text)}' could not be drawn: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
     } else {
       page.drawLine({
         start: { x: x + c.x1, y: layoutPage.size.height - (y + c.y1) },

@@ -15,7 +15,8 @@
   "peerDependencies": {
     "@angular/core": ">=12.0.0 <99.0.0",
     "@angular/common": ">=12.0.0 <99.0.0",
-    "rxjs": "^6.0.0 || ^7.0.0"
+    "rxjs": "^6.0.0 || ^7.0.0",
+    "@angular/platform-browser": ">=12.0.0 <99.0.0"
   },
   "dependencies": {
     "@ngx-pdf-studio/core": "*",

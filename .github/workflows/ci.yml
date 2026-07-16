@@ -32,3 +32,21 @@ jobs:
       - run: npm run build:core
       - run: npm run build:angular
       - run: npm run smoke:tarball
+
+  # Public-API type compatibility of the built packages against every
+  # supported Angular major (§2.1): install the tarballs into a pristine
+  # consumer and type-check imports of the module/service/component.
+  angular-compat:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        angular-version: ['12', '17', 'latest']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node tools/smoke-angular-consumer.mjs ${{ matrix.angular-version }}

@@ -216,6 +216,10 @@ function opsMarkup(ops: readonly VectorOp[], x: number, y: number): string {
       if (c.op === 'path') {
         return `<path transform="translate(${r2(x)} ${r2(y)})" d="${c.d}" fill="${rgb01ToCss(c.fill)}" />`;
       }
+      if (c.op === 'text') {
+        const anchor = c.align === 'middle' ? 'middle' : c.align === 'end' ? 'end' : 'start';
+        return `<text x="${r2(x + c.x)}" y="${r2(y + c.y)}" font-size="${r2(c.size)}" font-family="Vazirmatn, sans-serif" text-anchor="${anchor}" fill="${rgb01ToCss(c.color)}">${escapeXml(c.text)}</text>`;
+      }
       return `<line x1="${r2(x + c.x1)}" y1="${r2(y + c.y1)}" x2="${r2(x + c.x2)}" y2="${r2(y + c.y2)}" stroke="${rgb01ToCss(c.color)}" stroke-width="${r2(c.width)}" />`;
     })
     .join('');

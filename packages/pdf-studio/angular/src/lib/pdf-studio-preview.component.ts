@@ -5,7 +5,8 @@ import {
   Input,
   OnChanges,
 } from '@angular/core';
-import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer } from '@angular/platform-browser';
+import type { SafeHtml } from '@angular/platform-browser';
 import type { ExpressionDiagnostic, PdfTemplate } from '@ngx-pdf-studio/core';
 import { PdfStudioRenderer } from './pdf-studio-renderer.service';
 

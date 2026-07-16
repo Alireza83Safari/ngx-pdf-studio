@@ -60,10 +60,30 @@ interface BandLayout {
   height: number;
 }
 
+/** Does any band (top-level or section) contain a `toc` element? */
+function hasTocElement(template: PdfTemplate): boolean {
+  const bands = [...template.bands, ...(template.sections ?? []).flatMap((s) => s.bands)];
+  return bands.some((band) => band.elements.some((el) => el.type === 'toc'));
+}
+
 export function paginate(
   template: PdfTemplate,
   ctx: RenderContext,
   options: PaginateOptions = {},
+): PaginatedDocument {
+  // Auto ToC needs page numbers, which need pagination: run a first pass with
+  // no entries, then re-run with the collected bookmarks. ToC elements have
+  // fixed bounds, so the second pass cannot shift any page break (§11A-D).
+  const first = paginatePass(template, ctx, options, []);
+  if (!hasTocElement(template)) return first;
+  return paginatePass(template, ctx, options, first.bookmarks);
+}
+
+function paginatePass(
+  template: PdfTemplate,
+  ctx: RenderContext,
+  options: PaginateOptions,
+  tocEntries: BookmarkEntry[],
 ): PaginatedDocument {
   const measurer = options.measurer ?? new SimpleTextMeasurer();
   const styles = new Map(template.styles.map((s) => [s.id, s] as const));
@@ -80,6 +100,7 @@ export function paginate(
       resolveDataset(findDataset(template, datasetName, ctx), scope, ctx),
     subreports: new Map(Object.entries(options.subreports ?? {})),
     variables: template.variables ?? [],
+    tocEntries,
   };
 
   // One implicit section from the top-level page+bands, unless sections declared.
@@ -146,6 +167,8 @@ interface SharedDeps {
   resolveRows: (datasetName: string, scope: Scope) => Record<string, unknown>[];
   subreports: Map<string, SubreportTemplate>;
   variables: VariableDef[];
+  /** Bookmark entries from pass 1, consumed by `toc` elements in pass 2. */
+  tocEntries: BookmarkEntry[];
 }
 
 interface SectionPlan {
@@ -184,6 +207,7 @@ function planSection(page: PageSetup, bands: Band[], shared: SharedDeps): Sectio
     elements,
     images,
     resolveRows,
+    tocEntries: shared.tocEntries,
   };
   const layoutBand = (band: Band, scope: Scope): BandLayout =>
     layoutBandImpl(band, scope, leafDeps, tableDeps, resolveRows, subreports);

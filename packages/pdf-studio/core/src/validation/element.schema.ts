@@ -289,6 +289,13 @@ export const elementSchema: z.ZodType<unknown> = z.lazy(() =>
       .passthrough(),
     baseElement
       .extend({
+        type: z.literal('toc'),
+        maxDepth: z.number().optional(),
+        lineHeight: z.number().optional(),
+      })
+      .passthrough(),
+    baseElement
+      .extend({
         type: z.literal('custom'),
         renderer: z.string(),
         value: expressionSchema.optional(),

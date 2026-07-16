@@ -31,7 +31,8 @@ export type ElementType =
   | 'spacer'
   | 'pageBreak'
   | 'formField'
-  | 'custom';
+  | 'custom'
+  | 'toc';
 
 /**
  * A clickable hyperlink on an element (§11A-D): `url` opens an external link,

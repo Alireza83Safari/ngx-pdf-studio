@@ -1,11 +1,6 @@
 import { Injectable } from '@angular/core';
-import {
-  renderToPdf,
-  renderToSvg,
-  type ExpressionDiagnostic,
-  type PdfTemplate,
-  type RenderOptions,
-} from '@ngx-pdf-studio/core';
+import { renderToPdf, renderToSvg } from '@ngx-pdf-studio/core';
+import type { ExpressionDiagnostic, PdfTemplate, RenderOptions } from '@ngx-pdf-studio/core';
 
 /** A render request: a template plus the data/parameters to bind (§12). */
 export interface PdfRenderRequest {

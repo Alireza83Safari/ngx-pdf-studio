@@ -75,7 +75,7 @@ Legend: ✅ انجام‌شده · 🟡 ناقص/جزئی · ⬜ شروع‌نش
 - ✅ **Image** واقعی — embed PNG/JPEG در PDF + `<image>` در SVG، fit (contain/cover/fill/none)، منبع/data-URI/URL. (⬜ SVG→vector، URL در PDF)
 - 🟡 **Barcode**: Code 39 ✅ + **Code 128** ✅ (Code B/C، checksum mod-103) + **EAN-13** ✅ (لید-دیجیت با parity L/G، check mod-10، تأیید با decoder round-trip) — ⬜ UPC-A/E/ITF/DataMatrix/PDF417/Aztec/GS1
 - ✅ **QRCode** — encoder معتبر (qrcode-generator)، رندر برداری در هر دو painter، **تأییدشده با decode واقعی jsQR** (نه فقط ساختاری). سطح EC قابل‌انتخاب، quiet zone استاندارد.
-- 🟡 **Chart** برداری: column/bar/line/**stackedColumn**/**area**/**pie**/**donut** ✅ (هر دو painter) — ⬜ scatter/combo، sparkline، برچسب محور/legend
+- 🟡 **Chart** برداری: column/bar/line/**stackedColumn**/**area**/**pie**/**donut** ✅ + **برچسب محور** (دسته‌ها زیر محور/کنار ردیف، مقدار max) + **legend** (سری‌ها؛ ستون دسته‌ها برای pie/donut) ✅ — هر دو painter از طریق `VectorOp` نوع `text` — ⬜ scatter/combo، sparkline
 - 🟡 **Crosstab / Pivot** ✅ ماتریس سطر×ستون + measure تجمیعی + جمع‌های سطر/ستون/کل، RTL — ⬜ گروه‌های تو‌در‌تو، چند measure
 - 🟡 **Subreport** ✅ جاسازی زیرگزارش ثبت‌شده با دیتاست خودش (block inline، report header + detail rows + footer، offset در bounds) — ⬜ شکست بین صفحات، master-detail تو‌در‌تو
 - ✅ **Container/group** nesting در layout — جعبهٔ کانتینر + فرزندان به‌صورت بازگشتی با offset نسبی (تو‌در‌تو)
@@ -86,7 +86,7 @@ Legend: ✅ انجام‌شده · 🟡 ناقص/جزئی · ⬜ شروع‌نش
 
 - ✅ **Grouping**: groupHeader/groupFooter چندسطحی در موتور صفحه‌بندی + **aggregate گروهی** (`sum($group, expr)`، `$groupKey`/`$groupIndex`)
 - 🟡 **running totals** ✅ از طریق `sum(slice($root.items, 0, $index+1), expr)` (توابع `slice`/`len`/`abs`/`round` اضافه شد) — ⬜ متغیر با reset scope، carried-forward، «ادامه در صفحهٔ بعد»
-- ✅ **bookmarks/outline** ساختار تو‌در‌تو از `element.bookmark` (تأیید `pdfjs.getOutline()`) + ✅ **hyperlinks** (`element.link` خارجی URL یا page-jump داخلی، Link annotation، تأیید `pdfjs.getAnnotations()`) — ⬜ ToC خودکار به‌عنوان عنصر، cross-reference/drill-through داده‌محور
+- ✅ **bookmarks/outline** ساختار تو‌در‌تو از `element.bookmark` (تأیید `pdfjs.getOutline()`) + ✅ **hyperlinks** (`element.link` خارجی URL یا page-jump داخلی، Link annotation، تأیید `pdfjs.getAnnotations()`) + ✅ **ToC خودکار** (عنصر `toc`: یک خط per bookmark با شماره صفحه و تورفتگی سطح؛ صفحه‌بندی two-pass با bounds ثابت → شماره‌ها پایدار؛ ارقام فارسی per locale؛ `maxDepth`/`lineHeight`) — ⬜ cross-reference/drill-through داده‌محور
 - ✅ **Conditional formatting** کامل: `conditionalStyles` + **data bars** (نوار متناسب، RTL-aware) + **color scales** (درون‌یابی sRGB روی fill) + **icon sets** (circle/square/triangleUp/triangleDown، انتخاب با آستانه، رنگ‌پذیر، هر دو painter — SVG برداری، PDF با drawSvgPath/ellipse/rect)
 - 🟡 **Variables با reset scope** ✅ متغیرهای گزارش (`template.variables`) با `$vars.<name>`؛ calc=sum/count/avg/min/max/first/last؛ reset=report یا group (per-level)؛ running total در detail + subtotal در group footer — ⬜ reset=page (نیازمند آگاهی از مرز صفحه، فعلاً به report برمی‌گرده با warning)، carried-forward/«ادامه در صفحهٔ بعد»
 
@@ -115,7 +115,7 @@ Legend: ✅ انجام‌شده · 🟡 ناقص/جزئی · ⬜ شروع‌نش
 
 ### Phase 6 — Polish & release (§14A)
 
-- 🟡 **CI** ✅ workflow گیت‌هاب (Node 18/20/22: lint، format، typecheck، jest+coverage، build:core، tarball smoke) — ⬜ ماتریس Angular 12/LTS/latest
+- ✅ **CI** — ماتریس Node 18/20/22 (همهٔ گیت‌ها) + **ماتریس Angular 12/17/latest** (type-compat مصرف‌کننده روی tarball واقعی؛ سه باگ سازگاری واقعی پیدا و رفع کرد: peer جاافتادهٔ `@angular/platform-browser`، سینتکس TS4.5+ در d.ts (downlevel در build)، نشت تایپ zod به سطح عمومی (schemaها opaque منتشر می‌شن))
 - 🟡 **Consumer tarball smoke test** ✅ `npm run smoke:tarball` — pack از dist، نصب در پروژهٔ tmp تمیز، رندر PDF فارسی از `@ngx-pdf-studio/core/node` (فونت داخل پکیج) — ⬜ مصرف‌کنندهٔ Angular 12/latest
 - ✅ build واقعی `core` به dist — `npm run build:core` (tsc CJS + d.ts → `core/dist`، package.json بازنویسی‌شده برای publish، فونت Vazirmatn داخل پکیج با fallback مسیر dev/dist، smoke render فارسی از dist تأیید شد)
 - ✅ سیم‌کشی topology دو-پکیجی (ADR-0005) — build انگولار (ng-packagr) حالا `@ngx-pdf-studio/core` را از **dist** (d.ts) می‌بیند نه سورس؛ APF کامل سبز

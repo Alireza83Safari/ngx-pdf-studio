@@ -5,13 +5,11 @@
  * line (rect/line ops), area + pie/donut (filled path ops). Axis labels/legend
  * are a later step.
  */
-import type { LaidChart } from '../layout/page';
+import type { LaidChart, VectorOp } from '../layout/page';
 import type { Rgb01 } from './color';
 
-export type ChartOp =
-  | { op: 'rect'; x: number; y: number; w: number; h: number; fill: Rgb01 }
-  | { op: 'line'; x1: number; y1: number; x2: number; y2: number; color: Rgb01; width: number }
-  | { op: 'path'; d: string; fill: Rgb01 };
+/** Chart draw-ops are the shared neutral vector ops (incl. `text`, §7). */
+export type ChartOp = VectorOp;
 
 const PALETTE: Rgb01[] = [
   { r: 0.15, g: 0.39, b: 0.92 },
@@ -21,16 +19,34 @@ const PALETTE: Rgb01[] = [
   { r: 0.55, g: 0.36, b: 0.96 },
 ];
 const AXIS: Rgb01 = { r: 0.8, g: 0.84, b: 0.88 };
+const LABEL: Rgb01 = { r: 0.42, g: 0.45, b: 0.5 };
 const PAD = 8;
+const LABEL_SIZE = 7.5;
+const LEGEND_H = 12;
+const AXIS_LABEL_H = 11;
+
+/** Legend rows: one colored swatch + name per series (§5). */
+function legendOps(names: string[], x: number, y: number): ChartOp[] {
+  const ops: ChartOp[] = [];
+  let cx = x;
+  names.forEach((name, i) => {
+    ops.push({ op: 'rect', x: cx, y: y, w: 7, h: 7, fill: PALETTE[i % PALETTE.length] as Rgb01 });
+    ops.push({ op: 'text', x: cx + 10, y: y + 6.5, text: name, size: LABEL_SIZE, color: LABEL });
+    cx += 10 + name.length * LABEL_SIZE * 0.62 + 12;
+  });
+  return ops;
+}
 
 export function chartOps(chart: LaidChart, width: number, height: number): ChartOp[] {
   if (chart.kind === 'pie' || chart.kind === 'donut') return pieOps(chart, width, height);
 
+  const seriesNames = chart.series.map((s) => s.name ?? '').filter(Boolean);
+  const legendH = chart.showLegend && seriesNames.length > 0 ? LEGEND_H : 0;
   const plot = {
     x: PAD,
-    y: PAD,
+    y: PAD + legendH,
     w: Math.max(1, width - PAD * 2),
-    h: Math.max(1, height - PAD * 2),
+    h: Math.max(1, height - PAD * 2 - legendH - AXIS_LABEL_H),
   };
   const baselineY = plot.y + plot.h;
   const ops: ChartOp[] = [
@@ -52,6 +68,52 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
 
   const step = plot.w / categories;
   const yOf = (v: number): number => baselineY - (Math.max(0, v) / maxValue) * plot.h;
+
+  // Legend + axis labels (§5). Horizontal bars label their rows instead of
+  // the x-axis; every vertical kind centers a category label under its slot.
+  if (legendH > 0) ops.push(...legendOps(seriesNames, plot.x, PAD + 1));
+  if (chart.kind === 'bar') {
+    chart.categories.forEach((cat, gi) => {
+      const rowH = plot.h / categories;
+      ops.push({
+        op: 'text',
+        x: plot.x + 2,
+        y: plot.y + rowH * gi + rowH / 2 + LABEL_SIZE * 0.35,
+        text: cat,
+        size: LABEL_SIZE,
+        color: LABEL,
+      });
+    });
+  } else {
+    chart.categories.forEach((cat, gi) => {
+      ops.push({
+        op: 'text',
+        x: plot.x + step * (gi + 0.5),
+        y: baselineY + LABEL_SIZE + 1.5,
+        text: cat,
+        size: LABEL_SIZE,
+        color: LABEL,
+        align: 'middle',
+      });
+    });
+  }
+  const axisMax =
+    chart.kind === 'stackedColumn'
+      ? Math.max(
+          1,
+          ...Array.from({ length: categories }, (_, gi) =>
+            series.reduce((sum, s) => sum + Math.max(0, s.values[gi] ?? 0), 0),
+          ),
+        )
+      : maxValue;
+  ops.push({
+    op: 'text',
+    x: plot.x + 2,
+    y: plot.y + LABEL_SIZE,
+    text: String(axisMax),
+    size: LABEL_SIZE,
+    color: LABEL,
+  });
 
   if (chart.kind === 'line') {
     series.forEach((s, si) => {
@@ -164,12 +226,41 @@ function pieOps(chart: LaidChart, width: number, height: number): ChartOp[] {
   const total = values.reduce((a, b) => a + b, 0);
   if (total <= 0) return [];
 
-  const cx = width / 2;
+  // Reserve a legend column on the side when category names are shown (§5).
+  const legend = chart.showLegend && chart.categories.length > 0;
+  const legendW = legend
+    ? Math.min(
+        width * 0.45,
+        Math.max(...chart.categories.map((c) => c.length)) * LABEL_SIZE * 0.62 + 18,
+      )
+    : 0;
+  const cx = (width - legendW) / 2;
   const cy = height / 2;
-  const r = Math.min(width, height) / 2 - PAD;
+  const r = Math.min(width - legendW, height) / 2 - PAD;
   const ri = chart.kind === 'donut' ? r * 0.55 : 0;
 
   const ops: ChartOp[] = [];
+  if (legend) {
+    chart.categories.forEach((cat, i) => {
+      const y = PAD + i * (LABEL_SIZE + 4);
+      ops.push({
+        op: 'rect',
+        x: width - legendW,
+        y,
+        w: 7,
+        h: 7,
+        fill: PALETTE[i % PALETTE.length] as Rgb01,
+      });
+      ops.push({
+        op: 'text',
+        x: width - legendW + 10,
+        y: y + 6.5,
+        text: cat,
+        size: LABEL_SIZE,
+        color: LABEL,
+      });
+    });
+  }
   let a0 = -Math.PI / 2;
   values.forEach((v, i) => {
     if (v <= 0) return;

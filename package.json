@@ -21,7 +21,8 @@
     "smoke:tarball": "node tools/smoke-tarball.mjs",
     "build:angular": "ng-packagr -p packages/pdf-studio/angular/ng-package.json -c packages/pdf-studio/angular/tsconfig.lib.json",
     "build": "npm run build:core && npm run build:angular",
-    "designer:smoke": "npm run designer:build && node apps/playground/designer/smoke.js"
+    "designer:smoke": "npm run designer:build && node apps/playground/designer/smoke.js",
+    "smoke:angular": "node tools/smoke-angular-consumer.mjs"
   },
   "devDependencies": {
     "@angular/common": "^17.3.12",

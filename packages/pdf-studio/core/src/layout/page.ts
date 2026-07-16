@@ -51,7 +51,18 @@ export interface VecColor {
 export type VectorOp =
   | { op: 'rect'; x: number; y: number; w: number; h: number; fill: VecColor }
   | { op: 'line'; x1: number; y1: number; x2: number; y2: number; color: VecColor; width: number }
-  | { op: 'path'; d: string; fill: VecColor };
+  | { op: 'path'; d: string; fill: VecColor }
+  | {
+      op: 'text';
+      /** Anchor point; `y` is the baseline. */
+      x: number;
+      y: number;
+      text: string;
+      size: number;
+      color: VecColor;
+      /** Horizontal anchoring around `x`; defaults to `start`. */
+      align?: 'start' | 'middle' | 'end';
+    };
 
 /** A resolved QR code: a square matrix of dark/light modules (§5). */
 export interface LaidQr {
