@@ -78,7 +78,9 @@
 ### ۳.۱ ✅ معماری + provider
 
 - ماژول `copilot/` جدا: interface `generate(prompt, currentTemplate?) → templateJson`؛
-  providerهای قابل‌تعویض (Claude API پیش‌فرض، قابل‌تنظیم با کلید کاربر در UI).
+  providerهای قابل‌تعویض (Claude API پیش‌فرض، قابل‌تنظیم با کلید کاربر در UI) +
+  `OpenAICompatibleProvider` برای مسیرهای رایگان: Ollama (لوکال، بدون کلید)،
+  Groq و Gemini (تیر رایگان)، OpenRouter (مدل‌های `:free`) — انتخاب سرویس در UI.
   حلقهٔ **validate→repair**: خروجی LLM → `importTemplate` → اگر issue داشت،
   issueها را برگردان به مدل (حداکثر ۲ تلاش).
 - **پذیرش:** تست با mock provider؛ هیچ خروجی invalid ای به بوم نرسد.
