@@ -1706,6 +1706,11 @@
       },
       { label: 'راهنمای کامل', hint: '؟', run: () => document.getElementById('openHelp').click() },
       {
+        label: 'کوپایلوت هوش مصنوعی',
+        hint: '✨',
+        run: () => document.getElementById('openCopilot').click(),
+      },
+      {
         label: 'تور معرفی محیط',
         hint: '🧭',
         run: () => document.getElementById('startTour').click(),
@@ -2337,6 +2342,107 @@
     }
   });
 
+  // --- AI copilot (ROADMAP ۳.۲–۳.۳) ---------------------------------------------
+  var copilotEl = document.getElementById('copilot');
+  var CP_KEY = 'pdfstudio.apikey';
+  /** Replace the whole template as ONE undoable command. */
+  function replaceTemplateCmd(next, prev) {
+    return {
+      type: 'copilot',
+      apply: function () {
+        return next;
+      },
+      invert: function () {
+        return replaceTemplateCmd(prev, next);
+      },
+    };
+  }
+  function copilotProvider() {
+    // test/self-host hook first, then the user's Claude key
+    if (window.PDFSTUDIO_COPILOT_PROVIDER) return window.PDFSTUDIO_COPILOT_PROVIDER;
+    var key = document.getElementById('cpKey').value.trim();
+    if (!key) return null;
+    try {
+      window.localStorage.setItem(CP_KEY, key);
+    } catch (err) {
+      /* ignore */
+    }
+    return new P.ClaudeProvider({ apiKey: key });
+  }
+  document.getElementById('openCopilot').addEventListener('click', function () {
+    try {
+      var saved = window.localStorage.getItem(CP_KEY);
+      if (saved) document.getElementById('cpKey').value = saved;
+    } catch (err) {
+      /* ignore */
+    }
+    copilotEl.classList.add('show');
+    document.getElementById('cpPrompt').focus();
+  });
+  document.getElementById('closeCopilot').addEventListener('click', function () {
+    copilotEl.classList.remove('show');
+  });
+  copilotEl.addEventListener('click', function (e) {
+    if (e.target === copilotEl) copilotEl.classList.remove('show');
+  });
+  document.getElementById('cpPrompt').addEventListener('keydown', function (e) {
+    e.stopPropagation();
+  });
+  document.getElementById('cpKey').addEventListener('keydown', function (e) {
+    e.stopPropagation();
+  });
+
+  var cpBusy = false;
+  document.getElementById('cpRun').addEventListener('click', function () {
+    if (cpBusy) return;
+    var statusEl = document.getElementById('cpStatus');
+    var mode = document.getElementById('cpMode').value;
+    var promptText = document.getElementById('cpPrompt').value.trim();
+    if (mode === 'bind') {
+      promptText =
+        'Re-bind the dataField/table/chart elements of the current template to the sample data by matching names and meanings. Keep layout untouched; only change value/dataset/categories/series sources. ' +
+        (promptText ? 'Extra instructions: ' + promptText : '');
+    }
+    if (!promptText) {
+      statusEl.textContent = 'اول بنویس چه می‌خواهی.';
+      return;
+    }
+    var provider = copilotProvider();
+    if (!provider) {
+      statusEl.textContent = 'کلید API را وارد کن (فقط در مرورگر خودت ذخیره می‌شود).';
+      return;
+    }
+    cpBusy = true;
+    statusEl.textContent = 'در حال ساخت… (ممکن است تا یک دقیقه طول بکشد)';
+    var opts = { prompt: promptText, provider: provider, sampleData: sampleData };
+    if (mode !== 'new') opts.currentTemplate = store.getState();
+    P.generateTemplate(opts)
+      .then(function (res) {
+        cpBusy = false;
+        if (!res.success) {
+          statusEl.textContent = 'نشد: ' + res.error.slice(0, 180);
+          return;
+        }
+        bumpUid(res.template);
+        store.dispatch(replaceTemplateCmd(res.template, store.getState()));
+        selected = [];
+        copilotEl.classList.remove('show');
+        statusEl.textContent = '';
+        setTab('design');
+        toast(
+          'کوپایلوت قالب را ' +
+            (mode === 'new' ? 'ساخت' : 'به‌روزرسانی کرد') +
+            ' (تلاش ' +
+            res.attempts +
+            ') — Ctrl+Z برمی‌گرداند',
+        );
+      })
+      .catch(function (err) {
+        cpBusy = false;
+        statusEl.textContent = 'خطا: ' + (err && err.message ? err.message : err);
+      });
+  });
+
   // --- share as link (ROADMAP ۲.۱) --------------------------------------------
   function toBase64Url(str) {
     return window
@@ -2459,6 +2565,7 @@
       if (tourEl.classList.contains('show')) return endTour();
       if (helpEl.classList.contains('show')) return helpEl.classList.remove('show');
       if (historyEl.classList.contains('show')) return historyEl.classList.remove('show');
+      if (copilotEl.classList.contains('show')) return copilotEl.classList.remove('show');
       selected = [];
       renderInspector();
       renderCanvas();

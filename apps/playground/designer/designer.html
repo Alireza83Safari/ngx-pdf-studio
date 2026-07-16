@@ -1583,6 +1583,13 @@
       >
         ⌘K
       </button>
+      <button
+        id="openCopilot"
+        class="btn quiet"
+        data-tip="کوپایلوت هوش مصنوعی — با یک جمله قالب بساز یا تغییرش بده"
+      >
+        ✨ کوپایلوت
+      </button>
 
       <span class="spacer"></span>
 
@@ -2022,6 +2029,53 @@
           <button id="closeGallery" aria-label="بستن">✕</button>
         </div>
         <div id="galleryCards" class="gallery-cards"></div>
+      </div>
+    </div>
+
+    <div id="copilot" class="gallery-backdrop">
+      <div class="gallery-panel" style="width: min(540px, 92vw)">
+        <div class="gallery-head">
+          <div>
+            <strong>✨ کوپایلوت</strong>
+            <p>بگو چه سندی می‌خواهی — قالب معتبر ساخته و روی بوم می‌نشیند (undo هم دارد)</p>
+          </div>
+          <button id="closeCopilot" aria-label="بستن">✕</button>
+        </div>
+        <div style="padding: 18px 20px 22px; display: flex; flex-direction: column; gap: 12px">
+          <div class="row" data-tip="حالت کار کوپایلوت">
+            <label>حالت</label>
+            <select id="cpMode">
+              <option value="new">ساخت از صفر</option>
+              <option value="modify">تغییر قالب فعلی</option>
+              <option value="bind">بایند خودکار به دادهٔ نمونه</option>
+            </select>
+          </div>
+          <textarea
+            id="cpPrompt"
+            spellcheck="false"
+            style="
+              width: 100%;
+              min-height: 96px;
+              font: inherit;
+              font-size: 13px;
+              padding: 10px 12px;
+              border: 1px solid var(--border);
+              border-radius: 10px;
+              background: var(--field);
+              color: var(--ink);
+              resize: vertical;
+            "
+            placeholder="مثلاً: یک فاکتور رسمی با لوگو، جدول اقلام، جمع به حروف و QR بساز"
+          ></textarea>
+          <div class="row" data-tip="کلید API آنتروپیک — فقط در مرورگر خودت ذخیره می‌شود">
+            <label>کلید API</label>
+            <input id="cpKey" type="password" dir="ltr" placeholder="sk-ant-…" />
+          </div>
+          <div id="cpStatus" style="font-size: 11.5px; color: var(--muted); min-height: 16px"></div>
+          <div class="btnrow" style="margin: 0">
+            <button id="cpRun" class="btn primary" style="flex: 1; height: 36px">بساز ✨</button>
+          </div>
+        </div>
       </div>
     </div>
 

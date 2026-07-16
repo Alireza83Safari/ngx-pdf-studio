@@ -378,6 +378,32 @@ try {
     if (doc.getElementById('history').classList.contains('show'))
       fail('history did not close after restore');
 
+    // --- AI copilot (ROADMAP 3.2) ---
+    // scripted provider: first a broken template, then a valid one (repair loop)
+    const cpValid = JSON.stringify({
+      ...ctx.window.PDFSTUDIO_TEMPLATES.find((t) => t.id === 'card').template,
+      metadata: { name: 'ساختهٔ کوپایلوت' },
+    });
+    const cpBroken = cpValid.replace(/"bounds":\s*\{[^}]*\},/, '');
+    let cpCall = 0;
+    ctx.window.PDFSTUDIO_COPILOT_PROVIDER = {
+      complete: async () => (cpCall++ === 0 ? cpBroken : cpValid),
+    };
+    doc.getElementById('openCopilot').dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (!doc.getElementById('copilot').classList.contains('show')) fail('copilot did not open');
+    doc.getElementById('cpPrompt').value = 'یک کارت ویزیت بساز';
+    doc.getElementById('cpRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 30));
+    if (cpCall !== 2) fail('repair loop did not run (calls=' + cpCall + ')');
+    if (doc.getElementById('copilot').classList.contains('show'))
+      fail('copilot did not close after success');
+    if (doc.getElementById('docName').value !== 'ساختهٔ کوپایلوت')
+      fail('copilot template not applied: ' + doc.getElementById('docName').value);
+    // one undo returns the previous document
+    doc.getElementById('undo').dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (doc.getElementById('docName').value === 'ساختهٔ کوپایلوت')
+      fail('copilot apply was not a single undoable command');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,
