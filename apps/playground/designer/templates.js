@@ -957,7 +957,28 @@
     ],
   };
 
+  // --- ۰) سند خالی -------------------------------------------------------------
+  var blank = baseTemplate('سند خالی', page(), [
+    { id: 'main', type: 'reportHeader', height: { mode: 'fixed', value: 770 }, elements: [] },
+  ]);
+  var blankData = {
+    company: { name: 'شرکت نمونه' },
+    customer: { name: 'علی رضایی' },
+    invoice: { number: 'INV-1405-0042' },
+    items: [
+      { name: 'کالای اول', qty: 2, price: 1250000 },
+      { name: 'کالای دوم', qty: 1, price: 890000 },
+    ],
+  };
+
   window.PDFSTUDIO_TEMPLATES = [
+    {
+      id: 'blank',
+      name: 'سند خالی',
+      desc: 'بوم سفید A4 — طراحی از صفر',
+      template: blank,
+      data: blankData,
+    },
     {
       id: 'invoice',
       name: 'فاکتور فروش',

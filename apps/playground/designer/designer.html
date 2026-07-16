@@ -105,6 +105,42 @@
         border-radius: 8px;
       }
 
+      /* ---------- universal tooltips ---------- */
+      [data-tip] {
+        position: relative;
+      }
+      [data-tip]:not(.tool)::after {
+        content: attr(data-tip);
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--ink);
+        color: var(--bg);
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.7;
+        padding: 5px 10px;
+        border-radius: 7px;
+        width: max-content;
+        max-width: 230px;
+        text-align: center;
+        white-space: normal;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s 0.35s;
+        z-index: 150;
+        box-shadow: var(--shadow-bar);
+      }
+      [data-tip]:not(.tool):hover::after {
+        opacity: 1;
+      }
+      .statusbar [data-tip]:not(.tool)::after,
+      .layer[data-tip]::after {
+        top: auto;
+        bottom: calc(100% + 8px);
+      }
+
       /* ================= top bar ================= */
       .topbar {
         display: flex;
@@ -427,6 +463,29 @@
         border-radius: 3px;
         cursor: nwse-resize;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      }
+      #canvasHint {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        color: #98a1b2;
+        font-size: 12.5px;
+        line-height: 2;
+        text-align: center;
+        pointer-events: none;
+        z-index: 10;
+      }
+      #canvasHint.show {
+        display: flex;
+      }
+      #canvasHint span {
+        font-size: 15px;
+        font-weight: 600;
+        color: #6b7382;
       }
       .inline-edit {
         position: absolute;
@@ -1107,12 +1166,23 @@
   <body>
     <header class="topbar">
       <div class="brand"><span class="mark">P</span></div>
-      <input id="docName" value="سند بی‌نام" spellcheck="false" aria-label="نام سند" />
+      <input
+        id="docName"
+        value="سند بی‌نام"
+        spellcheck="false"
+        aria-label="نام سند"
+        data-tip="نام سند — کلیک کن و تغییرش بده"
+      />
       <span id="saveState"></span>
 
       <span class="sep"></span>
 
-      <button id="undo" class="btn icon quiet" title="واگرد (Ctrl+Z)" aria-label="واگرد">
+      <button
+        id="undo"
+        class="btn icon quiet"
+        data-tip="واگرد آخرین تغییر (Ctrl+Z)"
+        aria-label="واگرد"
+      >
         <svg
           width="17"
           height="17"
@@ -1127,7 +1197,12 @@
           <path d="M4 9h8.5a3.5 3.5 0 0 1 0 7H10" />
         </svg>
       </button>
-      <button id="redo" class="btn icon quiet" title="ازنو (Ctrl+Y)" aria-label="ازنو">
+      <button
+        id="redo"
+        class="btn icon quiet"
+        data-tip="انجام دوبارهٔ تغییر (Ctrl+Y)"
+        aria-label="ازنو"
+      >
         <svg
           width="17"
           height="17"
@@ -1145,7 +1220,11 @@
 
       <span class="sep"></span>
 
-      <button id="togglePreview" class="btn quiet" title="پیش‌نمایش چندصفحه‌ای">
+      <button
+        id="togglePreview"
+        class="btn quiet"
+        data-tip="نمایش پیش‌نمایش نهایی همهٔ صفحه‌ها کنار بوم"
+      >
         <svg
           width="16"
           height="16"
@@ -1161,14 +1240,28 @@
         </svg>
         پیش‌نمایش
       </button>
-      <button id="toggleValues" class="btn quiet" title="نمایش مقدار نمونه یا نام فیلد روی بوم">
+      <button
+        id="toggleValues"
+        class="btn quiet"
+        data-tip="سوییچ بوم بین مقدارهای نمونه و {نام فیلدها}"
+      >
         🔢 مقادیر
       </button>
-      <button id="openPalette" class="btn quiet" title="پالت فرمان (Ctrl+K)">⌘K</button>
+      <button
+        id="openPalette"
+        class="btn quiet"
+        data-tip="پالت فرمان: همهٔ دستورها با جست‌وجو (Ctrl+K)"
+      >
+        ⌘K
+      </button>
 
       <span class="spacer"></span>
 
-      <button id="openGallery" class="btn outline">
+      <button
+        id="openGallery"
+        class="btn outline"
+        data-tip="قالب‌های آماده — با یک کلیک لود می‌شوند"
+      >
         <svg
           width="15"
           height="15"
@@ -1187,7 +1280,7 @@
       </button>
 
       <div class="menu-wrap">
-        <button id="fileMenuBtn" class="btn quiet">
+        <button id="fileMenuBtn" class="btn quiet" data-tip="سند نو، ذخیره و بارگذاری فایل طرح">
           فایل
           <svg
             width="11"
@@ -1209,9 +1302,11 @@
         </div>
       </div>
 
-      <button id="toggleTheme" class="btn icon quiet" title="تم روشن/تیره">🌙</button>
+      <button id="toggleTheme" class="btn icon quiet" data-tip="تغییر تم محیط (روشن/تیره)">
+        🌙
+      </button>
 
-      <button id="downloadPdf" class="btn primary">
+      <button id="downloadPdf" class="btn primary" data-tip="ساخت PDF نهایی با فونت فارسی و دانلود">
         <svg
           width="15"
           height="15"
@@ -1413,6 +1508,11 @@
           <div id="guideH"></div>
           <div id="marquee"></div>
           <div id="quickbar"></div>
+          <div id="canvasHint">
+            <span>بوم خالیه ✨</span>
+            یک ابزار را از ریل کناری بکش و همین‌جا رها کن،<br />
+            یا از دکمهٔ «قالب‌ها» یک طرح آماده لود کن.
+          </div>
         </div>
       </div>
 
@@ -1420,17 +1520,56 @@
 
       <aside>
         <div class="tabs" role="tablist">
-          <button class="tab active" data-tab="design" role="tab">طراحی</button>
-          <button class="tab" data-tab="layers" role="tab">لایه‌ها</button>
-          <button class="tab" data-tab="data" role="tab">داده</button>
+          <button
+            class="tab active"
+            data-tab="design"
+            role="tab"
+            data-tip="خواص الِمان انتخاب‌شده و تنظیمات صفحه"
+          >
+            طراحی
+          </button>
+          <button
+            class="tab"
+            data-tab="layers"
+            role="tab"
+            data-tip="فهرست همهٔ الِمان‌های صفحه — کلیک برای انتخاب"
+          >
+            لایه‌ها
+          </button>
+          <button
+            class="tab"
+            data-tab="data"
+            role="tab"
+            data-tip="دادهٔ نمونه و فیلدهای قابل‌بایند"
+          >
+            داده
+          </button>
         </div>
 
         <div class="tabpane active" data-pane="design">
           <div id="inspector"></div>
           <div class="sec">
             <div class="sec-title">صفحه</div>
-            <div class="row">
-              <label>جهت</label>
+            <div class="row" data-tip="اندازهٔ کاغذ سند">
+              <label>اندازه</label>
+              <select id="pageSize">
+                <option value="A4">A4</option>
+                <option value="A5">A5</option>
+                <option value="A3">A3</option>
+                <option value="Letter">Letter</option>
+                <option value="Legal">Legal</option>
+                <option value="__custom__" disabled>سفارشی</option>
+              </select>
+            </div>
+            <div class="row" data-tip="عمودی یا افقی بودن کاغذ">
+              <label>جهت کاغذ</label>
+              <select id="pageOrient">
+                <option value="portrait">عمودی</option>
+                <option value="landscape">افقی</option>
+              </select>
+            </div>
+            <div class="row" data-tip="جهت نوشتار سند — برای فارسی راست‌به‌چپ">
+              <label>نوشتار</label>
               <select id="pageDir">
                 <option value="rtl">راست‌به‌چپ (RTL)</option>
                 <option value="ltr">چپ‌به‌راست (LTR)</option>
@@ -1454,7 +1593,11 @@
           </div>
           <div class="sec">
             <div class="sec-title">دادهٔ نمونه (JSON)</div>
-            <textarea id="sampleData" spellcheck="false"></textarea>
+            <textarea
+              id="sampleData"
+              spellcheck="false"
+              data-tip="دادهٔ آزمایشی JSON — فیلدها به این بایند می‌شوند"
+            ></textarea>
             <div class="hint">
               دادهٔ تست برای پیش‌نمایش و خروجی؛ چارت به آرایهٔ <code>items</code> بایند می‌شود.
             </div>
@@ -1475,15 +1618,15 @@
     </div>
 
     <footer class="statusbar">
-      <button id="zoomOut" class="sbtn" title="کوچک‌نمایی" aria-label="کوچک‌نمایی">−</button>
+      <button id="zoomOut" class="sbtn" data-tip="کوچک‌نمایی" aria-label="کوچک‌نمایی">−</button>
       <span id="zoomLabel">85%</span>
-      <button id="zoomIn" class="sbtn" title="بزرگ‌نمایی" aria-label="بزرگ‌نمایی">+</button>
-      <button id="zoomReset" class="sbtn" title="اندازهٔ واقعی">۱:۱</button>
-      <button id="zoomFit" class="sbtn" title="جا دادن صفحه در نما">جا بده</button>
+      <button id="zoomIn" class="sbtn" data-tip="بزرگ‌نمایی" aria-label="بزرگ‌نمایی">+</button>
+      <button id="zoomReset" class="sbtn" data-tip="زوم ۱۰۰٪ — اندازهٔ واقعی چاپ">۱:۱</button>
+      <button id="zoomFit" class="sbtn" data-tip="جا دادن کل صفحه در نما">جا بده</button>
       <span class="sdot"></span>
-      <span id="pageInfo">A4 · عمودی</span>
+      <span id="pageInfo" data-tip="اندازه و جهت کاغذ سند">A4 · عمودی</span>
       <span class="sdot"></span>
-      <span id="selInfo">چیزی انتخاب نشده</span>
+      <span id="selInfo" data-tip="وضعیت انتخاب فعلی روی بوم">چیزی انتخاب نشده</span>
       <span class="spacer"></span>
       <span>Ctrl+K = همهٔ فرمان‌ها</span>
     </footer>

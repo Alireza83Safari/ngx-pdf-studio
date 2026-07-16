@@ -117,6 +117,15 @@
     );
   }
 
+  /** Move native `title` attributes to the custom [data-tip] tooltips (§8A). */
+  function upgradeTooltips(root) {
+    (root || document).querySelectorAll('[title]').forEach(function (node) {
+      if (node.classList && node.classList.contains('tool')) return;
+      if (!node.dataset.tip) node.dataset.tip = node.getAttribute('title');
+      node.removeAttribute('title');
+    });
+  }
+
   // --- toast ----------------------------------------------------------------
   var toastTimer = null;
   function toast(msg) {
@@ -202,6 +211,14 @@
       ],
       resources: { fonts: [], images: [] },
     };
+  }
+
+  /** A completely empty page — the from-scratch starting point (§8A-B). */
+  function blankTemplate() {
+    var t = freshTemplate();
+    t.metadata = { name: 'سند خالی' };
+    t.bands[0].elements = [];
+    return t;
   }
 
   var store = new P.DocumentStore(freshTemplate());
@@ -568,6 +585,7 @@
       }
     });
     document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+    document.getElementById('canvasHint').classList.toggle('show', band.elements.length === 0);
     renderQuickbar(t, m);
   }
 
@@ -623,6 +641,7 @@
     quickbarEl.classList.add('show');
     // re-center once real width is known
     quickbarEl.style.left = midX - quickbarEl.offsetWidth / 2 + 'px';
+    upgradeTooltips(quickbarEl);
   }
 
   /** Layers panel: top-most first, click to select, shift-click to toggle. */
@@ -646,7 +665,7 @@
         return (
           '<div class="layer' +
           (isSelected(el.id) ? ' selected' : '') +
-          '" data-id="' +
+          '" title="کلیک: انتخاب · Shift+کلیک: افزودن به انتخاب" data-id="' +
           esc(el.id) +
           '"><span class="l-ico">' +
           typeIcon(el.type, 13) +
@@ -658,6 +677,7 @@
         );
       })
       .join('');
+    upgradeTooltips(layersEl);
   }
   layersEl.addEventListener('click', function (e) {
     var row = e.target.closest ? e.target.closest('.layer') : null;
@@ -954,10 +974,15 @@
     fieldPickerEl.innerHTML = paths
       .map(function (p) {
         return (
-          '<span class="fp-item" draggable="true" data-path="' + esc(p) + '">' + esc(p) + '</span>'
+          '<span class="fp-item" draggable="true" title="بکش و روی بوم رها کن — یا روی یک الِمان تا بایندش شود" data-path="' +
+          esc(p) +
+          '">' +
+          esc(p) +
+          '</span>'
         );
       })
       .join('');
+    upgradeTooltips(fieldPickerEl);
     fieldPickerEl.querySelectorAll('.fp-item').forEach(function (chip) {
       chip.addEventListener('dragstart', function (ev) {
         ev.dataTransfer.setData('text/plain', chip.dataset.path);
@@ -1101,12 +1126,14 @@
       '</div>';
     html += field(
       'چرخش',
-      '<input type="number" data-prop="rotation" value="' + (el.rotation || 0) + '" step="15">',
+      '<input type="number" title="چرخش الِمان به درجه — مثبت = ساعتگرد" data-prop="rotation" value="' +
+        (el.rotation || 0) +
+        '" step="15">',
     );
     html +=
       '<div class="btnrow">' +
-      '<button data-z="front" title="بیار جلو">⬆ بیار جلو</button>' +
-      '<button data-z="back" title="بفرست عقب">⬇ بفرست عقب</button>' +
+      '<button data-z="front" title="نمایش روی الِمان‌های دیگر">⬆ بیار جلو</button>' +
+      '<button data-z="back" title="نمایش زیر الِمان‌های دیگر">⬇ بفرست عقب</button>' +
       '</div>';
     html += '</div>';
 
@@ -1139,7 +1166,9 @@
     if (el.type === 'dataField' || el.type === 'barcode' || el.type === 'qrcode')
       content += field(
         el.type === 'dataField' ? 'بایند' : 'مقدار',
-        '<input dir="ltr" data-prop="source" value="' + esc(el.value ? el.value.source : '') + '">',
+        '<input dir="ltr" title="عبارت داده — مثل customer.name یا qty * price" data-prop="source" value="' +
+          esc(el.value ? el.value.source : '') +
+          '">',
       );
     if (el.type === 'barcode')
       content += field(
@@ -1239,17 +1268,26 @@
 
     html +=
       '<div class="sec"><div class="btnrow">' +
-      '<button id="dupEl">کپی (Ctrl+D)</button>' +
-      '<button id="deleteEl">حذف</button>' +
+      '<button id="dupEl" title="یک کپی با فاصلهٔ کم می‌سازد">کپی (Ctrl+D)</button>' +
+      '<button id="deleteEl" title="حذف الِمان(های) انتخاب‌شده">حذف</button>' +
       '</div></div>';
     inspectorEl.innerHTML = html;
     wireInspector(el);
+    upgradeTooltips(inspectorEl);
   }
+  var BOUND_TIPS = {
+    x: 'فاصلهٔ افقی از لبهٔ ناحیهٔ محتوا (pt)',
+    y: 'فاصلهٔ عمودی از بالای ناحیهٔ محتوا (pt)',
+    w: 'پهنای الِمان (pt)',
+    h: 'بلندی الِمان (pt)',
+  };
   function numField(k, v) {
     return (
       '<div class="row"><label>' +
       k +
-      '</label><input type="number" data-bound="' +
+      '</label><input type="number" title="' +
+      (BOUND_TIPS[k] || '') +
+      '" data-bound="' +
       k +
       '" value="' +
       Math.round(v) +
@@ -1413,6 +1451,14 @@
   });
   document.getElementById('pageDir').addEventListener('change', function (e) {
     store.dispatch(P.patchPageSetup({ direction: e.target.value }));
+  });
+  document.getElementById('pageSize').addEventListener('change', function (e) {
+    if (e.target.value !== '__custom__') {
+      store.dispatch(P.patchPageSetup({ size: e.target.value }));
+    }
+  });
+  document.getElementById('pageOrient').addEventListener('change', function (e) {
+    store.dispatch(P.patchPageSetup({ orientation: e.target.value }));
   });
   document.getElementById('exportJson').addEventListener('click', function () {
     download(
@@ -1708,11 +1754,13 @@
         var w = Number(svg.getAttribute('width')) || 595;
         svg.style.transform = 'scale(' + 220 / w + ')';
       }
+      card.title = 'لود قالب «' + entry.name + '» همراه دادهٔ نمونه‌اش';
       card.addEventListener('click', function () {
         loadGalleryTemplate(entry);
       });
       galleryCardsEl.appendChild(card);
     });
+    upgradeTooltips(galleryCardsEl);
   }
   function loadGalleryTemplate(entry) {
     sampleData = JSON.parse(JSON.stringify(entry.data || {}));
@@ -1783,7 +1831,8 @@
     } catch (err) {
       /* ignore */
     }
-    loadTemplate(freshTemplate());
+    loadTemplate(blankTemplate());
+    toast('سند خالی آماده است — از جعبه‌ابزار شروع کن');
   });
 
   // --- keyboard ------------------------------------------------------------
@@ -1841,6 +1890,10 @@
     document.getElementById('undo').disabled = !store.canUndo();
     document.getElementById('redo').disabled = !store.canRedo();
     document.getElementById('pageDir').value = store.getState().page.direction;
+    var pg = store.getState().page;
+    document.getElementById('pageSize').value =
+      typeof pg.size === 'string' ? pg.size : '__custom__';
+    document.getElementById('pageOrient').value = pg.orientation;
     if (document.activeElement !== docNameEl) {
       docNameEl.value = store.getState().metadata.name || 'سند بی‌نام';
     }
@@ -1874,6 +1927,7 @@
     rerender();
     renderInspector();
   });
+  upgradeTooltips(document);
   renderFieldPicker();
   if (!restoreDraft()) {
     rerender();

@@ -208,6 +208,43 @@ try {
   if (!doc.getElementById('fileMenu').contains(doc.getElementById('exportJson')))
     fail('exportJson not in file menu');
 
+  // --- universal tooltips ---
+  if (!doc.getElementById('undo').dataset.tip) fail('undo missing data-tip');
+  if (!doc.querySelector('#fieldPicker .fp-item').dataset.tip) fail('field chip missing data-tip');
+  if (doc.querySelector('#fieldPicker .fp-item').getAttribute('title'))
+    fail('chip title not upgraded to data-tip');
+  if (!doc.querySelector('.tab[data-tab="layers"]').dataset.tip) fail('tab missing data-tip');
+  if (!doc.getElementById('inspector').querySelector('[data-tip]'))
+    fail('inspector controls missing tooltips');
+
+  // --- blank template + page setup ---
+  doc.getElementById('openGallery').dispatchEvent(new window.Event('click', { bubbles: true }));
+  const blankCard = doc.querySelector('.tpl-card[data-template="blank"]');
+  if (!blankCard) fail('blank template card missing');
+  if (doc.querySelectorAll('.tpl-card')[0] !== blankCard) fail('blank template is not first');
+  blankCard.dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (doc.querySelectorAll('.el').length !== 0) fail('blank template should have 0 elements');
+  if (!doc.getElementById('canvasHint').classList.contains('show'))
+    fail('canvas hint not shown on empty page');
+  // page-size control switches the document size
+  const sizeSel = doc.getElementById('pageSize');
+  if (!sizeSel) fail('pageSize select missing');
+  sizeSel.value = 'A5';
+  sizeSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+  if (!/A5/.test(doc.getElementById('pageInfo').textContent))
+    fail('pageInfo did not reflect A5: ' + doc.getElementById('pageInfo').textContent);
+  const orientSel = doc.getElementById('pageOrient');
+  orientSel.value = 'landscape';
+  orientSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+  if (!/افقی/.test(doc.getElementById('pageInfo').textContent))
+    fail('pageInfo did not reflect landscape');
+  // adding an element hides the hint
+  doc
+    .querySelector('[data-add="staticText"]')
+    .dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (doc.getElementById('canvasHint').classList.contains('show'))
+    fail('canvas hint still visible after adding an element');
+
   console.log(
     'designer smoke OK — overlays:',
     overlays.length,
