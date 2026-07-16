@@ -409,6 +409,554 @@
     verifyUrl: 'https://example.ir/verify/CERT-1405-118',
   };
 
+  // --- ۶) رسید پرداخت (عرض ۸ سانتی، حرارتی) --------------------------------
+  var receipt = baseTemplate(
+    'رسید پرداخت',
+    page({
+      size: { width: 226, height: 430 },
+      margins: { top: 16, right: 14, bottom: 16, left: 14 },
+    }),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 398 },
+        elements: [
+          fieldEl('r-store', 'store.name', 0, 0, 198, 18, {
+            fontSize: 13,
+            fontWeight: 'bold',
+            align: 'center',
+          }),
+          fieldEl('r-branch', 'store.branch', 0, 22, 198, 12, {
+            fontSize: 8,
+            color: MUTED,
+            align: 'center',
+          }),
+          hline('r-ln1', 0, 44, 198),
+          text('r-no-l', 'شمارهٔ رسید', 0, 56, 90, 12, { fontSize: 9, color: MUTED }),
+          fieldEl('r-no', 'receipt.number', 98, 56, 100, 12, { fontSize: 9, align: 'end' }),
+          text('r-date-l', 'تاریخ', 0, 74, 90, 12, { fontSize: 9, color: MUTED }),
+          {
+            id: 'r-date',
+            type: 'pageField',
+            field: 'currentDate',
+            bounds: { x: 98, y: 74, width: 100, height: 12 },
+            zIndex: 1,
+            typography: { fontFamily: V, fontSize: 9, align: 'end', color: INK },
+          },
+          text('r-for-l', 'بابت', 0, 92, 90, 12, { fontSize: 9, color: MUTED }),
+          fieldEl('r-for', 'receipt.description', 60, 92, 138, 12, { fontSize: 9, align: 'end' }),
+          hline('r-ln2', 0, 114, 198),
+          text('r-amt-l', 'مبلغ پرداخت‌شده', 0, 128, 198, 14, {
+            fontSize: 9,
+            color: MUTED,
+            align: 'center',
+          }),
+          fieldEl('r-amt', 'receipt.amount', 0, 146, 198, 26, {
+            fontSize: 20,
+            fontWeight: 'bold',
+            align: 'center',
+            color: BLUE,
+          }),
+          text('r-unit', 'ریال', 0, 176, 198, 12, { fontSize: 8, color: MUTED, align: 'center' }),
+          hline('r-ln3', 0, 200, 198),
+          text('r-pay-l', 'روش پرداخت', 0, 212, 90, 12, { fontSize: 9, color: MUTED }),
+          fieldEl('r-pay', 'receipt.method', 98, 212, 100, 12, { fontSize: 9, align: 'end' }),
+          text('r-ref-l', 'کد پیگیری', 0, 230, 90, 12, { fontSize: 9, color: MUTED }),
+          fieldEl('r-ref', 'receipt.ref', 98, 230, 100, 12, { fontSize: 9, align: 'end' }),
+          {
+            id: 'r-qr',
+            type: 'qrcode',
+            bounds: { x: 69, y: 262, width: 60, height: 60 },
+            zIndex: 1,
+            value: { source: 'receipt.ref' },
+          },
+          text('r-thanks', 'از خرید شما سپاسگزاریم', 0, 336, 198, 14, {
+            fontSize: 9,
+            align: 'center',
+            color: MUTED,
+          }),
+          fieldEl('r-phone', 'store.phone', 0, 354, 198, 12, {
+            fontSize: 8,
+            align: 'center',
+            color: MUTED,
+          }),
+        ],
+      },
+    ],
+  );
+  var receiptData = {
+    store: { name: 'فروشگاه پارس', branch: 'شعبهٔ مرکزی — تهران', phone: '۰۲۱-۸۸۷۷۶۶۵۵' },
+    receipt: {
+      number: 'RC-140507-118',
+      description: 'شارژ اشتراک سالانه',
+      amount: '۴٬۸۵۰٬۰۰۰',
+      method: 'کارت بانکی',
+      ref: 'TRX-98213467',
+    },
+  };
+
+  // --- ۷) پیش‌فاکتور ----------------------------------------------------------
+  var proforma = baseTemplate('پیش‌فاکتور', page(), [
+    {
+      id: 'main',
+      type: 'reportHeader',
+      height: { mode: 'fixed', value: 700 },
+      elements: [
+        text('p-title', 'پیش‌فاکتور', 0, 0, 200, 30, {
+          fontSize: 22,
+          fontWeight: 'bold',
+          color: BLUE,
+        }),
+        text('p-badge', 'غیرقابل استناد مالیاتی', 0, 34, 140, 14, { fontSize: 8, color: MUTED }),
+        fieldEl('p-co', 'company.name', 300, 0, 223, 18, {
+          fontSize: 12,
+          fontWeight: 'bold',
+          align: 'end',
+        }),
+        text('p-no-l', 'شماره:', 300, 26, 60, 13, { fontSize: 9, color: MUTED }),
+        fieldEl('p-no', 'quote.number', 360, 26, 163, 13, { fontSize: 10, align: 'end' }),
+        text('p-valid-l', 'معتبر تا:', 300, 44, 60, 13, { fontSize: 9, color: MUTED }),
+        fieldEl('p-valid', 'quote.validUntil', 360, 44, 163, 13, { fontSize: 10, align: 'end' }),
+        hline('p-ln1', 0, 70, 523, BLUE, 2),
+        text('p-cust-l', 'مشتری:', 0, 86, 50, 14, { fontSize: 10, color: MUTED }),
+        fieldEl('p-cust', 'customer.name', 52, 84, 240, 16, { fontSize: 12, fontWeight: 'bold' }),
+        {
+          id: 'p-tbl',
+          type: 'table',
+          bounds: { x: 0, y: 116, width: 523, height: 120 },
+          zIndex: 1,
+          dataset: 'items',
+          columns: [
+            {
+              id: 'c-i',
+              width: { kind: 'percent', value: 8 },
+              header: { text: 'ردیف', styleId: 'cellHead' },
+              detail: { content: { source: '$index + 1' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-name',
+              width: { kind: 'percent', value: 42 },
+              header: { text: 'شرح', styleId: 'cellHead' },
+              detail: { content: { source: 'name' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-qty',
+              width: { kind: 'percent', value: 12 },
+              header: { text: 'تعداد', styleId: 'cellHead' },
+              detail: { content: { source: 'qty' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-price',
+              width: { kind: 'percent', value: 19 },
+              header: { text: 'فی (ریال)', styleId: 'cellHead' },
+              detail: { content: { source: 'price' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-sum',
+              width: { kind: 'percent', value: 19 },
+              header: { text: 'جمع (ریال)', styleId: 'cellHead' },
+              detail: { content: { source: 'qty * price' }, styleId: 'cell' },
+              footer: { aggregate: 'sum', styleId: 'cellHead' },
+            },
+          ],
+        },
+        text('p-total-l', 'جمع کل:', 330, 280, 60, 16, { fontSize: 12, fontWeight: 'bold' }),
+        fieldEl('p-total', 'sum(items, qty * price)', 392, 280, 131, 18, {
+          fontSize: 13,
+          fontWeight: 'bold',
+          color: BLUE,
+          align: 'end',
+        }),
+        text(
+          'p-terms',
+          'شرایط: پرداخت ۵۰٪ پیش‌پرداخت — تحویل ۱۰ روز کاری پس از ثبت سفارش.',
+          0,
+          320,
+          420,
+          14,
+          { fontSize: 9, color: MUTED },
+        ),
+      ],
+    },
+  ]);
+  var proformaData = {
+    company: { name: 'شرکت راهکار افزار' },
+    customer: { name: 'فروشگاه زنجیره‌ای آفتاب' },
+    quote: { number: 'PF-1405-0217', validUntil: '۱۴۰۵/۰۵/۳۱' },
+    items: [
+      { name: 'لایسنس نرم‌افزار انبار — ۱۰ کاربر', qty: 1, price: 480000000 },
+      { name: 'استقرار و آموزش (روز)', qty: 3, price: 35000000 },
+      { name: 'پشتیبانی سالانه', qty: 1, price: 96000000 },
+    ],
+  };
+
+  // --- ۸) لیست بسته‌بندی ------------------------------------------------------
+  var packing = baseTemplate('لیست بسته‌بندی', page(), [
+    {
+      id: 'main',
+      type: 'reportHeader',
+      height: { mode: 'fixed', value: 700 },
+      elements: [
+        text('k-title', 'لیست بسته‌بندی', 0, 0, 240, 26, { fontSize: 18, fontWeight: 'bold' }),
+        {
+          id: 'k-bc',
+          type: 'barcode',
+          symbology: 'code128',
+          bounds: { x: 353, y: 0, width: 170, height: 44 },
+          zIndex: 1,
+          value: { source: 'order.number' },
+          showText: true,
+        },
+        hline('k-ln1', 0, 58, 523, BLUE, 2),
+        text('k-to-l', 'گیرنده:', 0, 74, 50, 14, { fontSize: 10, color: MUTED }),
+        fieldEl('k-to', 'shipTo.name', 52, 72, 240, 16, { fontSize: 12, fontWeight: 'bold' }),
+        fieldEl('k-addr', 'shipTo.address', 52, 92, 400, 14, { fontSize: 9, color: MUTED }),
+        text('k-date-l', 'تاریخ ارسال:', 380, 74, 70, 13, { fontSize: 9, color: MUTED }),
+        fieldEl('k-date', 'order.shipDate', 452, 74, 71, 13, { fontSize: 10, align: 'end' }),
+        {
+          id: 'k-tbl',
+          type: 'table',
+          bounds: { x: 0, y: 122, width: 523, height: 140 },
+          zIndex: 1,
+          dataset: 'items',
+          columns: [
+            {
+              id: 'c-i',
+              width: { kind: 'percent', value: 8 },
+              header: { text: 'ردیف', styleId: 'cellHead' },
+              detail: { content: { source: '$index + 1' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-desc',
+              width: { kind: 'percent', value: 44 },
+              header: { text: 'شرح کالا', styleId: 'cellHead' },
+              detail: { content: { source: 'name' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-box',
+              width: { kind: 'percent', value: 16 },
+              header: { text: 'شمارهٔ کارتن', styleId: 'cellHead' },
+              detail: { content: { source: 'box' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-qty',
+              width: { kind: 'percent', value: 16 },
+              header: { text: 'تعداد', styleId: 'cellHead' },
+              detail: { content: { source: 'qty' }, styleId: 'cell' },
+              footer: { aggregate: 'sum', styleId: 'cellHead' },
+            },
+            {
+              id: 'c-wt',
+              width: { kind: 'percent', value: 16 },
+              header: { text: 'وزن (kg)', styleId: 'cellHead' },
+              detail: { content: { source: 'weight' }, styleId: 'cell' },
+              footer: { aggregate: 'sum', styleId: 'cellHead' },
+            },
+          ],
+        },
+        text(
+          'k-note',
+          'کالاها پیش از ارسال بازبینی و پلمب شده‌اند. لطفاً هنگام تحویل، تعداد کارتن‌ها را با این برگه تطبیق دهید.',
+          0,
+          300,
+          460,
+          14,
+          { fontSize: 8.5, color: MUTED },
+        ),
+        hline('k-sig1', 20, 400, 150),
+        text('k-sig1-l', 'مسئول انبار', 20, 408, 150, 14, { fontSize: 9, align: 'center' }),
+        hline('k-sig2', 350, 400, 150),
+        text('k-sig2-l', 'تحویل‌گیرنده', 350, 408, 150, 14, { fontSize: 9, align: 'center' }),
+      ],
+    },
+  ]);
+  var packingData = {
+    order: { number: 'ORD-88412', shipDate: '۱۴۰۵/۰۴/۲۲' },
+    shipTo: {
+      name: 'فروشگاه مرکزی کوروش',
+      address: 'اصفهان، خیابان چهارباغ بالا، مجتمع تجاری کوثر، واحد ۱۲',
+    },
+    items: [
+      { name: 'مانیتور ۲۴ اینچ', box: 'K-01', qty: 4, weight: 18.4 },
+      { name: 'کیس رایانه', box: 'K-02', qty: 4, weight: 26 },
+      { name: 'کیبورد و ماوس', box: 'K-03', qty: 8, weight: 6.2 },
+      { name: 'کابل و متعلقات', box: 'K-03', qty: 12, weight: 3.5 },
+    ],
+  };
+
+  // --- ۹) کارت ویزیت ----------------------------------------------------------
+  var card = baseTemplate(
+    'کارت ویزیت',
+    page({
+      size: { width: 252, height: 144 },
+      margins: { top: 16, right: 18, bottom: 16, left: 18 },
+    }),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 112 },
+        elements: [
+          {
+            id: 'v-band',
+            type: 'rectangle',
+            bounds: { x: -18, y: -16, width: 6, height: 144 },
+            zIndex: 1,
+            box: { fill: { color: BLUE } },
+          },
+          fieldEl('v-name', 'person.name', 0, 4, 150, 20, { fontSize: 14, fontWeight: 'bold' }),
+          fieldEl('v-role', 'person.role', 0, 27, 150, 13, { fontSize: 9, color: MUTED }),
+          fieldEl('v-co', 'person.company', 0, 44, 150, 13, {
+            fontSize: 10,
+            fontWeight: 'bold',
+            color: BLUE,
+          }),
+          hline('v-ln', 0, 68, 130),
+          fieldEl('v-phone', 'person.phone', 0, 78, 150, 12, { fontSize: 8.5, color: MUTED }),
+          fieldEl('v-mail', 'person.email', 0, 93, 150, 12, { fontSize: 8.5, color: MUTED }),
+          {
+            id: 'v-qr',
+            type: 'qrcode',
+            bounds: { x: 160, y: 34, width: 56, height: 56 },
+            zIndex: 1,
+            value: { source: 'person.site' },
+          },
+          text('v-site-l', 'اسکن کن', 160, 94, 56, 10, {
+            fontSize: 7,
+            color: MUTED,
+            align: 'center',
+          }),
+        ],
+      },
+    ],
+  );
+  var cardData = {
+    person: {
+      name: 'نگار صادقی',
+      role: 'مدیر محصول',
+      company: 'استودیو نارنج',
+      phone: '۰۹۱۲ ۳۴۵ ۶۷۸۹',
+      email: 'negar@naranj.studio',
+      site: 'https://naranj.studio',
+    },
+  };
+
+  // --- ۱۰) منوی رستوران --------------------------------------------------------
+  var menu = baseTemplate(
+    'منوی رستوران',
+    page(),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 700 },
+        elements: [
+          fieldEl('m-name', 'restaurant.name', 0, 0, 523, 30, {
+            fontSize: 24,
+            fontWeight: 'bold',
+            align: 'center',
+          }),
+          fieldEl('m-slogan', 'restaurant.slogan', 0, 36, 523, 14, {
+            fontSize: 10,
+            color: MUTED,
+            align: 'center',
+          }),
+          hline('m-ln1', 180, 60, 163, BLUE, 2),
+          text('m-hot-l', 'غذاهای اصلی', 0, 84, 200, 18, {
+            fontSize: 13,
+            fontWeight: 'bold',
+            color: BLUE,
+          }),
+          {
+            id: 'm-hot',
+            type: 'table',
+            bounds: { x: 0, y: 108, width: 523, height: 120 },
+            zIndex: 1,
+            dataset: 'mains',
+            columns: [
+              {
+                id: 'c-n',
+                width: { kind: 'percent', value: 40 },
+                header: { text: 'نام', styleId: 'cellHead' },
+                detail: { content: { source: 'name' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-d',
+                width: { kind: 'percent', value: 42 },
+                header: { text: 'توضیح', styleId: 'cellHead' },
+                detail: { content: { source: 'desc' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-p',
+                width: { kind: 'percent', value: 18 },
+                header: { text: 'قیمت (هزار تومان)', styleId: 'cellHead' },
+                detail: { content: { source: 'price' }, styleId: 'cell' },
+              },
+            ],
+          },
+          text('m-cold-l', 'نوشیدنی و دسر', 0, 268, 200, 18, {
+            fontSize: 13,
+            fontWeight: 'bold',
+            color: BLUE,
+          }),
+          {
+            id: 'm-cold',
+            type: 'table',
+            bounds: { x: 0, y: 292, width: 523, height: 100 },
+            zIndex: 1,
+            dataset: 'drinks',
+            columns: [
+              {
+                id: 'c-n2',
+                width: { kind: 'percent', value: 40 },
+                header: { text: 'نام', styleId: 'cellHead' },
+                detail: { content: { source: 'name' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-d2',
+                width: { kind: 'percent', value: 42 },
+                header: { text: 'توضیح', styleId: 'cellHead' },
+                detail: { content: { source: 'desc' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-p2',
+                width: { kind: 'percent', value: 18 },
+                header: { text: 'قیمت (هزار تومان)', styleId: 'cellHead' },
+                detail: { content: { source: 'price' }, styleId: 'cell' },
+              },
+            ],
+          },
+          text(
+            'm-note',
+            'قیمت‌ها شامل ۱۰٪ حق سرویس است — سفارش بیرون‌بر: داخلی ۲',
+            0,
+            430,
+            523,
+            14,
+            {
+              fontSize: 9,
+              color: MUTED,
+              align: 'center',
+            },
+          ),
+          {
+            id: 'm-qr',
+            type: 'qrcode',
+            bounds: { x: 232, y: 460, width: 60, height: 60 },
+            zIndex: 1,
+            value: { source: 'restaurant.orderUrl' },
+          },
+          text('m-qr-l', 'سفارش آنلاین', 212, 526, 100, 12, {
+            fontSize: 8,
+            color: MUTED,
+            align: 'center',
+          }),
+        ],
+      },
+    ],
+    {
+      datasets: [
+        { name: 'mains', source: { kind: 'path', path: 'mains' } },
+        { name: 'drinks', source: { kind: 'path', path: 'drinks' } },
+      ],
+    },
+  );
+  var menuData = {
+    restaurant: {
+      name: 'رستوران بهارنارنج',
+      slogan: 'طعم خانگی، از ۱۳۷۴',
+      orderUrl: 'https://baharnaranj.ir/menu',
+    },
+    mains: [
+      { name: 'چلوکباب سلطانی', desc: 'برگ و کوبیده، گوجه کبابی، برنج ایرانی', price: 485 },
+      { name: 'زرشک‌پلو با مرغ', desc: 'ران مرغ زعفرانی، زرشک تازه', price: 320 },
+      { name: 'قورمه‌سبزی', desc: 'گوشت گوسفندی، لیموعمانی، سبزی تازه', price: 295 },
+      { name: 'باقالی‌پلو با ماهیچه', desc: 'ماهیچهٔ گوسفندی، شوید و باقالی', price: 540 },
+    ],
+    drinks: [
+      { name: 'دوغ محلی', desc: 'نعناع و گل‌محمدی', price: 45 },
+      { name: 'شربت زعفران', desc: 'با تخم شربتی', price: 55 },
+      { name: 'بستنی سنتی', desc: 'زعفرانی با خلال پسته', price: 85 },
+    ],
+  };
+
+  // --- ۱۱) گزارش کارکرد ماهانه --------------------------------------------------
+  var timesheet = baseTemplate('گزارش کارکرد', page(), [
+    {
+      id: 'main',
+      type: 'reportHeader',
+      height: { mode: 'fixed', value: 700 },
+      elements: [
+        text('t-title', 'گزارش کارکرد ماهانه', 0, 0, 260, 24, { fontSize: 17, fontWeight: 'bold' }),
+        text('t-emp-l', 'کارمند:', 320, 2, 50, 14, { fontSize: 9, color: MUTED }),
+        fieldEl('t-emp', 'employee.name', 372, 0, 151, 16, {
+          fontSize: 11,
+          fontWeight: 'bold',
+          align: 'end',
+        }),
+        text('t-mon-l', 'ماه:', 320, 22, 50, 13, { fontSize: 9, color: MUTED }),
+        fieldEl('t-mon', 'employee.month', 372, 20, 151, 14, { fontSize: 10, align: 'end' }),
+        hline('t-ln1', 0, 48, 523, BLUE, 2),
+        {
+          id: 't-tbl',
+          type: 'table',
+          bounds: { x: 0, y: 64, width: 523, height: 150 },
+          zIndex: 1,
+          dataset: 'items',
+          columns: [
+            {
+              id: 'c-day',
+              width: { kind: 'percent', value: 14 },
+              header: { text: 'روز', styleId: 'cellHead' },
+              detail: { content: { source: 'day' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-prj',
+              width: { kind: 'percent', value: 28 },
+              header: { text: 'پروژه', styleId: 'cellHead' },
+              detail: { content: { source: 'project' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-desc',
+              width: { kind: 'percent', value: 44 },
+              header: { text: 'شرح فعالیت', styleId: 'cellHead' },
+              detail: { content: { source: 'task' }, styleId: 'cell' },
+            },
+            {
+              id: 'c-hr',
+              width: { kind: 'percent', value: 14 },
+              header: { text: 'ساعت', styleId: 'cellHead' },
+              detail: { content: { source: 'hours' }, styleId: 'cell' },
+              footer: { aggregate: 'sum', styleId: 'cellHead' },
+            },
+          ],
+        },
+        text('t-sum-l', 'جمع کارکرد:', 330, 280, 80, 16, { fontSize: 11, fontWeight: 'bold' }),
+        fieldEl('t-sum', "sum(items, hours) + ' ساعت'", 412, 280, 111, 16, {
+          fontSize: 12,
+          fontWeight: 'bold',
+          color: BLUE,
+          align: 'end',
+        }),
+        hline('t-sig1', 20, 380, 150),
+        text('t-sig1-l', 'امضای کارمند', 20, 388, 150, 14, { fontSize: 9, align: 'center' }),
+        hline('t-sig2', 350, 380, 150),
+        text('t-sig2-l', 'تأیید مدیر', 350, 388, 150, 14, { fontSize: 9, align: 'center' }),
+      ],
+    },
+  ]);
+  var timesheetData = {
+    employee: { name: 'امیرحسین کاظمی', month: 'تیر ۱۴۰۵' },
+    items: [
+      { day: 'شنبه ۱', project: 'پرتال مشتریان', task: 'پیاده‌سازی صفحهٔ ورود', hours: 8 },
+      { day: 'یکشنبه ۲', project: 'پرتال مشتریان', task: 'اتصال به سرویس پیامک', hours: 7.5 },
+      { day: 'دوشنبه ۳', project: 'اپ انبار', task: 'رفع اشکال گزارش موجودی', hours: 6 },
+      { day: 'سه‌شنبه ۴', project: 'اپ انبار', task: 'تست و مستندسازی', hours: 8 },
+      { day: 'چهارشنبه ۵', project: 'پرتال مشتریان', task: 'بازبینی کد و انتشار', hours: 5.5 },
+    ],
+  };
+
   window.PDFSTUDIO_TEMPLATES = [
     {
       id: 'invoice',
@@ -444,6 +992,48 @@
       desc: 'افقی با قاب و امضا',
       template: certificate,
       data: certificateData,
+    },
+    {
+      id: 'receipt',
+      name: 'رسید پرداخت',
+      desc: 'عرض ۸cm حرارتی + QR پیگیری',
+      template: receipt,
+      data: receiptData,
+    },
+    {
+      id: 'proforma',
+      name: 'پیش‌فاکتور',
+      desc: 'با اعتبار، شرایط و جمع کل',
+      template: proforma,
+      data: proformaData,
+    },
+    {
+      id: 'packing',
+      name: 'لیست بسته‌بندی',
+      desc: 'کارتن/تعداد/وزن + بارکد سفارش',
+      template: packing,
+      data: packingData,
+    },
+    {
+      id: 'card',
+      name: 'کارت ویزیت',
+      desc: 'سایز استاندارد + QR سایت',
+      template: card,
+      data: cardData,
+    },
+    {
+      id: 'menu',
+      name: 'منوی رستوران',
+      desc: 'دو بخش غذا/نوشیدنی + سفارش آنلاین',
+      template: menu,
+      data: menuData,
+    },
+    {
+      id: 'timesheet',
+      name: 'گزارش کارکرد',
+      desc: 'تایم‌شیت با جمع ساعت و امضا',
+      template: timesheet,
+      data: timesheetData,
     },
   ];
 })();
