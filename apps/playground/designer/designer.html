@@ -1101,6 +1101,296 @@
         color: var(--muted);
       }
 
+      /* ================= help center ================= */
+      .help-backdrop {
+        position: fixed;
+        inset: 0;
+        display: none;
+        background: rgba(10, 12, 16, 0.55);
+        backdrop-filter: blur(7px);
+        z-index: 110;
+        align-items: center;
+        justify-content: center;
+      }
+      .help-backdrop.show {
+        display: flex;
+      }
+      .help-panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        width: min(880px, 94vw);
+        height: min(600px, 86vh);
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--shadow-pop);
+        overflow: hidden;
+      }
+      .help-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        flex: none;
+      }
+      .help-head .hh-ico {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        font-size: 16px;
+      }
+      .help-head strong {
+        font-size: 14.5px;
+        display: block;
+      }
+      .help-head p {
+        margin: 2px 0 0;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .help-head .spacer {
+        flex: 1;
+      }
+      #startTour {
+        height: 32px;
+      }
+      .help-body {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+      }
+      .help-nav {
+        width: 190px;
+        flex: none;
+        border-inline-end: 1px solid var(--border);
+        padding: 10px 8px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        background: var(--raised);
+      }
+      .help-nav button {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-size: 12.5px;
+        padding: 8px 10px;
+        border-radius: 9px;
+        cursor: pointer;
+        text-align: start;
+        transition:
+          background 0.12s,
+          color 0.12s;
+      }
+      .help-nav button:hover {
+        background: var(--accent-weak);
+        color: var(--ink);
+      }
+      .help-nav button.active {
+        background: var(--accent-weak);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .help-nav button svg {
+        flex: none;
+      }
+      .help-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 22px 26px 30px;
+        line-height: 2.1;
+        font-size: 13px;
+      }
+      .help-content h3 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .help-content .lead {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 0 0 16px;
+      }
+      .help-content h4 {
+        margin: 20px 0 6px;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--accent);
+      }
+      .help-content p {
+        margin: 0 0 10px;
+      }
+      .help-content ol,
+      .help-content ul {
+        margin: 0 0 12px;
+        padding-inline-start: 20px;
+      }
+      .help-content li {
+        margin-bottom: 4px;
+      }
+      .help-content code {
+        font-family: ui-monospace, monospace;
+        font-size: 11.5px;
+        background: var(--field);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 1px 6px;
+        direction: ltr;
+        unicode-bidi: embed;
+      }
+      .help-content kbd {
+        font-family: inherit;
+        font-size: 11px;
+        border: 1px solid var(--border);
+        border-bottom-width: 2px;
+        border-radius: 5px;
+        padding: 1px 6px;
+        background: var(--field);
+        color: var(--ink);
+      }
+      .callout {
+        display: flex;
+        gap: 10px;
+        background: var(--accent-weak);
+        border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+        border-radius: 11px;
+        padding: 10px 14px;
+        margin: 12px 0;
+        font-size: 12.5px;
+      }
+      .callout .c-ico {
+        flex: none;
+        font-size: 15px;
+      }
+      .htable {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 14px;
+        font-size: 12px;
+      }
+      .htable th {
+        text-align: start;
+        color: var(--faint);
+        font-weight: 600;
+        font-size: 10.5px;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .htable td {
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      .htable tr:last-child td {
+        border-bottom: 0;
+      }
+
+      /* ================= interactive tour ================= */
+      #tour {
+        position: fixed;
+        inset: 0;
+        z-index: 300;
+        display: none;
+      }
+      #tour.show {
+        display: block;
+      }
+      #tourRing {
+        position: fixed;
+        border-radius: 13px;
+        box-shadow:
+          0 0 0 3px var(--accent),
+          0 0 0 9999px rgba(8, 10, 14, 0.6);
+        transition:
+          top 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+          left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+          width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+          height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: none;
+      }
+      #tourCard {
+        position: fixed;
+        width: min(330px, 88vw);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 15px;
+        box-shadow: var(--shadow-pop);
+        padding: 16px 18px 14px;
+        transition:
+          top 0.3s,
+          left 0.3s;
+      }
+      #tourCard .t-step {
+        font-size: 10.5px;
+        color: var(--accent);
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      #tourCard h4 {
+        margin: 0 0 6px;
+        font-size: 14.5px;
+      }
+      #tourCard p {
+        margin: 0 0 12px;
+        font-size: 12.5px;
+        color: var(--muted);
+        line-height: 2;
+      }
+      #tourCard .t-foot {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #tourCard .t-dots {
+        display: flex;
+        gap: 4px;
+        flex: 1;
+      }
+      #tourCard .t-dots i {
+        width: 6px;
+        height: 6px;
+        border-radius: 99px;
+        background: var(--border-strong);
+        transition:
+          background 0.2s,
+          width 0.2s;
+      }
+      #tourCard .t-dots i.on {
+        background: var(--accent);
+        width: 16px;
+      }
+      #tourCard button {
+        height: 30px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--field);
+        color: var(--ink);
+        font-size: 12px;
+        cursor: pointer;
+      }
+      #tourCard button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 600;
+      }
+      #tourCard button.linkish {
+        border: 0;
+        background: transparent;
+        color: var(--faint);
+      }
+
       /* ================= command palette ================= */
       .palette-backdrop {
         position: fixed;
@@ -1307,6 +1597,7 @@
       <button id="toggleTheme" class="btn icon quiet" data-tip="تغییر تم محیط (روشن/تیره)">
         🌙
       </button>
+      <button id="openHelp" class="btn icon quiet" data-tip="راهنمای کامل و تور معرفی">؟</button>
 
       <button id="downloadPdf" class="btn primary" data-tip="ساخت PDF نهایی با فونت فارسی و دانلود">
         <svg
@@ -1645,6 +1936,30 @@
     </footer>
 
     <div id="toast" role="status"></div>
+
+    <div id="help" class="help-backdrop">
+      <div class="help-panel">
+        <div class="help-head">
+          <span class="hh-ico">؟</span>
+          <div>
+            <strong>راهنمای PDF Studio</strong>
+            <p>همهٔ بخش‌ها، قدم‌به‌قدم — از اولین الِمان تا PDF نهایی</p>
+          </div>
+          <span class="spacer"></span>
+          <button id="startTour" class="btn outline">🧭 تور معرفی محیط</button>
+          <button id="closeHelp" class="btn icon quiet" aria-label="بستن">✕</button>
+        </div>
+        <div class="help-body">
+          <nav id="helpNav" class="help-nav"></nav>
+          <div id="helpContent" class="help-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tour">
+      <div id="tourRing"></div>
+      <div id="tourCard"></div>
+    </div>
 
     <div id="gallery" class="gallery-backdrop">
       <div class="gallery-panel">

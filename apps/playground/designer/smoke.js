@@ -262,6 +262,39 @@ try {
   if (doc.getElementById('canvasHint').classList.contains('show'))
     fail('canvas hint still visible after adding an element');
 
+  // --- help center + interactive tour ---
+  doc.getElementById('openHelp').dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (!doc.getElementById('help').classList.contains('show')) fail('help did not open');
+  const navBtns = doc.querySelectorAll('#helpNav button');
+  if (navBtns.length < 10) fail('help sections missing: ' + navBtns.length);
+  if (!doc.getElementById('helpContent').innerHTML.includes('چهار مفهوم'))
+    fail('help start section not rendered');
+  navBtns[3].dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (!doc.getElementById('helpContent').innerHTML.includes('زبان عبارت'))
+    fail('help section switch failed');
+  // tour: starts from help, highlights, advances, skip persists the flag
+  doc.getElementById('startTour').dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (doc.getElementById('help').classList.contains('show')) fail('help should close for tour');
+  if (!doc.getElementById('tour').classList.contains('show')) fail('tour did not start');
+  if (
+    !doc.getElementById('tourCard').innerHTML.includes('قدم 1 از 8') &&
+    !doc.getElementById('tourCard').innerHTML.includes('قدم ۱')
+  )
+    fail('tour step 1 not shown: ' + doc.getElementById('tourCard').textContent.slice(0, 40));
+  doc
+    .querySelector('#tourCard [data-tour="next"]')
+    .dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (!doc.getElementById('tourCard').innerHTML.includes('بوم')) fail('tour did not advance');
+  doc
+    .querySelector('#tourCard [data-tour="skip"]')
+    .dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (doc.getElementById('tour').classList.contains('show')) fail('tour did not end on skip');
+  try {
+    if (window.localStorage.getItem('pdfstudio.toured') !== '1') fail('toured flag not persisted');
+  } catch (e) {
+    /* jsdom file:// has no localStorage — the designer guards this the same way */
+  }
+
   console.log(
     'designer smoke OK — overlays:',
     overlays.length,
