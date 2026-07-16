@@ -1453,10 +1453,26 @@
     store.dispatch(P.patchPageSetup({ direction: e.target.value }));
   });
   document.getElementById('pageSize').addEventListener('change', function (e) {
-    if (e.target.value !== '__custom__') {
+    if (e.target.value === '__custom__') {
+      // seed the custom inputs with the current resolved dimensions so the
+      // page does not jump; edits below dispatch the real size.
+      var cur = pageSize(store.getState());
+      store.dispatch(
+        P.patchPageSetup({
+          size: { width: Math.round(cur.width), height: Math.round(cur.height) },
+        }),
+      );
+    } else {
       store.dispatch(P.patchPageSetup({ size: e.target.value }));
     }
   });
+  function dispatchCustomSize() {
+    var w = Math.max(40, Number(document.getElementById('pageW').value) || 0);
+    var hgt = Math.max(40, Number(document.getElementById('pageH').value) || 0);
+    store.dispatch(P.patchPageSetup({ size: { width: w, height: hgt } }));
+  }
+  document.getElementById('pageW').addEventListener('change', dispatchCustomSize);
+  document.getElementById('pageH').addEventListener('change', dispatchCustomSize);
   document.getElementById('pageOrient').addEventListener('change', function (e) {
     store.dispatch(P.patchPageSetup({ orientation: e.target.value }));
   });
@@ -1891,9 +1907,16 @@
     document.getElementById('redo').disabled = !store.canRedo();
     document.getElementById('pageDir').value = store.getState().page.direction;
     var pg = store.getState().page;
-    document.getElementById('pageSize').value =
-      typeof pg.size === 'string' ? pg.size : '__custom__';
+    var isCustom = typeof pg.size !== 'string';
+    document.getElementById('pageSize').value = isCustom ? '__custom__' : pg.size;
     document.getElementById('pageOrient').value = pg.orientation;
+    document.getElementById('customSizeRow').style.display = isCustom ? '' : 'none';
+    if (isCustom) {
+      var wInp = document.getElementById('pageW');
+      var hInp = document.getElementById('pageH');
+      if (document.activeElement !== wInp) wInp.value = Math.round(pg.size.width);
+      if (document.activeElement !== hInp) hInp.value = Math.round(pg.size.height);
+    }
     if (document.activeElement !== docNameEl) {
       docNameEl.value = store.getState().metadata.name || 'سند بی‌نام';
     }

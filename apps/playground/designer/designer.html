@@ -1558,8 +1558,19 @@
                 <option value="A3">A3</option>
                 <option value="Letter">Letter</option>
                 <option value="Legal">Legal</option>
-                <option value="__custom__" disabled>سفارشی</option>
+                <option value="__custom__">سفارشی…</option>
               </select>
+            </div>
+            <div
+              class="row"
+              id="customSizeRow"
+              style="display: none"
+              data-tip="ابعاد دلخواه کاغذ به پونت (هر میلی‌متر ≈ ۲.۸۳ پونت)"
+            >
+              <label>ابعاد (pt)</label>
+              <input type="number" id="pageW" min="40" step="1" aria-label="پهنای کاغذ" />
+              <span style="color: var(--faint)">×</span>
+              <input type="number" id="pageH" min="40" step="1" aria-label="بلندی کاغذ" />
             </div>
             <div class="row" data-tip="عمودی یا افقی بودن کاغذ">
               <label>جهت کاغذ</label>

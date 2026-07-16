@@ -238,6 +238,23 @@ try {
   orientSel.dispatchEvent(new window.Event('change', { bubbles: true }));
   if (!/افقی/.test(doc.getElementById('pageInfo').textContent))
     fail('pageInfo did not reflect landscape');
+  // custom page size: picking 'سفارشی…' reveals the W×H inputs seeded with
+  // the current dimensions; editing them resizes the document live
+  sizeSel.value = '__custom__';
+  sizeSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+  const customRow = doc.getElementById('customSizeRow');
+  if (customRow.style.display === 'none') fail('custom size row did not appear');
+  if (!Number(doc.getElementById('pageW').value)) fail('custom width not seeded');
+  doc.getElementById('pageW').value = '300';
+  doc.getElementById('pageH').value = '200';
+  doc.getElementById('pageH').dispatchEvent(new window.Event('change', { bubbles: true }));
+  if (!/300\s*×\s*200|300×200/.test(doc.getElementById('pageInfo').textContent))
+    fail('pageInfo did not reflect custom 300×200: ' + doc.getElementById('pageInfo').textContent);
+  // switching back to a named size hides the row again
+  sizeSel.value = 'A4';
+  sizeSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+  if (customRow.style.display !== 'none') fail('custom row did not hide for named size');
+
   // adding an element hides the hint
   doc
     .querySelector('[data-add="staticText"]')
