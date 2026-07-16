@@ -57,6 +57,11 @@ export class FontProvider {
         if (key.startsWith(`${family}|`)) return font;
       }
     }
+    // No family requested (e.g. chart labels): prefer any embedded font — it
+    // covers far more scripts (Persian!) than the WinAnsi standard fonts.
+    if (!family) {
+      for (const font of this.custom.values()) return font;
+    }
     return this.standardFont(query.bold, query.italic);
   }
 
