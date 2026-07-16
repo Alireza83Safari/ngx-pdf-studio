@@ -971,6 +971,262 @@
     ],
   };
 
+  // --- ۱۲) فاکتور رسمی مالیاتی (صورتحساب فروش کالا و خدمات) ---------------------
+  var taxInvoice = baseTemplate(
+    'فاکتور رسمی مالیاتی',
+    page({ margins: { top: 28, right: 28, bottom: 28, left: 28 } }),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 740 },
+        elements: [
+          // ---- سربرگ ----
+          text('x-title', 'صورتحساب فروش کالا و خدمات', 0, 2, 539, 22, {
+            fontSize: 15,
+            fontWeight: 'bold',
+            align: 'center',
+          }),
+          text('x-no-l', 'شماره سریال:', 0, 6, 70, 12, { fontSize: 8, color: MUTED }),
+          fieldEl('x-no', 'invoice.serial', 72, 4, 90, 13, { fontSize: 9 }),
+          text('x-date-l', 'تاریخ:', 449, 6, 35, 12, { fontSize: 8, color: MUTED }),
+          {
+            id: 'x-date',
+            type: 'pageField',
+            field: 'currentDate',
+            bounds: { x: 484, y: 4, width: 55, height: 13 },
+            zIndex: 1,
+            typography: { fontFamily: V, fontSize: 9, color: INK },
+          },
+          // ---- مشخصات فروشنده ----
+          {
+            id: 'x-sbox',
+            type: 'rectangle',
+            bounds: { x: 0, y: 28, width: 539, height: 52 },
+            zIndex: 1,
+            box: { border: { all: { width: 0.8, color: rgb(120, 130, 150) } } },
+          },
+          text('x-s-t', 'مشخصات فروشنده', 6, 32, 100, 12, {
+            fontSize: 8.5,
+            fontWeight: 'bold',
+            color: BLUE,
+          }),
+          text('x-s-n-l', 'نام:', 6, 47, 25, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-s-n', 'seller.name', 32, 45, 180, 12, { fontSize: 9 }),
+          text('x-s-id-l', 'شمارهٔ اقتصادی:', 220, 47, 70, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-s-id', 'seller.taxId', 292, 45, 100, 12, { fontSize: 9 }),
+          text('x-s-nid-l', 'شناسهٔ ملی:', 398, 47, 55, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-s-nid', 'seller.nationalId', 454, 45, 82, 12, { fontSize: 9 }),
+          text('x-s-a-l', 'نشانی:', 6, 63, 30, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-s-a', 'seller.address', 38, 61, 380, 12, { fontSize: 8 }),
+          text('x-s-p-l', 'کدپستی:', 424, 63, 40, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-s-p', 'seller.postalCode', 466, 61, 70, 12, { fontSize: 8.5 }),
+          // ---- مشخصات خریدار ----
+          {
+            id: 'x-bbox',
+            type: 'rectangle',
+            bounds: { x: 0, y: 86, width: 539, height: 52 },
+            zIndex: 1,
+            box: { border: { all: { width: 0.8, color: rgb(120, 130, 150) } } },
+          },
+          text('x-b-t', 'مشخصات خریدار', 6, 90, 100, 12, {
+            fontSize: 8.5,
+            fontWeight: 'bold',
+            color: BLUE,
+          }),
+          text('x-b-n-l', 'نام:', 6, 105, 25, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-b-n', 'buyer.name', 32, 103, 180, 12, { fontSize: 9 }),
+          text('x-b-id-l', 'شمارهٔ اقتصادی:', 220, 105, 70, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-b-id', 'buyer.taxId', 292, 103, 100, 12, { fontSize: 9 }),
+          text('x-b-nid-l', 'شناسهٔ ملی:', 398, 105, 55, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-b-nid', 'buyer.nationalId', 454, 103, 82, 12, { fontSize: 9 }),
+          text('x-b-a-l', 'نشانی:', 6, 121, 30, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-b-a', 'buyer.address', 38, 119, 380, 12, { fontSize: 8 }),
+          text('x-b-p-l', 'کدپستی:', 424, 121, 40, 11, { fontSize: 8, color: MUTED }),
+          fieldEl('x-b-p', 'buyer.postalCode', 466, 119, 70, 12, { fontSize: 8.5 }),
+          // ---- جدول اقلام ----
+          {
+            id: 'x-tbl',
+            type: 'table',
+            bounds: { x: 0, y: 148, width: 539, height: 150 },
+            zIndex: 1,
+            dataset: 'items',
+            columns: [
+              {
+                id: 'c-i',
+                width: { kind: 'percent', value: 5 },
+                header: { text: 'ردیف', styleId: 'cellHead' },
+                detail: { content: { source: '$index + 1' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-code',
+                width: { kind: 'percent', value: 10 },
+                header: { text: 'کد کالا', styleId: 'cellHead' },
+                detail: { content: { source: 'code' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-desc',
+                width: { kind: 'percent', value: 24 },
+                header: { text: 'شرح کالا/خدمت', styleId: 'cellHead' },
+                detail: { content: { source: 'name' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-qty',
+                width: { kind: 'percent', value: 7 },
+                header: { text: 'تعداد', styleId: 'cellHead' },
+                detail: { content: { source: 'qty' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-unit',
+                width: { kind: 'percent', value: 12 },
+                header: { text: 'مبلغ واحد', styleId: 'cellHead' },
+                detail: { content: { source: 'price' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-total',
+                width: { kind: 'percent', value: 14 },
+                header: { text: 'مبلغ کل', styleId: 'cellHead' },
+                detail: { content: { source: 'qty * price' }, styleId: 'cell' },
+                footer: { aggregate: 'sum', styleId: 'cellHead' },
+              },
+              {
+                id: 'c-disc',
+                width: { kind: 'percent', value: 9 },
+                header: { text: 'تخفیف', styleId: 'cellHead' },
+                detail: { content: { source: 'discount' }, styleId: 'cell' },
+                footer: { aggregate: 'sum', styleId: 'cellHead' },
+              },
+              {
+                id: 'c-vat',
+                width: { kind: 'percent', value: 9 },
+                header: { text: 'مالیات ۱۰٪', styleId: 'cellHead' },
+                detail: { content: { source: '(qty * price - discount) * 0.1' }, styleId: 'cell' },
+              },
+              {
+                id: 'c-net',
+                width: { kind: 'percent', value: 10 },
+                header: { text: 'قابل پرداخت', styleId: 'cellHead' },
+                detail: { content: { source: '(qty * price - discount) * 1.1' }, styleId: 'cell' },
+              },
+            ],
+          },
+          // ---- جمع‌ها ----
+          text('x-sum-l', 'جمع کل (ریال):', 300, 320, 90, 13, { fontSize: 9, color: MUTED }),
+          fieldEl('x-sum', 'sum(items, qty * price)', 392, 318, 147, 14, {
+            fontSize: 10,
+            align: 'end',
+          }),
+          text('x-disc-l', 'جمع تخفیف:', 300, 338, 90, 13, { fontSize: 9, color: MUTED }),
+          fieldEl('x-disc', 'sum(items, discount)', 392, 336, 147, 14, {
+            fontSize: 10,
+            align: 'end',
+          }),
+          text('x-vat-l', 'مالیات بر ارزش افزوده:', 300, 356, 90, 13, {
+            fontSize: 9,
+            color: MUTED,
+          }),
+          fieldEl('x-vat', 'sum(items, (qty * price - discount) * 0.1)', 392, 354, 147, 14, {
+            fontSize: 10,
+            align: 'end',
+          }),
+          hline('x-ln2', 300, 374, 239, BLUE, 1),
+          text('x-pay-l', 'مبلغ قابل پرداخت:', 300, 382, 100, 14, {
+            fontSize: 10,
+            fontWeight: 'bold',
+          }),
+          fieldEl('x-pay', 'sum(items, (qty * price - discount) * 1.1)', 402, 380, 137, 16, {
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: BLUE,
+            align: 'end',
+          }),
+          // ---- مبلغ به حروف (toWords!) ----
+          {
+            id: 'x-words-box',
+            type: 'rectangle',
+            bounds: { x: 0, y: 320, width: 290, height: 42 },
+            zIndex: 1,
+            box: {
+              fill: { color: rgb(246, 248, 251) },
+              border: { all: { width: 0.8, color: rgb(203, 213, 225) } },
+            },
+          },
+          text('x-words-l', 'مبلغ به حروف:', 8, 326, 80, 12, { fontSize: 8.5, color: MUTED }),
+          fieldEl(
+            'x-words',
+            "toWords(round(sum(items, (qty * price - discount) * 1.1)), 'rial')",
+            8,
+            340,
+            274,
+            14,
+            { fontSize: 9, fontWeight: 'bold' },
+          ),
+          // ---- QR مودیان + امضاها ----
+          {
+            id: 'x-qr',
+            type: 'qrcode',
+            bounds: { x: 0, y: 380, width: 64, height: 64 },
+            zIndex: 1,
+            value: { source: 'invoice.taxUid' },
+          },
+          text('x-qr-l', 'کد یکتای مالیاتی', 0, 448, 64, 11, {
+            fontSize: 6.5,
+            color: MUTED,
+            align: 'center',
+          }),
+          fieldEl('x-uid', 'invoice.taxUid', 72, 400, 180, 12, { fontSize: 7.5, color: MUTED }),
+          hline('x-sig1', 90, 560, 140, rgb(148, 163, 184), 1),
+          text('x-sig1-l', 'مهر و امضای فروشنده', 90, 568, 140, 13, {
+            fontSize: 8.5,
+            align: 'center',
+          }),
+          hline('x-sig2', 320, 560, 140, rgb(148, 163, 184), 1),
+          text('x-sig2-l', 'مهر و امضای خریدار', 320, 568, 140, 13, {
+            fontSize: 8.5,
+            align: 'center',
+          }),
+          text(
+            'x-foot',
+            'این صورتحساب مطابق ماده ۱۹ قانون مالیات بر ارزش افزوده صادر شده است.',
+            0,
+            600,
+            539,
+            12,
+            { fontSize: 7.5, color: MUTED, align: 'center' },
+          ),
+        ],
+      },
+    ],
+  );
+  var taxInvoiceData = {
+    invoice: { serial: '۱۴۰۵-۰۰۲۱۷', taxUid: 'A1B2C3D4E5F6G7H8I9J0K1L2' },
+    seller: {
+      name: 'شرکت بازرگانی نمونهٔ پارس (سهامی خاص)',
+      taxId: '411111111111',
+      nationalId: '10102345678',
+      address: 'تهران، خیابان ولیعصر، بالاتر از میدان ونک، پلاک ۲۵۴۰',
+      postalCode: '1969633111',
+    },
+    buyer: {
+      name: 'فروشگاه زنجیره‌ای آفتاب',
+      taxId: '422222222222',
+      nationalId: '10209876543',
+      address: 'اصفهان، خیابان چهارباغ بالا، مجتمع کوثر، واحد ۱۲',
+      postalCode: '8173654321',
+    },
+    items: [
+      { code: 'K-1101', name: 'مانیتور ۲۴ اینچ', qty: 4, price: 89500000, discount: 8000000 },
+      { code: 'K-1102', name: 'کیس رایانه', qty: 4, price: 152000000, discount: 0 },
+      {
+        code: 'S-2001',
+        name: 'خدمات نصب و راه‌اندازی',
+        qty: 1,
+        price: 25000000,
+        discount: 5000000,
+      },
+    ],
+  };
+
   window.PDFSTUDIO_TEMPLATES = [
     {
       id: 'blank',
@@ -985,6 +1241,13 @@
       desc: 'جدول اقلام + جمع کل + QR',
       template: invoice,
       data: invoiceData,
+    },
+    {
+      id: 'taxInvoice',
+      name: 'فاکتور رسمی مالیاتی',
+      desc: 'صورتحساب استاندارد + مبلغ به حروف + QR مودیان',
+      template: taxInvoice,
+      data: taxInvoiceData,
     },
     {
       id: 'report',

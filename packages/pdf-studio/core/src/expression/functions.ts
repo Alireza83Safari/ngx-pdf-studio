@@ -13,6 +13,7 @@
  * back rather than throwing (§9 non-fatal policy).
  */
 import type { Expr } from './ast';
+import { numberToPersianWords } from '../i18n/number-words';
 import { toLatinDigits, toPersianDigits } from './digits';
 import { formatNumberValue, type NumberFormatSettings } from './number-format';
 import type { DigitSystem } from '../model/locale';
@@ -156,6 +157,22 @@ export function createDefaultFunctions(): FunctionRegistry {
   reg.register('now', (ctx) => ctx.now());
 
   // Numerals & numbers -------------------------------------------------------
+  // «مبلغ به حروف» (§11, ROADMAP ۱.۱): toWords(4850000, 'rial') →
+  // «چهار میلیون و هشتصد و پنجاه هزار ریال». Second arg: 'rial' | 'toman' |
+  // any suffix string, or an options object { currency }.
+  reg.register('toWords', (ctx) => {
+    const n = toNumber(ctx.args[0]);
+    if (!Number.isFinite(n)) return '';
+    const opt = ctx.args[1];
+    const currency =
+      typeof opt === 'string'
+        ? opt
+        : typeof opt === 'object' && opt !== null
+          ? String((opt as Record<string, unknown>)['currency'] ?? '')
+          : '';
+    return numberToPersianWords(n, currency ? { currency } : {});
+  });
+
   reg.register('toPersianDigits', (ctx) => toPersianDigits(String(ctx.args[0] ?? '')));
   reg.register('toLatinDigits', (ctx) => toLatinDigits(String(ctx.args[0] ?? '')));
   reg.register('formatNumber', (ctx) => {

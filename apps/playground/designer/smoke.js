@@ -122,9 +122,9 @@ try {
   doc.getElementById('openGallery').dispatchEvent(new window.Event('click', { bubbles: true }));
   if (!doc.getElementById('gallery').classList.contains('show')) fail('gallery did not open');
   const cards = doc.querySelectorAll('.tpl-card');
-  if (cards.length < 11) fail('expected 11+ template cards, got ' + cards.length);
+  if (cards.length < 13) fail('expected 13+ template cards, got ' + cards.length);
   const thumbs = doc.querySelectorAll('.tpl-thumb svg');
-  if (thumbs.length < 11) fail('template thumbnails missing: ' + thumbs.length);
+  if (thumbs.length < 13) fail('template thumbnails missing: ' + thumbs.length);
   // load the invoice template → canvas shows its title, sample data swapped
   const invoiceCard = doc.querySelector('.tpl-card[data-template="invoice"]');
   if (!invoiceCard) fail('invoice card missing');

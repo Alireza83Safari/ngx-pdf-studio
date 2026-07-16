@@ -7,3 +7,4 @@ export {
   type BaseDirection,
   type VisualRun,
 } from './bidi';
+export { numberToPersianWords, type NumberToWordsOptions } from './number-words';
