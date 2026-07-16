@@ -349,7 +349,9 @@
       .tool::after {
         content: attr(data-tip);
         position: absolute;
-        inset-inline-end: calc(100% + 12px);
+        /* the rail sits at the inline-start edge (right in RTL) — open the
+           tooltip toward the canvas so it stays on-screen */
+        inset-inline-start: calc(100% + 12px);
         top: 50%;
         translate: 0 -50%;
         background: var(--ink);
