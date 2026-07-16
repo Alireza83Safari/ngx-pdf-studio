@@ -2,6 +2,8 @@
 export {
   ClaudeProvider,
   type ClaudeProviderOptions,
+  OpenAICompatibleProvider,
+  type OpenAICompatibleProviderOptions,
   type CopilotMessage,
   type CopilotProvider,
 } from './provider';

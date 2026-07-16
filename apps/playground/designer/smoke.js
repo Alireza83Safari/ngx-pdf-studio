@@ -391,6 +391,20 @@ try {
     };
     doc.getElementById('openCopilot').dispatchEvent(new window.Event('click', { bubbles: true }));
     if (!doc.getElementById('copilot').classList.contains('show')) fail('copilot did not open');
+    // provider presets: default is the free-tier groq, claude hides url/model, ollama needs no key
+    if (doc.getElementById('cpProvider').value !== 'groq') fail('default provider is not groq');
+    if (doc.getElementById('cpBaseUrlRow').style.display === 'none')
+      fail('groq preset should show the baseUrl row');
+    if (!/groq/.test(doc.getElementById('cpBaseUrl').value)) fail('groq baseUrl not prefilled');
+    doc.getElementById('cpProvider').value = 'claude';
+    doc.getElementById('cpProvider').dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (doc.getElementById('cpBaseUrlRow').style.display !== 'none')
+      fail('claude should hide the baseUrl row');
+    doc.getElementById('cpProvider').value = 'ollama';
+    doc.getElementById('cpProvider').dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (doc.getElementById('cpKeyRow').style.display !== 'none')
+      fail('ollama should hide the key row');
+    if (!/11434/.test(doc.getElementById('cpBaseUrl').value)) fail('ollama baseUrl not prefilled');
     doc.getElementById('cpPrompt').value = 'یک کارت ویزیت بساز';
     doc.getElementById('cpRun').dispatchEvent(new window.Event('click', { bubbles: true }));
     await new Promise((r) => setTimeout(r, 30));
@@ -403,6 +417,22 @@ try {
     doc.getElementById('undo').dispatchEvent(new window.Event('click', { bubbles: true }));
     if (doc.getElementById('docName').value === 'ساختهٔ کوپایلوت')
       fail('copilot apply was not a single undoable command');
+
+    // free-provider presets: picking Groq fills the OpenAI-compatible fields
+    doc.getElementById('openCopilot').dispatchEvent(new window.Event('click', { bubbles: true }));
+    const provSel = doc.getElementById('cpProvider');
+    if (!provSel) fail('provider select missing');
+    provSel.value = 'groq';
+    provSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (!doc.getElementById('cpBaseUrl').value.includes('groq'))
+      fail('groq preset did not fill baseUrl: ' + doc.getElementById('cpBaseUrl').value);
+    if (doc.getElementById('cpBaseUrlRow').style.display === 'none')
+      fail('baseUrl row hidden for OpenAI-compatible provider');
+    provSel.value = 'ollama';
+    provSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (doc.getElementById('cpKeyRow').style.display !== 'none')
+      fail('key row should hide for keyless Ollama');
+    doc.getElementById('closeCopilot').dispatchEvent(new window.Event('click', { bubbles: true }));
 
     console.log(
       'designer smoke OK — overlays:',

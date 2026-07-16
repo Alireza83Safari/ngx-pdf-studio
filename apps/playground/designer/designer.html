@@ -2067,7 +2067,31 @@
             "
             placeholder="مثلاً: یک فاکتور رسمی با لوگو، جدول اقلام، جمع به حروف و QR بساز"
           ></textarea>
-          <div class="row" data-tip="کلید API آنتروپیک — فقط در مرورگر خودت ذخیره می‌شود">
+          <div class="row" data-tip="سرویس هوش مصنوعی — Ollama لوکال و کاملاً رایگان است">
+            <label>سرویس</label>
+            <select id="cpProvider">
+              <option value="claude">Claude (آنتروپیک)</option>
+              <option value="ollama">Ollama — لوکال و رایگان</option>
+              <option value="groq">Groq — تیر رایگان</option>
+              <option value="gemini">Google Gemini — تیر رایگان</option>
+              <option value="openrouter">OpenRouter — مدل‌های ‎:free</option>
+              <option value="custom">سفارشی (سازگار با OpenAI)</option>
+            </select>
+          </div>
+          <div
+            class="row"
+            id="cpBaseUrlRow"
+            data-tip="آدرس پایهٔ سرویس، تا قبل از ‎/chat/completions‎"
+            style="display: none"
+          >
+            <label>آدرس</label>
+            <input id="cpBaseUrl" dir="ltr" placeholder="http://localhost:11434/v1" />
+          </div>
+          <div class="row" id="cpModelRow" data-tip="نام مدل نزد همان سرویس" style="display: none">
+            <label>مدل</label>
+            <input id="cpModel" dir="ltr" placeholder="qwen2.5-coder:7b" />
+          </div>
+          <div class="row" id="cpKeyRow" data-tip="کلید API — فقط در مرورگر خودت ذخیره می‌شود">
             <label>کلید API</label>
             <input id="cpKey" type="password" dir="ltr" placeholder="sk-ant-…" />
           </div>

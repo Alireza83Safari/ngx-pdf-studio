@@ -1,4 +1,5 @@
 import { extractJson, generateTemplate } from './generate';
+import { OpenAICompatibleProvider } from './provider';
 import type { CopilotMessage, CopilotProvider } from './provider';
 import { serializeTemplate } from '../serialization/serialize';
 import type { PdfTemplate } from '../model/template';
@@ -120,5 +121,82 @@ describe('generateTemplate — validate→repair loop (ROADMAP ۳.۱)', () => {
     const res = await generateTemplate({ prompt: 'بساز', provider });
     expect(res.success).toBe(false);
     if (!res.success) expect(res.error).toContain('network down');
+  });
+});
+
+/** fetch stub that records the request and replies with a canned body. */
+function fakeFetch(status: number, body: unknown) {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const impl = (async (url: unknown, init: unknown) => {
+    calls.push({ url: String(url), init: init as RequestInit });
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => JSON.stringify(body),
+      json: async () => body,
+    } as Response;
+  }) as typeof fetch;
+  return { impl, calls };
+}
+
+describe('OpenAICompatibleProvider (Ollama/Groq/Gemini/OpenRouter)', () => {
+  const reply = { choices: [{ message: { content: 'سلام از مدل' } }] };
+
+  it('speaks the /chat/completions shape with the system prompt first', async () => {
+    const { impl, calls } = fakeFetch(200, reply);
+    // trailing slash on baseUrl must not produce a double slash
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: 'http://localhost:11434/v1/',
+      model: 'qwen2.5-coder:7b',
+      fetchImpl: impl,
+    });
+    const text = await provider.complete('you are a copilot', [{ role: 'user', content: 'بساز' }]);
+
+    expect(text).toBe('سلام از مدل');
+    expect(calls[0]!.url).toBe('http://localhost:11434/v1/chat/completions');
+    const sent = JSON.parse(calls[0]!.init.body as string);
+    expect(sent.model).toBe('qwen2.5-coder:7b');
+    expect(sent.messages[0]).toEqual({ role: 'system', content: 'you are a copilot' });
+    expect(sent.messages[1]).toEqual({ role: 'user', content: 'بساز' });
+    // keyless local server → no Authorization header
+    const headers = calls[0]!.init.headers as Record<string, string>;
+    expect(headers.authorization).toBeUndefined();
+  });
+
+  it('sends a bearer token when a key is given', async () => {
+    const { impl, calls } = fakeFetch(200, reply);
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: 'https://api.groq.com/openai/v1',
+      model: 'llama-3.3-70b-versatile',
+      apiKey: 'gsk_test',
+      fetchImpl: impl,
+    });
+    await provider.complete('sys', [{ role: 'user', content: 'hi' }]);
+    const headers = calls[0]!.init.headers as Record<string, string>;
+    expect(headers.authorization).toBe('Bearer gsk_test');
+  });
+
+  it('throws with the HTTP status on failure', async () => {
+    const { impl } = fakeFetch(429, { error: 'rate limited' });
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: 'https://openrouter.ai/api/v1',
+      model: 'x',
+      fetchImpl: impl,
+    });
+    await expect(provider.complete('sys', [{ role: 'user', content: 'hi' }])).rejects.toThrow(
+      /429/,
+    );
+  });
+
+  it('throws when the reply carries no text', async () => {
+    const { impl } = fakeFetch(200, { choices: [{ message: { content: '' } }] });
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: 'http://x/v1',
+      model: 'm',
+      fetchImpl: impl,
+    });
+    await expect(provider.complete('sys', [{ role: 'user', content: 'hi' }])).rejects.toThrow(
+      /no text/,
+    );
   });
 });

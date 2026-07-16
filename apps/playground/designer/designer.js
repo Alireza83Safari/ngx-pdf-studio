@@ -2344,7 +2344,6 @@
 
   // --- AI copilot (ROADMAP ۳.۲–۳.۳) ---------------------------------------------
   var copilotEl = document.getElementById('copilot');
-  var CP_KEY = 'pdfstudio.apikey';
   /** Replace the whole template as ONE undoable command. */
   function replaceTemplateCmd(next, prev) {
     return {
@@ -2357,25 +2356,106 @@
       },
     };
   }
+  /** Free-tier friendly presets for the OpenAI-compatible path (ROADMAP ۳). */
+  var CP_PRESETS = {
+    groq: {
+      baseUrl: 'https://api.groq.com/openai/v1',
+      model: 'llama-3.3-70b-versatile',
+      needsKey: true,
+    },
+    gemini: {
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      model: 'gemini-2.0-flash',
+      needsKey: true,
+    },
+    openrouter: {
+      baseUrl: 'https://openrouter.ai/api/v1',
+      model: 'meta-llama/llama-3.3-70b-instruct:free',
+      needsKey: true,
+    },
+    ollama: { baseUrl: 'http://localhost:11434/v1', model: 'qwen2.5:14b', needsKey: false },
+    claude: { baseUrl: '', model: 'claude-sonnet-5', needsKey: true },
+    custom: { baseUrl: '', model: '', needsKey: true },
+  };
+  var CP_CFG_KEY = 'pdfstudio.copilot';
+  function applyCpPreset(name, keepFields) {
+    var preset = CP_PRESETS[name] || CP_PRESETS.custom;
+    var isClaude = name === 'claude';
+    document.getElementById('cpBaseUrlRow').style.display = isClaude ? 'none' : '';
+    document.getElementById('cpModelRow').style.display = isClaude ? 'none' : '';
+    document.getElementById('cpKeyRow').style.display = preset.needsKey ? '' : 'none';
+    if (!keepFields) {
+      document.getElementById('cpBaseUrl').value = preset.baseUrl;
+      document.getElementById('cpModel').value = preset.model;
+    }
+    document.getElementById('cpKey').placeholder = isClaude ? 'sk-ant-…' : 'کلید سرویس…';
+  }
+  document.getElementById('cpProvider').addEventListener('change', function (e) {
+    applyCpPreset(e.target.value, false);
+    saveCpConfig();
+  });
+  function saveCpConfig() {
+    try {
+      window.localStorage.setItem(
+        CP_CFG_KEY,
+        JSON.stringify({
+          provider: document.getElementById('cpProvider').value,
+          baseUrl: document.getElementById('cpBaseUrl').value,
+          model: document.getElementById('cpModel').value,
+          key: document.getElementById('cpKey').value,
+        }),
+      );
+    } catch (err) {
+      /* ignore */
+    }
+  }
+  function loadCpConfig() {
+    try {
+      var raw = window.localStorage.getItem(CP_CFG_KEY);
+      if (!raw) {
+        // migrate the pre-provider-select storage: a bare Claude key
+        var legacyKey = window.localStorage.getItem('pdfstudio.apikey');
+        var name = legacyKey ? 'claude' : 'groq';
+        document.getElementById('cpProvider').value = name;
+        applyCpPreset(name, false);
+        if (legacyKey) document.getElementById('cpKey').value = legacyKey;
+        return;
+      }
+      var cfg = JSON.parse(raw);
+      document.getElementById('cpProvider').value = cfg.provider || 'groq';
+      applyCpPreset(cfg.provider || 'groq', true);
+      document.getElementById('cpBaseUrl').value = cfg.baseUrl || '';
+      document.getElementById('cpModel').value = cfg.model || '';
+      document.getElementById('cpKey').value = cfg.key || '';
+    } catch (err) {
+      document.getElementById('cpProvider').value = 'groq';
+      applyCpPreset('groq', false);
+    }
+  }
+  ['cpBaseUrl', 'cpModel', 'cpKey'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', saveCpConfig);
+  });
+
   function copilotProvider() {
     // test/self-host hook first, then the user's Claude key
     if (window.PDFSTUDIO_COPILOT_PROVIDER) return window.PDFSTUDIO_COPILOT_PROVIDER;
+    var name = document.getElementById('cpProvider').value;
     var key = document.getElementById('cpKey').value.trim();
-    if (!key) return null;
-    try {
-      window.localStorage.setItem(CP_KEY, key);
-    } catch (err) {
-      /* ignore */
+    saveCpConfig();
+    if (name === 'claude') {
+      return key ? new P.ClaudeProvider({ apiKey: key }) : null;
     }
-    return new P.ClaudeProvider({ apiKey: key });
+    var baseUrl = document.getElementById('cpBaseUrl').value.trim();
+    var model = document.getElementById('cpModel').value.trim();
+    if (!baseUrl || !model) return null;
+    var needsKey = (CP_PRESETS[name] || CP_PRESETS.custom).needsKey;
+    if (needsKey && !key) return null;
+    var opts = { baseUrl: baseUrl, model: model };
+    if (key) opts.apiKey = key;
+    return new P.OpenAICompatibleProvider(opts);
   }
   document.getElementById('openCopilot').addEventListener('click', function () {
-    try {
-      var saved = window.localStorage.getItem(CP_KEY);
-      if (saved) document.getElementById('cpKey').value = saved;
-    } catch (err) {
-      /* ignore */
-    }
+    loadCpConfig();
     copilotEl.classList.add('show');
     document.getElementById('cpPrompt').focus();
   });
@@ -2385,11 +2465,11 @@
   copilotEl.addEventListener('click', function (e) {
     if (e.target === copilotEl) copilotEl.classList.remove('show');
   });
-  document.getElementById('cpPrompt').addEventListener('keydown', function (e) {
-    e.stopPropagation();
-  });
-  document.getElementById('cpKey').addEventListener('keydown', function (e) {
-    e.stopPropagation();
+  // keep canvas shortcuts (Delete, arrows…) out of the copilot inputs
+  ['cpPrompt', 'cpKey', 'cpBaseUrl', 'cpModel'].forEach(function (id) {
+    document.getElementById(id).addEventListener('keydown', function (e) {
+      e.stopPropagation();
+    });
   });
 
   var cpBusy = false;
@@ -2409,7 +2489,8 @@
     }
     var provider = copilotProvider();
     if (!provider) {
-      statusEl.textContent = 'کلید API را وارد کن (فقط در مرورگر خودت ذخیره می‌شود).';
+      statusEl.textContent =
+        'تنظیمات سرویس کامل نیست — Groq و Gemini کلید رایگان می‌دهند؛ Ollama هم بدون کلید است.';
       return;
     }
     cpBusy = true;
