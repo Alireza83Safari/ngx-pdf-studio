@@ -8,3 +8,4 @@ export {
   type VisualRun,
 } from './bidi';
 export { numberToPersianWords, type NumberToWordsOptions } from './number-words';
+export { kashidaPoints, justifyLineWithKashida } from './kashida';

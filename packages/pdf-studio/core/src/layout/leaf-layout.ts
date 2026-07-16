@@ -22,6 +22,7 @@ import type { BoxStyle, NamedStyle, Typography } from '../model/style';
 import type { Rect } from '../model/units';
 import { colorScaleColor, dataBarFraction, pickIcon } from './conditional-visuals';
 import { toPersianDigits } from '../expression/digits';
+import { justifyLineWithKashida } from '../i18n/kashida';
 import type { ElementRegistry } from './element-registry';
 import { resolveImage } from './image-resolve';
 import { resolveChart } from './chart-resolve';
@@ -170,6 +171,22 @@ export function layoutLeaf(
     );
     lines = measured.lines;
     bounds = { ...el.bounds, height: Math.max(el.bounds.height, measured.height) };
+
+    // Persian kashida justification (§11, ROADMAP ۱.۴): stretch every line
+    // except the last to the element width by elongating letter joins.
+    if (typography?.align === 'justify' && lines.length > 1) {
+      const style = {
+        fontSize,
+        ...(typography?.lineHeight !== undefined ? { lineHeight: typography.lineHeight } : {}),
+        ...(typography?.fontFamily !== undefined ? { fontFamily: typography.fontFamily } : {}),
+      };
+      const tatweelWidth = deps.measurer.measure('ـ', style).width;
+      lines = lines.map((line, i) => {
+        if (i === lines!.length - 1) return line;
+        const deficit = el.bounds.width - deps.measurer.measure(line, style).width;
+        return justifyLineWithKashida(line, deficit, tatweelWidth);
+      });
+    }
   }
 
   // Auto table of contents (§11A-D): one clipped line per bookmark entry.

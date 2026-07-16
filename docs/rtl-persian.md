@@ -60,7 +60,16 @@ In the browser, fetch/bundle the TTF yourself and pass `{ family, bytes }`.
 Form-field appearances are also generated with the embedded font, so fillable
 fields with Persian defaults work.
 
-### 4. Alignment
+### 4. Kashida justification
+
+Set `typography.align: 'justify'` on a text element: wrapped Persian lines
+(all but the last) are stretched to the element width by elongating letter
+joins with tatweel (ـ) — real Persian typesetting, not stretched spaces.
+One elongation point per word (the last legal junction); Latin lines are
+left unchanged. Both painters render the same elongated string, so the
+preview matches the PDF exactly.
+
+### 5. Alignment
 
 `typography.align` is _logical_: `start`/`end` follow direction (`start` = right
 under RTL), `left`/`right`/`center` are physical. Prefer logical alignment in
