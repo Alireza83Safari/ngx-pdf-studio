@@ -169,6 +169,45 @@ try {
   if (doc.getElementById('palette').classList.contains('show')) fail('palette did not close');
   if (doc.querySelectorAll('.el').length !== before + 1) fail('palette command did not run');
 
+  // --- professional-UX shell ---
+  // editable doc name in the top bar
+  if (!doc.getElementById('docName')) fail('docName input missing');
+  if (!doc.getElementById('saveState')) fail('saveState indicator missing');
+  // status bar: page info + selection info + fit zoom
+  if (!/A4/.test(doc.getElementById('pageInfo').textContent)) fail('pageInfo missing A4');
+  if (!doc.getElementById('zoomFit')) fail('zoomFit missing');
+  // right-panel tabs switch panes
+  const layersTab = doc.querySelector('.tab[data-tab="layers"]');
+  if (!layersTab) fail('layers tab missing');
+  layersTab.dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (!doc.querySelector('.tabpane[data-pane="layers"]').classList.contains('active'))
+    fail('layers pane did not activate');
+  // layers list mirrors the elements on canvas
+  const layerRows = doc.querySelectorAll('#layers .layer');
+  const elCount = doc.querySelectorAll('.el').length;
+  if (layerRows.length !== elCount)
+    fail('layers rows ' + layerRows.length + ' != elements ' + elCount);
+  // clicking a layer selects its element and the inspector opens (design tab via canvas)
+  layerRows[0].dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (!doc.querySelector('#layers .layer.selected')) fail('layer selection not reflected');
+  // selection info in the status bar
+  if (/چیزی انتخاب نشده/.test(doc.getElementById('selInfo').textContent))
+    fail('selInfo did not update on selection');
+  // quickbar appears above the selection
+  if (!doc.getElementById('quickbar').classList.contains('show'))
+    fail('quickbar not shown for selection');
+  // quickbar duplicate works
+  const beforeDup = doc.querySelectorAll('.el').length;
+  doc
+    .querySelector('#quickbar [data-q="dup"]')
+    .dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (doc.querySelectorAll('.el').length !== beforeDup + 1) fail('quickbar duplicate failed');
+  // file menu opens and hosts the JSON actions
+  doc.getElementById('fileMenuBtn').dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (!doc.getElementById('fileMenu').classList.contains('open')) fail('file menu did not open');
+  if (!doc.getElementById('fileMenu').contains(doc.getElementById('exportJson')))
+    fail('exportJson not in file menu');
+
   console.log(
     'designer smoke OK — overlays:',
     overlays.length,

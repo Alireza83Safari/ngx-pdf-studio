@@ -5,49 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PDF Studio — دیزاینر</title>
     <style>
-      /* ---------- design tokens ---------- */
+      /* ================= design tokens ================= */
       :root {
         --bg: #f2f3f5;
-        --workspace: #e8eaee;
+        --workspace: #e9ebef;
         --surface: #ffffff;
-        --raised: #ffffff;
+        --raised: #fbfcfd;
         --ink: #1b1f27;
-        --muted: #6b7382;
-        --faint: #9aa2b1;
-        --border: #e2e5ea;
-        --border-strong: #d0d4db;
-        --accent: #3d7bfd;
+        --muted: #667085;
+        --faint: #98a1b2;
+        --border: #e3e6eb;
+        --border-strong: #cfd4dc;
+        --accent: #3b76f6;
         --accent-ink: #ffffff;
-        --accent-weak: rgba(61, 123, 253, 0.12);
+        --accent-weak: rgba(59, 118, 246, 0.11);
         --danger: #d64545;
-        --field: #f6f7f9;
+        --ok: #1f9d61;
+        --field: #f5f6f8;
         --shadow-page:
-          0 0 0 1px rgba(27, 31, 39, 0.08), 0 2px 6px rgba(27, 31, 39, 0.08),
-          0 24px 48px -12px rgba(27, 31, 39, 0.18);
-        --shadow-pop: 0 12px 40px -8px rgba(15, 20, 30, 0.35);
-        --dot: rgba(27, 31, 39, 0.1);
+          0 0 0 1px rgba(27, 31, 39, 0.09), 0 2px 6px rgba(27, 31, 39, 0.07),
+          0 28px 56px -16px rgba(27, 31, 39, 0.22);
+        --shadow-pop: 0 16px 48px -12px rgba(15, 20, 30, 0.32);
+        --shadow-bar: 0 4px 18px -6px rgba(15, 20, 30, 0.28);
+        --dot: rgba(27, 31, 39, 0.11);
         --guide: #f43f5e;
       }
       body[data-theme='dark'] {
-        --bg: #14161b;
-        --workspace: #191c22;
-        --surface: #1e222a;
-        --raised: #242933;
-        --ink: #e8ebf1;
-        --muted: #939cad;
-        --faint: #5d6675;
-        --border: #2b303b;
-        --border-strong: #363d4a;
-        --accent: #5a93f5;
+        --bg: #131519;
+        --workspace: #17191f;
+        --surface: #1d2129;
+        --raised: #232833;
+        --ink: #e9ecf2;
+        --muted: #97a0b1;
+        --faint: #5b6473;
+        --border: #2a2f3a;
+        --border-strong: #39404d;
+        --accent: #5b94f6;
         --accent-ink: #0d1117;
-        --accent-weak: rgba(90, 147, 245, 0.16);
+        --accent-weak: rgba(91, 148, 246, 0.16);
         --danger: #e06c5f;
-        --field: #171a20;
+        --ok: #3fbf82;
+        --field: #161920;
         --shadow-page:
-          0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4),
-          0 28px 60px -12px rgba(0, 0, 0, 0.55);
-        --shadow-pop: 0 16px 48px -8px rgba(0, 0, 0, 0.6);
-        --dot: rgba(232, 235, 241, 0.07);
+          0 0 0 1px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.45),
+          0 32px 64px -16px rgba(0, 0, 0, 0.6);
+        --shadow-pop: 0 20px 56px -12px rgba(0, 0, 0, 0.65);
+        --shadow-bar: 0 4px 18px -6px rgba(0, 0, 0, 0.55);
+        --dot: rgba(233, 236, 242, 0.06);
         --guide: #fb7185;
       }
 
@@ -76,8 +80,8 @@
           color 0.25s;
       }
       ::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
+        width: 9px;
+        height: 9px;
       }
       ::-webkit-scrollbar-thumb {
         background: var(--border-strong);
@@ -88,61 +92,6 @@
       ::-webkit-scrollbar-track {
         background: transparent;
       }
-
-      /* ---------- top bar ---------- */
-      .topbar {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        height: 48px;
-        padding: 0 10px;
-        background: var(--surface);
-        border-bottom: 1px solid var(--border);
-        flex: none;
-        z-index: 60;
-      }
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-inline-end: 10px;
-        user-select: none;
-      }
-      .brand .mark {
-        width: 26px;
-        height: 26px;
-        border-radius: 8px;
-        background: var(--accent);
-        color: var(--accent-ink);
-        display: grid;
-        place-items: center;
-        font-weight: 700;
-        font-size: 13px;
-      }
-      .brand .name {
-        font-weight: 600;
-        font-size: 13px;
-        letter-spacing: -0.01em;
-      }
-      .brand .tag {
-        font-size: 10px;
-        color: var(--muted);
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        padding: 1px 7px;
-      }
-
-      .sep {
-        width: 1px;
-        height: 22px;
-        background: var(--border);
-        margin: 0 6px;
-        flex: none;
-      }
-      .spacer {
-        flex: 1;
-      }
-
       button,
       select,
       input,
@@ -150,22 +99,103 @@
         font: inherit;
         color: inherit;
       }
+      :is(button, input, select, textarea, [tabindex]):focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+        border-radius: 8px;
+      }
+
+      /* ================= top bar ================= */
+      .topbar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 50px;
+        padding: 0 12px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        flex: none;
+        z-index: 70;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        user-select: none;
+        margin-inline-end: 6px;
+      }
+      .brand .mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        font-size: 14px;
+      }
+      #docName {
+        border: 1px solid transparent;
+        background: transparent;
+        border-radius: 8px;
+        padding: 5px 9px;
+        font-size: 13px;
+        font-weight: 600;
+        width: 190px;
+        color: var(--ink);
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+      }
+      #docName:hover {
+        background: var(--field);
+      }
+      #docName:focus {
+        border-color: var(--accent);
+        background: var(--field);
+        outline: none;
+      }
+      #saveState {
+        font-size: 11px;
+        color: var(--faint);
+        margin-inline-start: 2px;
+        white-space: nowrap;
+        transition: color 0.2s;
+      }
+      #saveState.saved {
+        color: var(--ok);
+      }
+
+      .sep {
+        width: 1px;
+        height: 24px;
+        background: var(--border);
+        margin: 0 8px;
+        flex: none;
+      }
+      .spacer {
+        flex: 1;
+      }
+
       .btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        height: 32px;
-        padding: 0 10px;
+        gap: 7px;
+        height: 34px;
+        padding: 0 12px;
         border: 1px solid transparent;
-        border-radius: 8px;
+        border-radius: 9px;
         background: transparent;
         color: var(--ink);
         cursor: pointer;
         white-space: nowrap;
+        font-size: 12.5px;
         transition:
           background 0.15s,
           border-color 0.15s,
+          color 0.15s,
           transform 0.05s;
       }
       .btn:hover {
@@ -175,14 +205,11 @@
         transform: translateY(1px);
       }
       .btn:disabled {
-        opacity: 0.38;
+        opacity: 0.35;
         pointer-events: none;
       }
-      .btn svg {
-        flex: none;
-      }
       .btn.icon {
-        width: 32px;
+        width: 34px;
         padding: 0;
       }
       .btn.quiet {
@@ -203,75 +230,72 @@
         background: var(--accent);
         color: #fff;
         font-weight: 600;
-        padding: 0 14px;
+        padding: 0 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
       }
       .btn.primary:hover {
-        filter: brightness(1.08);
+        filter: brightness(1.07);
         background: var(--accent);
       }
-      :is(button, input, select, textarea, [tabindex]):focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 1px;
-        border-radius: 8px;
-      }
 
-      .zoomgroup {
-        display: inline-flex;
-        align-items: center;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        overflow: hidden;
+      /* file menu dropdown */
+      .menu-wrap {
+        position: relative;
+      }
+      .menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        inset-inline-start: 0;
+        min-width: 170px;
         background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: var(--shadow-pop);
+        padding: 5px;
+        display: none;
+        flex-direction: column;
+        z-index: 90;
       }
-      .zoomgroup .btn {
-        border-radius: 0;
-        height: 30px;
+      .menu.open {
+        display: flex;
       }
-      #zoomLabel {
-        min-width: 46px;
-        text-align: center;
-        font-size: 12px;
-        color: var(--muted);
-        font-variant-numeric: tabular-nums;
-        user-select: none;
+      .menu .btn {
+        justify-content: flex-start;
+        height: 32px;
+        border-radius: 8px;
+        width: 100%;
       }
 
-      /* ---------- layout ---------- */
+      /* ================= main layout ================= */
       .main {
         flex: 1;
         display: flex;
         min-height: 0;
       }
 
-      /* tool rail (start side = right in RTL) */
+      /* tool rail */
       .toolrail {
-        width: 52px;
+        width: 56px;
         flex: none;
         background: var(--surface);
         border-inline-end: 1px solid var(--border);
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 2px;
-        padding: 8px 0;
+        gap: 3px;
+        padding: 10px 0;
         z-index: 50;
       }
-      .toolrail .rail-label {
-        font-size: 9.5px;
-        color: var(--faint);
-        margin: 6px 0 2px;
-        letter-spacing: 0.08em;
-      }
       .tool {
-        width: 38px;
-        height: 38px;
+        width: 40px;
+        height: 40px;
         border: 0;
-        border-radius: 10px;
+        border-radius: 11px;
         background: transparent;
         color: var(--muted);
         display: grid;
         place-items: center;
-        cursor: pointer;
+        cursor: grab;
         position: relative;
         transition:
           background 0.15s,
@@ -283,27 +307,36 @@
         color: var(--accent);
       }
       .tool:active {
-        transform: scale(0.94);
+        transform: scale(0.93);
+        cursor: grabbing;
       }
       .tool::after {
         content: attr(data-tip);
         position: absolute;
-        inset-inline-end: calc(100% + 10px);
+        inset-inline-end: calc(100% + 12px);
         top: 50%;
         translate: 0 -50%;
         background: var(--ink);
         color: var(--bg);
         font-size: 11px;
-        padding: 4px 9px;
-        border-radius: 6px;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 7px;
         white-space: nowrap;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.12s;
+        transition: opacity 0.12s 0.15s;
         z-index: 100;
+        box-shadow: var(--shadow-bar);
       }
       .tool:hover::after {
         opacity: 1;
+      }
+      .rail-sep {
+        width: 26px;
+        height: 1px;
+        background: var(--border);
+        margin: 5px 0;
       }
 
       /* canvas */
@@ -313,10 +346,11 @@
         display: flex;
         justify-content: center;
         align-items: flex-start;
-        padding: 36px;
+        padding: 40px;
         background: var(--workspace);
         background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
         background-size: 22px 22px;
+        position: relative;
       }
       #page {
         position: relative;
@@ -337,7 +371,7 @@
       }
       #margins {
         position: absolute;
-        border: 1px dashed rgba(120, 130, 150, 0.4);
+        border: 1px dashed rgba(120, 130, 150, 0.38);
         pointer-events: none;
       }
       #guideV,
@@ -396,16 +430,61 @@
       }
       .inline-edit {
         position: absolute;
-        z-index: 50;
+        z-index: 55;
         font: inherit;
         font-size: 13px;
-        padding: 3px 6px;
+        padding: 4px 7px;
         border: 1.5px solid var(--accent);
-        border-radius: 6px;
+        border-radius: 7px;
         background: var(--surface);
         color: var(--ink);
         box-shadow: var(--shadow-pop);
         outline: none;
+      }
+
+      /* floating quick actions above the selection */
+      #quickbar {
+        position: absolute;
+        display: none;
+        gap: 2px;
+        align-items: center;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 3px;
+        box-shadow: var(--shadow-bar);
+        z-index: 60;
+      }
+      #quickbar.show {
+        display: inline-flex;
+      }
+      #quickbar button {
+        width: 28px;
+        height: 28px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        transition:
+          background 0.12s,
+          color 0.12s;
+      }
+      #quickbar button:hover {
+        background: var(--accent-weak);
+        color: var(--accent);
+      }
+      #quickbar button.danger:hover {
+        background: color-mix(in srgb, var(--danger) 12%, transparent);
+        color: var(--danger);
+      }
+      #quickbar .qsep {
+        width: 1px;
+        height: 16px;
+        background: var(--border);
+        margin: 0 2px;
       }
 
       /* preview strip */
@@ -433,54 +512,112 @@
         display: block;
       }
 
-      /* ---------- side panel ---------- */
+      /* ================= right panel ================= */
       aside {
-        width: 292px;
+        width: 300px;
         flex: none;
         background: var(--surface);
         border-inline-start: 1px solid var(--border);
-        overflow-y: auto;
-        overflow-x: hidden;
         display: flex;
         flex-direction: column;
+        min-height: 0;
       }
-      .panel-section {
-        padding: 14px 14px 12px;
+      .tabs {
+        display: flex;
+        gap: 2px;
+        padding: 8px 10px 0;
+        border-bottom: 1px solid var(--border);
+        flex: none;
+      }
+      .tab {
+        flex: 1;
+        height: 34px;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-size: 12.5px;
+        font-weight: 500;
+        cursor: pointer;
+        border-radius: 9px 9px 0 0;
+        position: relative;
+        transition: color 0.15s;
+      }
+      .tab:hover {
+        color: var(--ink);
+      }
+      .tab.active {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        inset-inline: 18%;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--accent);
+      }
+      .tabpane {
+        display: none;
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex: 1;
+      }
+      .tabpane.active {
+        display: block;
+      }
+
+      .sec {
+        padding: 13px 14px 11px;
         border-bottom: 1px solid var(--border);
       }
-      .panel-section > h2,
-      aside h2 {
+      .sec-title {
         font-size: 10.5px;
         font-weight: 600;
-        letter-spacing: 0.07em;
+        letter-spacing: 0.06em;
         color: var(--faint);
-        margin: 0 0 10px;
-        text-transform: uppercase;
+        margin-bottom: 10px;
       }
-      #inspector h2 {
-        font-size: 12.5px;
-        font-weight: 600;
-        letter-spacing: 0;
-        text-transform: none;
-        color: var(--ink);
-        margin: 0 0 12px;
+      .sec.head {
         display: flex;
-        align-items: baseline;
-        gap: 6px;
+        align-items: center;
+        gap: 10px;
+        padding-block: 14px;
       }
-      #inspector h2 small {
-        color: var(--muted);
-        font-weight: 400;
-        font-size: 11px;
+      .sec.head .el-ico {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: var(--accent-weak);
+        color: var(--accent);
+        display: grid;
+        place-items: center;
+        flex: none;
       }
+      .sec.head b {
+        font-size: 13.5px;
+        font-weight: 600;
+        display: block;
+      }
+      .sec.head small {
+        font-size: 10.5px;
+        color: var(--faint);
+        direction: ltr;
+        display: block;
+      }
+
       .row {
         display: flex;
         gap: 8px;
         align-items: center;
         margin-bottom: 8px;
       }
+      .row:last-child {
+        margin-bottom: 0;
+      }
       .row label {
-        flex: 0 0 58px;
+        flex: 0 0 56px;
         font-size: 11.5px;
         color: var(--muted);
       }
@@ -490,9 +627,9 @@
         flex: 1;
         min-width: 0;
         font-size: 12.5px;
-        padding: 6px 8px;
+        padding: 6px 9px;
         border: 1px solid var(--border);
-        border-radius: 7px;
+        border-radius: 8px;
         background: var(--field);
         color: var(--ink);
         transition: border-color 0.15s;
@@ -507,7 +644,7 @@
       aside textarea:focus {
         border-color: var(--accent);
         outline: none;
-        box-shadow: 0 0 0 2px var(--accent-weak);
+        box-shadow: 0 0 0 3px var(--accent-weak);
       }
       .row input[type='number'] {
         font-variant-numeric: tabular-nums;
@@ -516,38 +653,44 @@
         padding: 2px;
         height: 30px;
         cursor: pointer;
+        flex: 0 0 46px;
       }
       .row input[type='checkbox'] {
         flex: none;
-        width: 16px;
-        height: 16px;
+        width: 17px;
+        height: 17px;
         accent-color: var(--accent);
+        cursor: pointer;
       }
       .grid2 {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 6px 8px;
-        margin-bottom: 8px;
+        gap: 7px 9px;
+        margin-bottom: 9px;
       }
       .grid2 .row {
         margin-bottom: 0;
       }
       .grid2 .row label {
-        flex-basis: 16px;
+        flex-basis: 15px;
         text-align: center;
         font-family: ui-monospace, monospace;
-        font-size: 10.5px;
+        font-size: 10px;
+        color: var(--faint);
       }
       .btnrow {
         display: flex;
-        gap: 6px;
+        gap: 7px;
         margin-bottom: 8px;
+      }
+      .btnrow:last-child {
+        margin-bottom: 0;
       }
       .btnrow button {
         flex: 1;
-        height: 28px;
+        height: 30px;
         border: 1px solid var(--border);
-        border-radius: 7px;
+        border-radius: 8px;
         background: var(--field);
         color: var(--ink);
         font-size: 12px;
@@ -560,22 +703,23 @@
         border-color: var(--accent);
         background: var(--accent-weak);
       }
-      #inspector {
-        padding: 14px 14px 12px;
-        border-bottom: 1px solid var(--border);
-      }
       #inspector .empty {
         color: var(--muted);
         font-size: 12px;
-        line-height: 2;
+        line-height: 2.1;
         text-align: center;
-        padding: 18px 6px;
+        padding: 34px 14px;
       }
       #inspector .empty .glyph {
-        font-size: 22px;
-        display: block;
-        margin-bottom: 6px;
-        opacity: 0.5;
+        width: 44px;
+        height: 44px;
+        margin: 0 auto 10px;
+        border-radius: 12px;
+        background: var(--field);
+        color: var(--faint);
+        display: grid;
+        place-items: center;
+        font-size: 19px;
       }
       #deleteEl {
         color: var(--danger) !important;
@@ -585,12 +729,70 @@
         background: color-mix(in srgb, var(--danger) 10%, transparent) !important;
       }
 
+      /* layers */
+      #layers {
+        padding: 8px;
+      }
+      .layer {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 9px;
+        border-radius: 9px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition:
+          background 0.12s,
+          border-color 0.12s;
+      }
+      .layer:hover {
+        background: var(--field);
+      }
+      .layer.selected {
+        background: var(--accent-weak);
+        border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+      }
+      .layer .l-ico {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        background: var(--field);
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+        flex: none;
+      }
+      .layer.selected .l-ico {
+        background: var(--accent);
+        color: #fff;
+      }
+      .layer .l-name {
+        flex: 1;
+        min-width: 0;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .layer .l-type {
+        font-size: 9.5px;
+        color: var(--faint);
+        direction: ltr;
+      }
+      .layers-empty {
+        color: var(--faint);
+        text-align: center;
+        font-size: 11.5px;
+        padding: 26px 10px;
+        line-height: 2;
+      }
+
       aside textarea {
         width: 100%;
-        min-height: 110px;
+        min-height: 120px;
         font-family: ui-monospace, 'Cascadia Code', monospace;
         font-size: 11.5px;
-        line-height: 1.6;
+        line-height: 1.65;
         direction: ltr;
         resize: vertical;
       }
@@ -604,15 +806,18 @@
         font-family: ui-monospace, monospace;
         background: var(--accent-weak);
         color: var(--accent);
-        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-        border-radius: 6px;
-        padding: 3px 8px;
+        border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+        border-radius: 7px;
+        padding: 3px 9px;
         cursor: grab;
         direction: ltr;
-        transition: background 0.15s;
+        transition:
+          background 0.15s,
+          transform 0.1s;
       }
       .fp-item:hover {
-        background: color-mix(in srgb, var(--accent) 22%, transparent);
+        background: color-mix(in srgb, var(--accent) 20%, transparent);
+        transform: translateY(-1px);
       }
       .fp-item:active {
         cursor: grabbing;
@@ -620,8 +825,8 @@
       .hint {
         font-size: 10.5px;
         color: var(--faint);
-        margin-top: 8px;
-        line-height: 1.9;
+        margin-top: 9px;
+        line-height: 1.95;
       }
       .hint kbd {
         font-family: inherit;
@@ -642,13 +847,95 @@
         text-align: left;
       }
 
-      /* ---------- gallery ---------- */
+      /* ================= status bar ================= */
+      .statusbar {
+        height: 34px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 12px;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        font-size: 11.5px;
+        color: var(--muted);
+        z-index: 60;
+      }
+      .statusbar .sbtn {
+        height: 24px;
+        min-width: 24px;
+        padding: 0 6px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          background 0.12s,
+          color 0.12s;
+      }
+      .statusbar .sbtn:hover {
+        background: var(--accent-weak);
+        color: var(--accent);
+      }
+      #zoomLabel {
+        min-width: 44px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink);
+        font-size: 11.5px;
+      }
+      #pageInfo,
+      #selInfo {
+        white-space: nowrap;
+      }
+      .sdot {
+        width: 3px;
+        height: 3px;
+        border-radius: 99px;
+        background: var(--border-strong);
+        margin: 0 4px;
+      }
+
+      /* toast */
+      #toast {
+        position: fixed;
+        bottom: 46px;
+        inset-inline-start: 50%;
+        translate: -50% 0;
+        background: var(--ink);
+        color: var(--bg);
+        font-size: 12.5px;
+        padding: 9px 16px;
+        border-radius: 10px;
+        box-shadow: var(--shadow-pop);
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.25s,
+          translate 0.25s;
+        z-index: 200;
+      }
+      html[dir='rtl'] #toast {
+        translate: 50% 6px;
+      }
+      #toast.show {
+        opacity: 1;
+      }
+      html[dir='rtl'] #toast.show {
+        translate: 50% 0;
+      }
+
+      /* ================= gallery ================= */
       .gallery-backdrop {
         position: fixed;
         inset: 0;
         display: none;
         background: rgba(10, 12, 16, 0.55);
-        backdrop-filter: blur(6px);
+        backdrop-filter: blur(7px);
         z-index: 100;
         align-items: center;
         justify-content: center;
@@ -659,9 +946,9 @@
       .gallery-panel {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 16px;
-        width: min(880px, 94vw);
-        max-height: 84vh;
+        border-radius: 18px;
+        width: min(900px, 94vw);
+        max-height: 85vh;
         display: flex;
         flex-direction: column;
         box-shadow: var(--shadow-pop);
@@ -671,22 +958,31 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 14px 20px;
+        padding: 16px 22px;
         border-bottom: 1px solid var(--border);
       }
       .gallery-head strong {
-        font-size: 14px;
-        font-weight: 600;
+        font-size: 14.5px;
+        font-weight: 700;
+      }
+      .gallery-head p {
+        margin: 3px 0 0;
+        font-size: 11.5px;
+        color: var(--muted);
+        font-weight: 400;
       }
       .gallery-head button {
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         border: 0;
-        border-radius: 8px;
-        background: transparent;
+        border-radius: 9px;
+        background: var(--field);
         color: var(--muted);
         cursor: pointer;
-        font-size: 14px;
+        font-size: 13px;
+        transition:
+          background 0.15s,
+          color 0.15s;
       }
       .gallery-head button:hover {
         background: var(--accent-weak);
@@ -695,13 +991,13 @@
       .gallery-cards {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
-        gap: 14px;
-        padding: 18px 20px 22px;
+        gap: 15px;
+        padding: 20px 22px 24px;
         overflow: auto;
       }
       .tpl-card {
         border: 1px solid var(--border);
-        border-radius: 12px;
+        border-radius: 13px;
         overflow: hidden;
         cursor: pointer;
         background: var(--raised);
@@ -714,11 +1010,11 @@
       }
       .tpl-card:hover {
         border-color: var(--accent);
-        box-shadow: 0 10px 30px -8px rgba(20, 30, 50, 0.3);
-        transform: translateY(-2px);
+        box-shadow: 0 14px 34px -10px rgba(20, 30, 50, 0.35);
+        transform: translateY(-3px);
       }
       .tpl-thumb {
-        height: 168px;
+        height: 165px;
         overflow: hidden;
         display: flex;
         justify-content: center;
@@ -731,7 +1027,7 @@
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
       }
       .tpl-meta {
-        padding: 10px 13px 12px;
+        padding: 11px 14px 13px;
       }
       .tpl-meta strong {
         display: block;
@@ -744,13 +1040,13 @@
         color: var(--muted);
       }
 
-      /* ---------- command palette ---------- */
+      /* ================= command palette ================= */
       .palette-backdrop {
         position: fixed;
         inset: 0;
         display: none;
         background: rgba(10, 12, 16, 0.45);
-        backdrop-filter: blur(4px);
+        backdrop-filter: blur(5px);
         z-index: 120;
         align-items: flex-start;
         justify-content: center;
@@ -760,10 +1056,10 @@
         display: flex;
       }
       .palette {
-        width: min(480px, 92vw);
+        width: min(490px, 92vw);
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 14px;
+        border-radius: 15px;
         box-shadow: var(--shadow-pop);
         overflow: hidden;
       }
@@ -771,7 +1067,7 @@
         width: 100%;
         border: 0;
         border-bottom: 1px solid var(--border);
-        padding: 14px 16px;
+        padding: 15px 18px;
         font-size: 14px;
         background: transparent;
         color: var(--ink);
@@ -783,13 +1079,13 @@
       .palette ul {
         list-style: none;
         margin: 0;
-        padding: 6px;
+        padding: 7px;
         max-height: 44vh;
         overflow: auto;
       }
       .palette li {
-        padding: 9px 12px;
-        border-radius: 9px;
+        padding: 10px 13px;
+        border-radius: 10px;
         cursor: pointer;
         font-size: 13px;
         display: flex;
@@ -810,11 +1106,11 @@
   </head>
   <body>
     <header class="topbar">
-      <div class="brand">
-        <span class="mark">P</span>
-        <span class="name">PDF Studio</span>
-        <span class="tag">دیزاینر</span>
-      </div>
+      <div class="brand"><span class="mark">P</span></div>
+      <input id="docName" value="سند بی‌نام" spellcheck="false" aria-label="نام سند" />
+      <span id="saveState"></span>
+
+      <span class="sep"></span>
 
       <button id="undo" class="btn icon quiet" title="واگرد (Ctrl+Z)" aria-label="واگرد">
         <svg
@@ -849,39 +1145,6 @@
 
       <span class="sep"></span>
 
-      <span class="zoomgroup">
-        <button id="zoomOut" class="btn icon quiet" title="کوچک‌نمایی" aria-label="کوچک‌نمایی">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-          >
-            <path d="M5 10h10" />
-          </svg>
-        </button>
-        <span id="zoomLabel">85%</span>
-        <button id="zoomIn" class="btn icon quiet" title="بزرگ‌نمایی" aria-label="بزرگ‌نمایی">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-          >
-            <path d="M10 5v10M5 10h10" />
-          </svg>
-        </button>
-      </span>
-      <button id="zoomReset" class="btn quiet" title="اندازهٔ واقعی">۱:۱</button>
-
-      <span class="sep"></span>
-
       <button id="togglePreview" class="btn quiet" title="پیش‌نمایش چندصفحه‌ای">
         <svg
           width="16"
@@ -901,7 +1164,6 @@
       <button id="toggleValues" class="btn quiet" title="نمایش مقدار نمونه یا نام فیلد روی بوم">
         🔢 مقادیر
       </button>
-      <button id="toggleTheme" class="btn icon quiet" title="تم روشن/تیره">🌙</button>
       <button id="openPalette" class="btn quiet" title="پالت فرمان (Ctrl+K)">⌘K</button>
 
       <span class="spacer"></span>
@@ -923,9 +1185,32 @@
         </svg>
         قالب‌ها
       </button>
-      <button id="newDoc" class="btn quiet" title="سند نو">سند نو</button>
-      <button id="importJson" class="btn quiet" title="بارگذاری فایل طرح">ورود JSON</button>
-      <button id="exportJson" class="btn quiet" title="ذخیرهٔ فایل طرح">خروجی JSON</button>
+
+      <div class="menu-wrap">
+        <button id="fileMenuBtn" class="btn quiet">
+          فایل
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="m5 8 5 5 5-5" />
+          </svg>
+        </button>
+        <div id="fileMenu" class="menu">
+          <button id="newDoc" class="btn quiet">سند نو</button>
+          <button id="importJson" class="btn quiet">بارگذاری طرح (JSON)</button>
+          <button id="exportJson" class="btn quiet">ذخیرهٔ طرح (JSON)</button>
+        </div>
+      </div>
+
+      <button id="toggleTheme" class="btn icon quiet" title="تم روشن/تیره">🌙</button>
+
       <button id="downloadPdf" class="btn primary">
         <svg
           width="15"
@@ -946,7 +1231,13 @@
 
     <div class="main">
       <nav class="toolrail" aria-label="جعبه‌ابزار">
-        <button class="tool" data-add="staticText" data-tip="متن" aria-label="افزودن متن">
+        <button
+          class="tool"
+          draggable="true"
+          data-add="staticText"
+          data-tip="متن — بکش یا کلیک کن"
+          aria-label="افزودن متن"
+        >
           <svg
             width="18"
             height="18"
@@ -961,6 +1252,7 @@
         </button>
         <button
           class="tool"
+          draggable="true"
           data-add="dataField"
           data-tip="فیلد داده"
           aria-label="افزودن فیلد داده"
@@ -979,7 +1271,14 @@
             <path d="M12.5 4c2 0 1 6 3.5 6-2.5 0-1.5 6-3.5 6" />
           </svg>
         </button>
-        <button class="tool" data-add="rectangle" data-tip="مستطیل" aria-label="افزودن مستطیل">
+        <span class="rail-sep"></span>
+        <button
+          class="tool"
+          draggable="true"
+          data-add="rectangle"
+          data-tip="مستطیل"
+          aria-label="افزودن مستطیل"
+        >
           <svg
             width="18"
             height="18"
@@ -991,7 +1290,7 @@
             <rect x="3.5" y="5" width="13" height="10" rx="1.5" />
           </svg>
         </button>
-        <button class="tool" data-add="line" data-tip="خط" aria-label="افزودن خط">
+        <button class="tool" draggable="true" data-add="line" data-tip="خط" aria-label="افزودن خط">
           <svg
             width="18"
             height="18"
@@ -1004,7 +1303,13 @@
             <path d="M4 16 16 4" />
           </svg>
         </button>
-        <button class="tool" data-add="ellipse" data-tip="بیضی" aria-label="افزودن بیضی">
+        <button
+          class="tool"
+          draggable="true"
+          data-add="ellipse"
+          data-tip="بیضی"
+          aria-label="افزودن بیضی"
+        >
           <svg
             width="18"
             height="18"
@@ -1016,7 +1321,13 @@
             <ellipse cx="10" cy="10" rx="7" ry="5" />
           </svg>
         </button>
-        <button class="tool" data-add="image" data-tip="تصویر" aria-label="افزودن تصویر">
+        <button
+          class="tool"
+          draggable="true"
+          data-add="image"
+          data-tip="تصویر"
+          aria-label="افزودن تصویر"
+        >
           <svg
             width="18"
             height="18"
@@ -1031,7 +1342,14 @@
             <path d="m4.5 14.5 4-4 3 3 2-2 2 2" />
           </svg>
         </button>
-        <button class="tool" data-add="barcode" data-tip="بارکد" aria-label="افزودن بارکد">
+        <span class="rail-sep"></span>
+        <button
+          class="tool"
+          draggable="true"
+          data-add="barcode"
+          data-tip="بارکد"
+          aria-label="افزودن بارکد"
+        >
           <svg
             width="18"
             height="18"
@@ -1044,7 +1362,13 @@
             <path d="M4 5v10M7 5v10M9.5 5v10M13 5v10M16 5v10M11 5v6" />
           </svg>
         </button>
-        <button class="tool" data-add="qrcode" data-tip="کد QR" aria-label="افزودن کد QR">
+        <button
+          class="tool"
+          draggable="true"
+          data-add="qrcode"
+          data-tip="کد QR"
+          aria-label="افزودن کد QR"
+        >
           <svg
             width="18"
             height="18"
@@ -1059,7 +1383,13 @@
             <path d="M11.5 11.5h2v2h-2zM14.5 14.5h2v2h-2z" />
           </svg>
         </button>
-        <button class="tool" data-add="chart" data-tip="چارت" aria-label="افزودن چارت">
+        <button
+          class="tool"
+          draggable="true"
+          data-add="chart"
+          data-tip="چارت"
+          aria-label="افزودن چارت"
+        >
           <svg
             width="18"
             height="18"
@@ -1082,52 +1412,91 @@
           <div id="guideV"></div>
           <div id="guideH"></div>
           <div id="marquee"></div>
+          <div id="quickbar"></div>
         </div>
       </div>
 
       <div id="preview"></div>
 
       <aside>
-        <div id="inspector">
-          <p class="empty">یک المان را انتخاب کن یا از جعبه‌ابزار اضافه کن.</p>
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="design" role="tab">طراحی</button>
+          <button class="tab" data-tab="layers" role="tab">لایه‌ها</button>
+          <button class="tab" data-tab="data" role="tab">داده</button>
         </div>
 
-        <div class="panel-section">
-          <h2>صفحه</h2>
-          <div class="row">
-            <label>جهت</label>
-            <select id="pageDir">
-              <option value="rtl">راست‌به‌چپ (RTL)</option>
-              <option value="ltr">چپ‌به‌راست (LTR)</option>
-            </select>
+        <div class="tabpane active" data-pane="design">
+          <div id="inspector"></div>
+          <div class="sec">
+            <div class="sec-title">صفحه</div>
+            <div class="row">
+              <label>جهت</label>
+              <select id="pageDir">
+                <option value="rtl">راست‌به‌چپ (RTL)</option>
+                <option value="ltr">چپ‌به‌راست (LTR)</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        <div class="panel-section">
-          <h2>فیلدهای داده</h2>
-          <div id="fieldPicker"></div>
-          <div class="hint">چیپ را بکش و روی بوم رها کن تا فیلد بایندشده ساخته شود.</div>
+        <div class="tabpane" data-pane="layers">
+          <div id="layers"></div>
         </div>
 
-        <div class="panel-section">
-          <h2>دادهٔ نمونه</h2>
-          <textarea id="sampleData" spellcheck="false"></textarea>
-          <div class="hint">
-            JSON دادهٔ تست برای پیش‌نمایش و خروجی؛ چارت به آرایهٔ <code>items</code> بایند می‌شود.
+        <div class="tabpane" data-pane="data">
+          <div class="sec">
+            <div class="sec-title">فیلدهای داده</div>
+            <div id="fieldPicker"></div>
+            <div class="hint">
+              چیپ را بکش و روی بوم رها کن تا فیلد بایندشده ساخته شود؛ روی الِمان رها کنی، بایندش عوض
+              می‌شود.
+            </div>
           </div>
-          <div class="hint">
-            <kbd>Shift</kbd>+کلیک چندانتخابی · <kbd>Ctrl</kbd>+<kbd>K</kbd> فرمان‌ها ·
-            <kbd>Ctrl</kbd>+<kbd>D</kbd> کپی · فلش‌ها جابه‌جایی · <kbd>Alt</kbd> حین درگ = بدون snap
+          <div class="sec">
+            <div class="sec-title">دادهٔ نمونه (JSON)</div>
+            <textarea id="sampleData" spellcheck="false"></textarea>
+            <div class="hint">
+              دادهٔ تست برای پیش‌نمایش و خروجی؛ چارت به آرایهٔ <code>items</code> بایند می‌شود.
+            </div>
+            <div id="diag" class="diag"></div>
           </div>
-          <div id="diag" class="diag"></div>
+          <div class="sec">
+            <div class="sec-title">میان‌برها</div>
+            <div class="hint">
+              <kbd>Shift</kbd>+کلیک چندانتخابی · کشیدن روی بوم خالی = انتخاب گروهی<br />
+              <kbd>Ctrl</kbd>+<kbd>K</kbd> فرمان‌ها · <kbd>Ctrl</kbd>+<kbd>D</kbd> کپی ·
+              <kbd>Delete</kbd> حذف<br />
+              فلش‌ها جابه‌جایی (<kbd>Shift</kbd>=۱۰) · <kbd>Alt</kbd> حین درگ = بدون snap ·
+              <kbd>Ctrl</kbd>+چرخ‌موس = زوم
+            </div>
+          </div>
         </div>
       </aside>
     </div>
 
+    <footer class="statusbar">
+      <button id="zoomOut" class="sbtn" title="کوچک‌نمایی" aria-label="کوچک‌نمایی">−</button>
+      <span id="zoomLabel">85%</span>
+      <button id="zoomIn" class="sbtn" title="بزرگ‌نمایی" aria-label="بزرگ‌نمایی">+</button>
+      <button id="zoomReset" class="sbtn" title="اندازهٔ واقعی">۱:۱</button>
+      <button id="zoomFit" class="sbtn" title="جا دادن صفحه در نما">جا بده</button>
+      <span class="sdot"></span>
+      <span id="pageInfo">A4 · عمودی</span>
+      <span class="sdot"></span>
+      <span id="selInfo">چیزی انتخاب نشده</span>
+      <span class="spacer"></span>
+      <span>Ctrl+K = همهٔ فرمان‌ها</span>
+    </footer>
+
+    <div id="toast" role="status"></div>
+
     <div id="gallery" class="gallery-backdrop">
       <div class="gallery-panel">
         <div class="gallery-head">
-          <strong>گالری قالب‌ها</strong>
+          <div>
+            <strong>گالری قالب‌ها</strong>
+            <p>با یک کلیک شروع کن — قالب و دادهٔ نمونه با هم لود می‌شوند.</p>
+          </div>
           <button id="closeGallery" aria-label="بستن">✕</button>
         </div>
         <div id="galleryCards" class="gallery-cards"></div>

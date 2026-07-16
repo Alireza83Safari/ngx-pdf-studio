@@ -63,6 +63,87 @@
     return selected.indexOf(id) !== -1;
   }
 
+  // --- type metadata for the UI (§8) ---------------------------------------
+  var FA_NAMES = {
+    staticText: 'متن',
+    dataField: 'فیلد داده',
+    richText: 'متن غنی',
+    rectangle: 'مستطیل',
+    line: 'خط',
+    ellipse: 'بیضی',
+    image: 'تصویر',
+    barcode: 'بارکد',
+    qrcode: 'کد QR',
+    chart: 'چارت',
+    table: 'جدول',
+    list: 'لیست',
+    container: 'گروه',
+    toc: 'فهرست مطالب',
+    formField: 'فیلد فرم',
+    custom: 'المان سفارشی',
+    pageField: 'فیلد صفحه',
+    subreport: 'زیرگزارش',
+    crosstab: 'جدول محوری',
+  };
+  function faName(type) {
+    return FA_NAMES[type] || type;
+  }
+  var ICON_PATHS = {
+    staticText: '<path d="M4 5h12M10 5v10"/>',
+    dataField:
+      '<path d="M7.5 4C5.5 4 6.5 10 4 10c2.5 0 1.5 6 3.5 6"/><path d="M12.5 4c2 0 1 6 3.5 6-2.5 0-1.5 6-3.5 6"/>',
+    rectangle: '<rect x="3.5" y="5" width="13" height="10" rx="1.5"/>',
+    line: '<path d="M4 16 16 4"/>',
+    ellipse: '<ellipse cx="10" cy="10" rx="7" ry="5"/>',
+    image:
+      '<rect x="3.5" y="4" width="13" height="12" rx="2"/><circle cx="8" cy="8.5" r="1.4"/><path d="m4.5 14.5 4-4 3 3 2-2 2 2"/>',
+    barcode: '<path d="M4 5v10M7 5v10M9.5 5v10M13 5v10M16 5v10M11 5v6"/>',
+    qrcode:
+      '<rect x="3.5" y="3.5" width="5" height="5" rx="1"/><rect x="11.5" y="3.5" width="5" height="5" rx="1"/><rect x="3.5" y="11.5" width="5" height="5" rx="1"/><path d="M11.5 11.5h2v2h-2zM14.5 14.5h2v2h-2z"/>',
+    chart: '<path d="M4 4v12h12"/><path d="M7.5 13V9M11 13V6.5M14.5 13v-3"/>',
+    table: '<rect x="3.5" y="4" width="13" height="12" rx="1.5"/><path d="M3.5 8.5h13M8.5 4v12"/>',
+    toc: '<path d="M4 5h9M4 10h12M4 15h7"/><circle cx="16" cy="5" r="0.8"/>',
+  };
+  function typeIcon(type, size) {
+    var d = ICON_PATHS[type] || '<rect x="4" y="4" width="12" height="12" rx="2"/>';
+    return (
+      '<svg width="' +
+      size +
+      '" height="' +
+      size +
+      '" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+      d +
+      '</svg>'
+    );
+  }
+
+  // --- toast ----------------------------------------------------------------
+  var toastTimer = null;
+  function toast(msg) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      el.classList.remove('show');
+    }, 2400);
+  }
+
+  // --- right-panel tabs -------------------------------------------------------
+  function setTab(name) {
+    document.querySelectorAll('.tab').forEach(function (t) {
+      t.classList.toggle('active', t.dataset.tab === name);
+    });
+    document.querySelectorAll('.tabpane').forEach(function (pane) {
+      pane.classList.toggle('active', pane.dataset.pane === name);
+    });
+  }
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.addEventListener('click', function () {
+      setTab(t.dataset.tab);
+    });
+  });
+
   // Make the bundled font available to the canvas SVG + overlays.
   if (window.VAZIRMATN_BASE64) {
     var fontCss = document.createElement('style');
@@ -124,6 +205,19 @@
   }
 
   var store = new P.DocumentStore(freshTemplate());
+
+  /** Rename the document (undoable). */
+  function renameCmd(name, prev) {
+    return {
+      type: 'rename',
+      apply: function (t) {
+        return Object.assign({}, t, { metadata: Object.assign({}, t.metadata, { name: name }) });
+      },
+      invert: function () {
+        return renameCmd(prev, name);
+      },
+    };
+  }
 
   // --- commands ------------------------------------------------------------
   function restoreCmd(id, element) {
@@ -474,6 +568,129 @@
       }
     });
     document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+    renderQuickbar(t, m);
+  }
+
+  /** Floating quick actions above the selection's bounding box (§8A). */
+  var quickbarEl = document.getElementById('quickbar');
+  quickbarEl.addEventListener('mousedown', function (e) {
+    e.stopPropagation();
+    e.preventDefault();
+  });
+  quickbarEl.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('button') : null;
+    if (!btn) return;
+    var q = btn.dataset.q;
+    if (q === 'dup') duplicateSelected();
+    else if (q === 'front') reorderSelected(true);
+    else if (q === 'back') reorderSelected(false);
+    else if (q === 'del') deleteSelected();
+  });
+  function renderQuickbar(t, m) {
+    if (!selected.length) {
+      quickbarEl.classList.remove('show');
+      return;
+    }
+    var minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity;
+    selected.forEach(function (id) {
+      var loc = P.findElement(t, id);
+      if (!loc) return;
+      var b = loc.element.bounds;
+      minX = Math.min(minX, b.x);
+      minY = Math.min(minY, b.y);
+      maxX = Math.max(maxX, b.x + b.width);
+    });
+    if (!isFinite(minX)) {
+      quickbarEl.classList.remove('show');
+      return;
+    }
+    quickbarEl.innerHTML =
+      '<button data-q="dup" title="کپی (Ctrl+D)">' +
+      '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="7" y="7" width="9" height="9" rx="2"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4h-6A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></svg></button>' +
+      '<button data-q="front" title="بیار جلو">' +
+      '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 14V5m0 0L6.5 8.5M10 5l3.5 3.5"/></svg></button>' +
+      '<button data-q="back" title="بفرست عقب">' +
+      '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 6v9m0 0 3.5-3.5M10 15l-3.5-3.5"/></svg></button>' +
+      '<span class="qsep"></span>' +
+      '<button data-q="del" class="danger" title="حذف (Delete)">' +
+      '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m3 0-.7 9.2A2 2 0 0 1 12.3 17H7.7a2 2 0 0 1-2-1.8L5 6"/></svg></button>';
+    var midX = (m.left + (minX + maxX) / 2) * zoom;
+    var topY = (m.top + minY) * zoom;
+    quickbarEl.style.left = midX - quickbarEl.offsetWidth / 2 + 'px';
+    quickbarEl.style.top = Math.max(4, topY - 40) + 'px';
+    quickbarEl.classList.add('show');
+    // re-center once real width is known
+    quickbarEl.style.left = midX - quickbarEl.offsetWidth / 2 + 'px';
+  }
+
+  /** Layers panel: top-most first, click to select, shift-click to toggle. */
+  var layersEl = document.getElementById('layers');
+  function layerLabel(el) {
+    if (el.type === 'staticText' && el.text) return el.text;
+    if (el.value && el.value.source) return el.value.source;
+    if (el.type === 'chart') return faName(el.type) + ' · ' + (el.chartKind || '');
+    return faName(el.type);
+  }
+  function renderLayers() {
+    var t = store.getState();
+    var els = t.bands[0].elements.slice().reverse();
+    if (!els.length) {
+      layersEl.innerHTML =
+        '<div class="layers-empty">هنوز الِمانی نداری.<br>از جعبه‌ابزار یکی بکش روی بوم.</div>';
+      return;
+    }
+    layersEl.innerHTML = els
+      .map(function (el) {
+        return (
+          '<div class="layer' +
+          (isSelected(el.id) ? ' selected' : '') +
+          '" data-id="' +
+          esc(el.id) +
+          '"><span class="l-ico">' +
+          typeIcon(el.type, 13) +
+          '</span><span class="l-name">' +
+          esc(layerLabel(el)) +
+          '</span><span class="l-type">' +
+          esc(el.type) +
+          '</span></div>'
+        );
+      })
+      .join('');
+  }
+  layersEl.addEventListener('click', function (e) {
+    var row = e.target.closest ? e.target.closest('.layer') : null;
+    if (!row) return;
+    var id = row.dataset.id;
+    if (e.shiftKey) {
+      var i = selected.indexOf(id);
+      if (i === -1) selected.push(id);
+      else selected.splice(i, 1);
+    } else {
+      selected = [id];
+    }
+    renderCanvas();
+    renderInspector();
+    renderLayers();
+  });
+
+  /** Status bar: page info + selection info. */
+  function renderStatus() {
+    var t = store.getState();
+    var size = t.page.size;
+    var sizeName =
+      typeof size === 'string'
+        ? size
+        : Math.round(size.width) + '×' + Math.round(size.height) + 'pt';
+    document.getElementById('pageInfo').textContent =
+      sizeName + ' · ' + (t.page.orientation === 'landscape' ? 'افقی' : 'عمودی');
+    var sel = document.getElementById('selInfo');
+    if (!selected.length) sel.textContent = 'چیزی انتخاب نشده';
+    else if (selected.length === 1) {
+      var loc = P.findElement(t, selected[0]);
+      sel.textContent = loc ? faName(loc.element.type) + ' انتخاب شده' : '';
+    } else sel.textContent = selected.length + ' الِمان انتخاب شده';
   }
 
   // --- snapping ------------------------------------------------------------
@@ -550,6 +767,7 @@
         starts: starts,
         moved: false,
       };
+      setTab('design');
       renderInspector();
       renderCanvas();
       e.preventDefault();
@@ -751,10 +969,35 @@
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
   });
+  document.querySelectorAll('.tool[data-add]').forEach(function (toolBtn) {
+    toolBtn.addEventListener('dragstart', function (ev) {
+      ev.dataTransfer.setData('text/plain', '__add__:' + toolBtn.dataset.add);
+      ev.dataTransfer.effectAllowed = 'copy';
+    });
+  });
+
   pageEl.addEventListener('drop', function (e) {
     e.preventDefault();
     var path = e.dataTransfer.getData('text/plain');
     if (!path) return;
+    if (path.indexOf('__add__:') === 0) {
+      // dropped a toolbox tool: create that element at the drop point
+      var addType = path.slice(8);
+      var rect0 = pageEl.getBoundingClientRect();
+      var t0 = store.getState();
+      var m0 = t0.page.margins;
+      var id0 = 'el-' + uid++;
+      var make = DEFAULTS[addType] || DEFAULTS.staticText;
+      var el0 = make({ id: id0, bounds: { x: 40, y: 80, width: 200, height: 24 }, zIndex: 1 });
+      el0.bounds = Object.assign({}, el0.bounds, {
+        x: Math.max(0, Math.round((e.clientX - rect0.left) / zoom - m0.left)),
+        y: Math.max(0, Math.round((e.clientY - rect0.top) / zoom - m0.top)),
+      });
+      selected = [id0];
+      setTab('design');
+      store.dispatch(P.addElement('main', el0));
+      return;
+    }
     var target = e.target.closest ? e.target.closest('.el') : null;
     if (target) {
       // drop on an element: rebind it (fields/barcode/qr get their value)
@@ -801,6 +1044,11 @@
   document.getElementById('zoomReset').addEventListener('click', function () {
     setZoom(1);
   });
+  document.getElementById('zoomFit').addEventListener('click', function () {
+    var wrap = document.querySelector('.canvas-wrap');
+    var size = pageSize(store.getState());
+    setZoom(Math.min((wrap.clientWidth - 90) / size.width, (wrap.clientHeight - 90) / size.height));
+  });
   document.querySelector('.canvas-wrap').addEventListener(
     'wheel',
     function (e) {
@@ -823,15 +1071,48 @@
     var loc = id ? P.findElement(t, id) : null;
     if (!loc) {
       inspectorEl.innerHTML =
-        '<p class="empty"><span class="glyph">⬚</span>الِمانی انتخاب نشده.<br>از جعبه‌ابزار اضافه کن یا روی بوم کلیک کن.</p>';
+        '<p class="empty"><span class="glyph">⬚</span>الِمانی انتخاب نشده<br>' +
+        'از جعبه‌ابزار بکش روی بوم، یا از <b>قالب‌ها</b> شروع کن.</p>';
       return;
     }
     var el = loc.element,
       b = el.bounds,
       ty = el.typography || {};
-    var multi = selected.length > 1 ? ' <small>(' + selected.length + ' انتخاب)</small>' : '';
-    var html = '<h2>' + el.type + multi + '</h2>';
+    var multi = selected.length > 1 ? ' · ' + selected.length + ' الِمان انتخاب شده' : '';
+
+    var html =
+      '<div class="sec head"><span class="el-ico">' +
+      typeIcon(el.type, 18) +
+      '</span><div><b>' +
+      faName(el.type) +
+      '</b><small>' +
+      el.type +
+      multi +
+      '</small></div></div>';
+
+    // --- placement ----------------------------------------------------------
+    html += '<div class="sec"><div class="sec-title">قرارگیری و اندازه</div>';
+    html +=
+      '<div class="grid2">' +
+      numField('x', b.x) +
+      numField('y', b.y) +
+      numField('w', b.width) +
+      numField('h', b.height) +
+      '</div>';
+    html += field(
+      'چرخش',
+      '<input type="number" data-prop="rotation" value="' + (el.rotation || 0) + '" step="15">',
+    );
+    html +=
+      '<div class="btnrow">' +
+      '<button data-z="front" title="بیار جلو">⬆ بیار جلو</button>' +
+      '<button data-z="back" title="بفرست عقب">⬇ بفرست عقب</button>' +
+      '</div>';
+    html += '</div>';
+
+    // --- alignment (multi) ----------------------------------------------------
     if (selected.length > 1) {
+      html += '<div class="sec"><div class="sec-title">هم‌ترازی انتخاب</div>';
       html +=
         '<div class="btnrow">' +
         '<button data-align="left" title="چپ">⇤</button>' +
@@ -848,73 +1129,71 @@
           '<button data-dist="v">توزیع عمودی</button>' +
           '</div>';
       }
+      html += '</div>';
     }
-    html +=
-      '<div class="btnrow">' +
-      '<button data-z="front" title="بیار جلو">⬆ جلو</button>' +
-      '<button data-z="back" title="بفرست عقب">⬇ عقب</button>' +
-      '</div>';
-    html +=
-      '<div class="grid2">' +
-      numField('x', b.x) +
-      numField('y', b.y) +
-      numField('w', b.width) +
-      numField('h', b.height) +
-      '</div>';
-    html += field(
-      'چرخش',
-      '<input type="number" data-prop="rotation" value="' + (el.rotation || 0) + '">',
-    );
 
+    // --- content ---------------------------------------------------------------
+    var content = '';
     if (el.type === 'staticText')
-      html += field('متن', '<input data-prop="text" value="' + esc(el.text || '') + '">');
+      content += field('متن', '<input data-prop="text" value="' + esc(el.text || '') + '">');
     if (el.type === 'dataField' || el.type === 'barcode' || el.type === 'qrcode')
-      html += field(
+      content += field(
         el.type === 'dataField' ? 'بایند' : 'مقدار',
-        '<input data-prop="source" value="' + esc(el.value ? el.value.source : '') + '">',
+        '<input dir="ltr" data-prop="source" value="' + esc(el.value ? el.value.source : '') + '">',
       );
     if (el.type === 'barcode')
-      html += field(
-        'symbology',
+      content += field(
+        'نوع بارکد',
         '<select data-prop="symbology">' +
           opts(['code128', 'code39', 'ean13'], el.symbology) +
           '</select>',
       );
     if (el.type === 'image') {
-      html += field(
+      content += field(
         'آدرس',
-        '<input data-prop="imgsource" value="' + esc(el.source ? el.source.source : '') + '">',
+        '<input dir="ltr" data-prop="imgsource" value="' +
+          esc(el.source ? el.source.source : '') +
+          '">',
       );
-      html += field(
-        'fit',
+      content += field(
+        'برازش',
         '<select data-prop="fit">' +
           opts(['contain', 'cover', 'fill', 'none'], el.fit || 'contain') +
           '</select>',
       );
     }
     if (el.type === 'chart') {
-      html += field(
-        'نوع',
+      content += field(
+        'نوع چارت',
         '<select data-prop="chartKind">' +
           opts(['column', 'bar', 'line', 'stackedColumn', 'area', 'pie', 'donut'], el.chartKind) +
           '</select>',
       );
-      html += field('دیتاست', '<input data-prop="dataset" value="' + esc(el.dataset || '') + '">');
-      html += field(
+      content += field(
+        'دیتاست',
+        '<input dir="ltr" data-prop="dataset" value="' + esc(el.dataset || '') + '">',
+      );
+      content += field(
         'دسته‌ها',
-        '<input data-prop="categories" value="' +
+        '<input dir="ltr" data-prop="categories" value="' +
           esc(el.categories ? el.categories.source : '') +
           '">',
       );
-      html += field(
+      content += field(
         'مقادیر',
-        '<input data-prop="values" value="' +
+        '<input dir="ltr" data-prop="values" value="' +
           esc(el.series && el.series[0] ? el.series[0].values.source : '') +
           '">',
       );
     }
+    if (content) {
+      html += '<div class="sec"><div class="sec-title">محتوا</div>' + content + '</div>';
+    }
+
+    // --- appearance ---------------------------------------------------------
+    var looks = '';
     if (el.type === 'line') {
-      html += field(
+      looks += field(
         'رنگ خط',
         '<input type="color" data-prop="stroke" value="' +
           rgbToHex(el.stroke ? el.stroke.color : rgb(51, 65, 85)) +
@@ -923,7 +1202,7 @@
     }
     if (el.type === 'rectangle' || el.type === 'ellipse') {
       var fill = el.box && el.box.fill ? rgbToHex(el.box.fill.color) : '#f1f5f9';
-      html += field('پُری', '<input type="color" data-prop="fill" value="' + fill + '">');
+      looks += field('رنگ پُری', '<input type="color" data-prop="fill" value="' + fill + '">');
     }
     if (
       el.type === 'staticText' ||
@@ -931,32 +1210,38 @@
       el.type === 'richText' ||
       el.type === 'pageField'
     ) {
-      html += field(
+      looks += field(
         'اندازه',
         '<input type="number" data-prop="fontSize" value="' + (ty.fontSize || 12) + '">',
       );
-      html += field(
+      looks += field(
         'رنگ',
         '<input type="color" data-prop="color" value="' +
           rgbToHex(ty.color || rgb(15, 23, 42)) +
           '">',
       );
-      html += field(
+      looks += field(
         'ضخیم',
         '<input type="checkbox" data-prop="bold"' +
           (ty.fontWeight === 'bold' ? ' checked' : '') +
           '>',
       );
-      html += field(
+      looks += field(
         'چینش',
         '<select data-prop="align">' +
           opts(['start', 'center', 'end'], ty.align || 'start') +
           '</select>',
       );
     }
+    if (looks) {
+      html += '<div class="sec"><div class="sec-title">ظاهر</div>' + looks + '</div>';
+    }
+
     html +=
-      '<div class="row"><button id="dupEl" style="flex:1">کپی (Ctrl+D)</button>' +
-      '<button id="deleteEl" style="flex:1;color:#b91c1c">حذف</button></div>';
+      '<div class="sec"><div class="btnrow">' +
+      '<button id="dupEl">کپی (Ctrl+D)</button>' +
+      '<button id="deleteEl">حذف</button>' +
+      '</div></div>';
     inspectorEl.innerHTML = html;
     wireInspector(el);
   }
@@ -1183,6 +1468,11 @@
             })
             .join('\n')
         : '';
+      toast(
+        res.diagnostics.length
+          ? 'PDF با ' + res.diagnostics.length + ' هشدار ساخته شد'
+          : 'PDF ساخته شد و در حال دانلود است',
+      );
     } catch (err) {
       diagEl.textContent = err.message;
     }
@@ -1430,6 +1720,8 @@
     renderFieldPicker();
     loadTemplate(JSON.parse(JSON.stringify(entry.template)));
     galleryEl.classList.remove('show');
+    setTab('design');
+    toast('قالب «' + entry.name + '» لود شد');
   }
   document.getElementById('openGallery').addEventListener('click', function () {
     renderGallery();
@@ -1447,11 +1739,16 @@
   var autosaveTimer = null;
   function autosave() {
     clearTimeout(autosaveTimer);
+    var stateEl = document.getElementById('saveState');
+    stateEl.textContent = 'در حال ذخیره…';
+    stateEl.classList.remove('saved');
     autosaveTimer = setTimeout(function () {
       try {
         window.localStorage.setItem(DRAFT_KEY, P.serializeTemplate(store.getState()));
+        stateEl.textContent = 'ذخیره شد ✓';
+        stateEl.classList.add('saved');
       } catch (err) {
-        /* storage unavailable (private mode / file://) — skip silently */
+        stateEl.textContent = '';
       }
     }, 400);
   }
@@ -1467,6 +1764,18 @@
       return false;
     }
   }
+  var fileMenu = document.getElementById('fileMenu');
+  document.getElementById('fileMenuBtn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    fileMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', function (e) {
+    if (!fileMenu.contains(e.target)) fileMenu.classList.remove('open');
+  });
+  fileMenu.addEventListener('click', function () {
+    fileMenu.classList.remove('open');
+  });
+
   document.getElementById('newDoc').addEventListener('click', function () {
     if (!window.confirm('سند جدید؟ طرح فعلی پاک می‌شود (پیش‌نویس هم).')) return;
     try {
@@ -1516,11 +1825,28 @@
   });
 
   // --- wiring --------------------------------------------------------------
+  var docNameEl = document.getElementById('docName');
+  docNameEl.addEventListener('change', function () {
+    var prev = store.getState().metadata.name;
+    if (docNameEl.value.trim() && docNameEl.value !== prev) {
+      store.dispatch(renameCmd(docNameEl.value.trim(), prev));
+    }
+  });
+  docNameEl.addEventListener('keydown', function (e) {
+    e.stopPropagation();
+    if (e.key === 'Enter') docNameEl.blur();
+  });
+
   function rerender() {
     document.getElementById('undo').disabled = !store.canUndo();
     document.getElementById('redo').disabled = !store.canRedo();
     document.getElementById('pageDir').value = store.getState().page.direction;
+    if (document.activeElement !== docNameEl) {
+      docNameEl.value = store.getState().metadata.name || 'سند بی‌نام';
+    }
     renderCanvas();
+    renderLayers();
+    renderStatus();
     renderPreview();
     autosave();
   }
