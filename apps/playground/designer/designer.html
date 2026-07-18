@@ -2241,11 +2241,11 @@
     <div id="toast" role="status"></div>
 
     <div id="help" class="help-backdrop">
-      <div class="help-panel">
+      <div class="help-panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
         <div class="help-head">
           <span class="hh-ico">؟</span>
           <div>
-            <strong>راهنمای PDF Studio</strong>
+            <strong id="helpTitle">راهنمای PDF Studio</strong>
             <p>همهٔ بخش‌ها، قدم‌به‌قدم — از اولین الِمان تا PDF نهایی</p>
           </div>
           <span class="spacer"></span>
@@ -2265,10 +2265,10 @@
     </div>
 
     <div id="gallery" class="gallery-backdrop">
-      <div class="gallery-panel">
+      <div class="gallery-panel" role="dialog" aria-modal="true" aria-labelledby="galleryTitle">
         <div class="gallery-head">
           <div>
-            <strong>گالری قالب‌ها</strong>
+            <strong id="galleryTitle">گالری قالب‌ها</strong>
             <p>با یک کلیک شروع کن — قالب و دادهٔ نمونه با هم لود می‌شوند.</p>
           </div>
           <button id="closeGallery" aria-label="بستن">✕</button>
@@ -2278,10 +2278,16 @@
     </div>
 
     <div id="copilot" class="gallery-backdrop">
-      <div class="gallery-panel" style="width: min(540px, 92vw)">
+      <div
+        class="gallery-panel"
+        style="width: min(540px, 92vw)"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="copilotTitle"
+      >
         <div class="gallery-head">
           <div>
-            <strong>✨ کوپایلوت</strong>
+            <strong id="copilotTitle">✨ کوپایلوت</strong>
             <p>بگو چه سندی می‌خواهی — قالب معتبر ساخته و روی بوم می‌نشیند (undo هم دارد)</p>
           </div>
           <button id="closeCopilot" aria-label="بستن">✕</button>
@@ -2349,10 +2355,16 @@
     </div>
 
     <div id="history" class="gallery-backdrop">
-      <div class="gallery-panel" style="width: min(560px, 92vw)">
+      <div
+        class="gallery-panel"
+        style="width: min(560px, 92vw)"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="historyTitle"
+      >
         <div class="gallery-head">
           <div>
-            <strong>تاریخچهٔ نسخه‌ها</strong>
+            <strong id="historyTitle">تاریخچهٔ نسخه‌ها</strong>
             <p>ذخیره‌های خودکار اخیر — روی «بازگردانی» بزن تا برگردی</p>
           </div>
           <button id="closeHistory" aria-label="بستن">✕</button>
@@ -2362,7 +2374,7 @@
     </div>
 
     <div id="palette" class="palette-backdrop">
-      <div class="palette">
+      <div class="palette" role="dialog" aria-modal="true" aria-label="پالت فرمان">
         <input id="paletteInput" placeholder="فرمان را بنویس… (افزودن متن، قالب‌ها، دانلود PDF…)" />
         <ul id="paletteList"></ul>
       </div>

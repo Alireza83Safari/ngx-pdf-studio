@@ -3788,6 +3788,65 @@
     rerender();
     renderInspector();
   });
+  // Accessible modal dialogs (design-review 1.4): trap Tab inside an open
+  // dialog and restore focus to the opener on close. Driven by a MutationObserver
+  // on each modal's `class`, so the many scattered `.show` toggles need no changes.
+  function installModalA11y() {
+    var BACKDROPS = '.help-backdrop, .gallery-backdrop, .palette-backdrop';
+    var FOCUSABLE =
+      'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),' +
+      'textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+    var lastOutside = null;
+    document.addEventListener('focusin', function (e) {
+      if (!(e.target.closest && e.target.closest(BACKDROPS))) lastOutside = e.target;
+    });
+    function visibleFocusables(modal) {
+      return Array.prototype.filter.call(modal.querySelectorAll(FOCUSABLE), function (el) {
+        return el.offsetWidth > 0 || el.offsetHeight > 0;
+      });
+    }
+    ['help', 'gallery', 'copilot', 'history', 'palette'].forEach(function (id) {
+      var modal = document.getElementById(id);
+      if (!modal) return;
+      var restoreTo = null;
+      function onKey(e) {
+        if (e.key !== 'Tab') return;
+        var f = visibleFocusables(modal);
+        if (!f.length) return;
+        var first = f[0];
+        var last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+      new MutationObserver(function () {
+        var open = modal.classList.contains('show');
+        if (open && !modal.__trap) {
+          modal.__trap = true;
+          restoreTo = lastOutside;
+          modal.addEventListener('keydown', onKey);
+          if (!modal.contains(document.activeElement)) {
+            var f = visibleFocusables(modal);
+            if (f.length) f[0].focus();
+          }
+        } else if (!open && modal.__trap) {
+          modal.__trap = false;
+          modal.removeEventListener('keydown', onKey);
+          var active = document.activeElement;
+          var stillHere = !active || active === document.body || modal.contains(active);
+          if (stillHere && restoreTo && document.contains(restoreTo) && restoreTo.focus) {
+            restoreTo.focus();
+          }
+          restoreTo = null;
+        }
+      }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+    });
+  }
+  installModalA11y();
   upgradeTooltips(document);
   renderFieldPicker();
   if (!tryLoadFromHash() && !restoreDraft()) {
