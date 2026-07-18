@@ -945,6 +945,34 @@
         place-items: center;
         font-size: 19px;
       }
+      #inspector .empty .empty-cta {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 16px;
+      }
+      #inspector .empty .empty-cta button {
+        font: inherit;
+        font-size: 12px;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--field);
+        color: var(--ink);
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+      }
+      #inspector .empty .empty-cta button:first-child {
+        border-color: var(--accent);
+        background: var(--accent-weak);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      #inspector .empty .empty-cta button:hover {
+        border-color: var(--accent);
+      }
       #deleteEl {
         color: var(--danger) !important;
       }

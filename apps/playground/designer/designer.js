@@ -1704,6 +1704,13 @@
 
   // --- inspector -----------------------------------------------------------
   var inspectorEl = document.getElementById('inspector');
+  // empty-state quick actions (design-review 3.10) — delegated so it survives re-render
+  inspectorEl.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-empty-action]') : null;
+    if (!b) return;
+    if (b.dataset.emptyAction === 'add-text') addElement('staticText');
+    else if (b.dataset.emptyAction === 'gallery') document.getElementById('openGallery').click();
+  });
   function field(label, inputHtml) {
     return '<div class="row"><label>' + label + '</label>' + inputHtml + '</div>';
   }
@@ -1811,7 +1818,11 @@
       '</div></div>';
     s +=
       '<p class="empty"><span class="glyph">⬚</span>الِمانی انتخاب نشده<br>' +
-      'از جعبه‌ابزار روی این باند بکش، یا روی بوم کلیک کن.</p>';
+      'از جعبه‌ابزار روی این باند بکش، یا روی بوم کلیک کن.' +
+      '<span class="empty-cta">' +
+      '<button type="button" data-empty-action="add-text">+ افزودن متن</button>' +
+      '<button type="button" data-empty-action="gallery">شروع از قالب</button>' +
+      '</span></p>';
     return s;
   }
   function addBand() {
