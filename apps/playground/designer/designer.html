@@ -13,12 +13,12 @@
         --raised: #fbfcfd;
         --ink: #1b1f27;
         --muted: #667085;
-        --faint: #98a1b2;
+        --faint: #6b7280;
         --border: #e3e6eb;
         --border-strong: #cfd4dc;
-        --accent: #3b76f6;
+        --accent: #2f6bf0;
         --accent-ink: #ffffff;
-        --accent-weak: rgba(59, 118, 246, 0.11);
+        --accent-weak: rgba(47, 107, 240, 0.11);
         --danger: #d64545;
         --ok: #1f9d61;
         --field: #f5f6f8;
@@ -37,7 +37,7 @@
         --raised: #232833;
         --ink: #e9ecf2;
         --muted: #97a0b1;
-        --faint: #5b6473;
+        --faint: #8a93a3;
         --border: #2a2f3a;
         --border-strong: #39404d;
         --accent: #5b94f6;
@@ -264,7 +264,7 @@
       }
       .btn.primary {
         background: var(--accent);
-        color: #fff;
+        color: var(--accent-ink);
         font-weight: 600;
         padding: 0 16px;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
@@ -1304,7 +1304,7 @@
         height: 34px;
         border-radius: 10px;
         background: var(--accent);
-        color: #fff;
+        color: var(--accent-ink);
         display: grid;
         place-items: center;
         font-weight: 800;
@@ -1547,7 +1547,7 @@
       #tourCard button.primary {
         background: var(--accent);
         border-color: var(--accent);
-        color: #fff;
+        color: var(--accent-ink);
         font-weight: 600;
       }
       #tourCard button.linkish {
@@ -1654,6 +1654,21 @@
       .palette li small {
         color: var(--faint);
         font-size: 10.5px;
+      }
+
+      /* ---------- respect reduced-motion ---------- */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+        }
+        #tourRing {
+          transition: none !important;
+        }
       }
     </style>
   </head>
