@@ -1098,8 +1098,9 @@
       var node = document.createElement('div');
       node.className = 'el' + (isSelected(el.id) ? ' selected' : '');
       node.dataset.id = el.id;
-      node.title = faName(el.type);
-      // keyboard access (design-review 1.3): Tab reaches elements, Enter/Space selects
+      // keyboard access (design-review 1.3): Tab reaches elements, Enter/Space selects.
+      // aria-label carries the type for AT; no native `title` so the styled
+      // [data-tip] tooltips stay the single tooltip mechanism (design-review 3.9)
       node.tabIndex = 0;
       node.setAttribute('role', 'button');
       node.setAttribute('aria-label', faName(el.type));

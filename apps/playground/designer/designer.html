@@ -79,6 +79,11 @@
           background 0.25s,
           color 0.25s;
       }
+      /* Firefox scrollbars (inherited to all scroll containers) */
+      html {
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-strong) transparent;
+      }
       ::-webkit-scrollbar {
         width: 9px;
         height: 9px;
@@ -102,7 +107,7 @@
       :is(button, input, select, textarea, [tabindex]):focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: 1px;
-        border-radius: 8px;
+        /* let the ring follow each element's own radius instead of forcing 8px */
       }
 
       /* ---------- universal tooltips ---------- */
