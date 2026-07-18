@@ -2718,10 +2718,19 @@
   if (liveUrlEl) liveUrlEl.addEventListener('keydown', stopKeys);
 
   // --- theme + values toggles (§8A) -------------------------------------------
+  // inline SVG icons keep the top bar consistent — no OS-dependent color emoji
+  var ICON_SUN =
+    '<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="3.4"/><path d="M10 2.4v2M10 15.6v2M2.4 10h2M15.6 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M15.3 4.7l-1.4 1.4M6.1 13.9l-1.4 1.4"/></svg>';
+  var ICON_MOON =
+    '<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.6 11.3A5.8 5.8 0 1 1 8.7 4.4a4.6 4.6 0 0 0 6.9 6.9Z"/></svg>';
+  var ICON_HASH =
+    '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.6 3.5 6 16.5M14 3.5 12.4 16.5M4 7.5h11.5M3.5 12.5H15"/></svg>';
+  var ICON_TAG =
+    '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5h5.4L16 11l-5.5 5.5L4 9.9Z"/><circle cx="7" cy="7.5" r="1"/></svg>';
   var THEME_KEY = 'pdfstudio.theme';
   function applyTheme(theme) {
     document.body.dataset.theme = theme;
-    document.getElementById('toggleTheme').textContent = theme === 'dark' ? '☀️' : '🌙';
+    document.getElementById('toggleTheme').innerHTML = theme === 'dark' ? ICON_SUN : ICON_MOON;
     try {
       window.localStorage.setItem(THEME_KEY, theme);
     } catch (err) {
@@ -2739,11 +2748,19 @@
   }
   applyTheme(storedTheme === 'light' ? 'light' : 'dark');
 
+  function updateValuesBtn() {
+    document.getElementById('toggleValues').innerHTML =
+      (showValues ? ICON_HASH : ICON_TAG) +
+      '<span>' +
+      (showValues ? 'مقادیر' : 'نام فیلد') +
+      '</span>';
+  }
   document.getElementById('toggleValues').addEventListener('click', function () {
     showValues = !showValues;
-    document.getElementById('toggleValues').textContent = showValues ? '🔢 مقادیر' : '🏷 نام فیلد';
+    updateValuesBtn();
     renderCanvas();
   });
+  updateValuesBtn();
 
   // --- command palette (Ctrl+K, §8A) -------------------------------------------
   var paletteEl = document.getElementById('palette');
