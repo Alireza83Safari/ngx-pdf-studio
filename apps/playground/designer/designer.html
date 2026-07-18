@@ -664,6 +664,22 @@
         letter-spacing: 0;
         color: var(--accent);
       }
+      .tinyhint {
+        font-size: 10.5px;
+        color: var(--muted);
+        line-height: 1.75;
+        margin: 8px 0 0;
+      }
+      .tinyhint code {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 10px;
+        background: var(--field);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 1px 4px;
+        direction: ltr;
+        unicode-bidi: isolate;
+      }
       /* band strip */
       .band-bar {
         display: flex;
@@ -2026,6 +2042,29 @@
             <rect x="3" y="4.5" width="14" height="11" rx="2" />
             <path d="M6 8.5h5" />
             <path d="M6 12h8" stroke-width="2" />
+          </svg>
+        </button>
+        <button
+          class="tool"
+          draggable="true"
+          data-add="pageField"
+          data-tip="شماره صفحه / تعداد صفحات / تاریخ (در سرصفحه و پاصفحه)"
+          aria-label="افزودن شماره صفحه"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="4" y="3" width="12" height="14" rx="2" />
+            <path d="M7.5 13.5h5" />
+            <path d="M10 7v3.5" />
+            <path d="M8.5 8.5 10 7l1.5 1.5" />
           </svg>
         </button>
       </nav>

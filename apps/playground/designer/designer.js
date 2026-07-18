@@ -539,6 +539,15 @@
         bounds: { x: 40, y: 80, width: 260, height: 140 },
       });
     },
+    pageField: function (base) {
+      // page number / total / date — resolves inside page headers & footers
+      return Object.assign(base, {
+        type: 'pageField',
+        field: 'page',
+        bounds: { x: base.bounds.x, y: base.bounds.y, width: 120, height: 16 },
+        typography: { fontFamily: 'Vazirmatn', fontSize: 10, color: rgb(100, 116, 139) },
+      });
+    },
     table: function (base) {
       // bind to the first array-of-objects in the sample data, one column per
       // field — so "add table" lands already wired to real data, not empty.
@@ -1692,6 +1701,33 @@
           '">',
       );
     }
+    if (band.type === 'pageHeader' || band.type === 'pageFooter') {
+      var master = band.master || 'all';
+      var mOpts = [
+        ['all', 'همهٔ صفحات'],
+        ['first', 'فقط صفحهٔ اول'],
+        ['odd', 'صفحات فرد'],
+        ['even', 'صفحات زوج'],
+      ]
+        .map(function (o) {
+          return (
+            '<option value="' +
+            o[0] +
+            '"' +
+            (o[0] === master ? ' selected' : '') +
+            '>' +
+            o[1] +
+            '</option>'
+          );
+        })
+        .join('');
+      s += field(
+        'تکرار روی',
+        '<select title="این سرصفحه/پاصفحه روی کدام صفحات نمایش داده شود" data-band-master>' +
+          mOpts +
+          '</select>',
+      );
+    }
     s +=
       '<div class="btnrow">' +
       '<button data-band-up title="جابه‌جایی به بالا"' +
@@ -1754,6 +1790,11 @@
         store.dispatch(
           patchBandCmd(i, { height: { mode: 'fixed', value: Number(hInp.value) || 8 } }),
         );
+      });
+    var masterSel = inspectorEl.querySelector('[data-band-master]');
+    if (masterSel)
+      masterSel.addEventListener('change', function () {
+        store.dispatch(patchBandCmd(i, { master: masterSel.value }));
       });
     var dsInp = inspectorEl.querySelector('[data-band-dataset]');
     if (dsInp)
@@ -1910,6 +1951,27 @@
           opts(['code128', 'code39', 'ean13'], el.symbology) +
           '</select>',
       );
+    if (el.type === 'pageField') {
+      var pfOpts =
+        '<option value="page"' +
+        (el.field === 'page' ? ' selected' : '') +
+        '>شماره صفحه</option>' +
+        '<option value="pageCount"' +
+        (el.field === 'pageCount' ? ' selected' : '') +
+        '>تعداد کل صفحات</option>' +
+        '<option value="currentDate"' +
+        (el.field === 'currentDate' ? ' selected' : '') +
+        '>تاریخ امروز</option>';
+      content += field(
+        'مقدار',
+        '<select title="این فیلد در سرصفحه و پاصفحه مقدار می‌گیرد" data-prop="pffield">' +
+          pfOpts +
+          '</select>',
+      );
+      content +=
+        '<p class="tinyhint">فقط داخل «سرصفحه» و «پاصفحه» عدد می‌گیرد. برای «۱ از ۳» یک ' +
+        '«شماره صفحه» و کنارش یک «تعداد کل صفحات» بگذار و بینشان یک متنِ «از».</p>';
+    }
     if (el.type === 'image') {
       content += field(
         'آدرس',
@@ -2231,6 +2293,9 @@
     });
     bindProp('symbology', function (e, v) {
       e.symbology = v;
+    });
+    bindProp('pffield', function (e, v) {
+      e.field = v;
     });
     bindProp('chartKind', function (e, v) {
       e.chartKind = v;
