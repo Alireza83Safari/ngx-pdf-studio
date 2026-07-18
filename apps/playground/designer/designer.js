@@ -486,7 +486,152 @@
         bounds: { x: 40, y: 80, width: 260, height: 140 },
       });
     },
+    table: function (base) {
+      // bind to the first array-of-objects in the sample data, one column per
+      // field — so "add table" lands already wired to real data, not empty.
+      var ds = detectDataset();
+      return Object.assign(base, {
+        type: 'table',
+        dataset: ds.name,
+        repeatHeader: true,
+        rowStripeStyleId: 'tblCell',
+        columns: ds.keys.map(function (k) {
+          return {
+            id: 'col-' + uid++,
+            width: { kind: 'percent', value: 100 / ds.keys.length },
+            header: { text: k, styleId: 'tblHead' },
+            detail: { content: { source: k }, styleId: 'tblCell' },
+          };
+        }),
+        bounds: { x: 40, y: 80, width: 360, height: 120 },
+      });
+    },
   };
+
+  // Cell styles a designer-made table references. Injected into the template
+  // when the first table is added — without them cells fall back to the
+  // Standard-14 font and Persian text vanishes from the PDF.
+  var TABLE_STYLES = [
+    {
+      id: 'tblCell',
+      name: 'سلول جدول',
+      typography: { fontFamily: 'Vazirmatn', fontSize: 10, color: rgb(15, 23, 42) },
+    },
+    {
+      id: 'tblHead',
+      name: 'سرستون جدول',
+      typography: {
+        fontFamily: 'Vazirmatn',
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: rgb(15, 23, 42),
+      },
+      box: { fill: { color: rgb(241, 245, 249) } },
+    },
+  ];
+
+  function detectDataset() {
+    for (var k in sampleData) {
+      if (
+        Object.prototype.hasOwnProperty.call(sampleData, k) &&
+        Array.isArray(sampleData[k]) &&
+        sampleData[k].length &&
+        sampleData[k][0] &&
+        typeof sampleData[k][0] === 'object'
+      ) {
+        return { name: k, keys: Object.keys(sampleData[k][0]).slice(0, 5) };
+      }
+    }
+    return { name: 'items', keys: ['name', 'qty', 'price'] };
+  }
+
+  /** Add any styles whose id isn't already present; undo removes exactly those. */
+  function ensureStylesCmd(newStyles) {
+    return {
+      type: 'ensureStyles',
+      apply: function (t) {
+        var have = {};
+        (t.styles || []).forEach(function (s) {
+          have[s.id] = true;
+        });
+        var add = newStyles.filter(function (s) {
+          return !have[s.id];
+        });
+        return add.length ? Object.assign({}, t, { styles: (t.styles || []).concat(add) }) : t;
+      },
+      invert: function (t) {
+        var have = {};
+        (t.styles || []).forEach(function (s) {
+          have[s.id] = true;
+        });
+        var addedIds = newStyles
+          .filter(function (s) {
+            return !have[s.id];
+          })
+          .map(function (s) {
+            return s.id;
+          });
+        return {
+          type: 'removeStyles',
+          apply: function (t2) {
+            return Object.assign({}, t2, {
+              styles: (t2.styles || []).filter(function (s) {
+                return addedIds.indexOf(s.id) === -1;
+              }),
+            });
+          },
+          invert: function () {
+            return ensureStylesCmd(newStyles);
+          },
+        };
+      },
+    };
+  }
+
+  /** Declare a path-backed dataset by name if the template doesn't have it yet. */
+  function ensureDatasetCmd(name) {
+    return {
+      type: 'ensureDataset',
+      apply: function (t) {
+        var nm = (name || '').trim();
+        if (!nm || (t.datasets || []).some((d) => d.name === nm)) return t;
+        return Object.assign({}, t, {
+          datasets: (t.datasets || []).concat([{ name: nm, source: { kind: 'path', path: nm } }]),
+        });
+      },
+      invert: function (t) {
+        var nm = (name || '').trim();
+        if (!nm || (t.datasets || []).some((d) => d.name === nm)) return P.NO_OP;
+        return {
+          type: 'removeDataset',
+          apply: function (t2) {
+            return Object.assign({}, t2, {
+              datasets: (t2.datasets || []).filter((d) => d.name !== nm),
+            });
+          },
+          invert: function () {
+            return ensureDatasetCmd(name);
+          },
+        };
+      },
+    };
+  }
+
+  /** Dispatch an element add, wiring table cell styles + dataset atomically. */
+  function dispatchAddElement(el) {
+    var bandId = store.getState().bands[0].id;
+    if (el.type === 'table') {
+      store.dispatch(
+        P.composite([
+          ensureStylesCmd(TABLE_STYLES),
+          ensureDatasetCmd(el.dataset),
+          P.addElement(bandId, el),
+        ]),
+      );
+    } else {
+      store.dispatch(P.addElement(bandId, el));
+    }
+  }
 
   function addElement(type) {
     var id = 'el-' + uid++;
@@ -499,7 +644,7 @@
     // select first: the store notifies synchronously on dispatch and the
     // subscribers read the selection when re-rendering.
     selected = [id];
-    store.dispatch(P.addElement(store.getState().bands[0].id, el));
+    dispatchAddElement(el);
   }
 
   function copySelected() {
@@ -1085,7 +1230,7 @@
       });
       selected = [id0];
       setTab('design');
-      store.dispatch(P.addElement(store.getState().bands[0].id, el0));
+      dispatchAddElement(el0);
       return;
     }
     var target = e.target.closest ? e.target.closest('.el') : null;
@@ -1311,6 +1456,57 @@
           '">',
       );
     }
+    if (el.type === 'table') {
+      content += field(
+        'دیتاست',
+        '<input dir="ltr" title="نام آرایهٔ داده که هر ردیف جدول از یک عضو آن ساخته می‌شود — مثل items" data-prop="tbldataset" value="' +
+          esc(el.dataset || '') +
+          '">',
+      );
+      var cols = el.columns || [];
+      var colsHtml = '<div class="col-block"><label>ستون‌ها</label><div class="cols-editor">';
+      cols.forEach(function (c, i) {
+        var head = c.header && c.header.text != null ? c.header.text : '';
+        var src = c.detail && c.detail.content ? c.detail.content.source : '';
+        var w = c.width && c.width.value != null ? c.width.value : '';
+        colsHtml +=
+          '<div class="col-row">' +
+          '<input class="col-h" data-colhead="' +
+          i +
+          '" title="عنوان ستون" placeholder="عنوان" value="' +
+          esc(head) +
+          '">' +
+          '<input class="col-s" dir="ltr" data-colsrc="' +
+          i +
+          '" title="منبع دادهٔ سلول — مثل name یا qty * price" placeholder="منبع" value="' +
+          esc(src) +
+          '">' +
+          '<input class="col-w" type="number" min="1" data-colw="' +
+          i +
+          '" title="عرض بر حسب درصد" value="' +
+          (w === '' ? '' : Math.round(w)) +
+          '">' +
+          '<button class="col-del" data-coldel="' +
+          i +
+          '" title="حذف ستون">✕</button>' +
+          '</div>';
+      });
+      colsHtml +=
+        '<button class="col-add" data-coladd title="افزودن ستون تازه">+ ستون</button></div></div>';
+      content += colsHtml;
+      content += field(
+        'تکرار سرستون',
+        '<input type="checkbox" title="سرستون‌ها بالای هر صفحه تکرار شوند" data-prop="repeathdr"' +
+          (el.repeatHeader ? ' checked' : '') +
+          '>',
+      );
+      content += field(
+        'راه‌راه ردیف‌ها',
+        '<input type="checkbox" title="ردیف‌های یک‌درمیان پس‌زمینهٔ روشن بگیرند" data-prop="stripe"' +
+          (el.rowStripeStyleId ? ' checked' : '') +
+          '>',
+      );
+    }
     if (content) {
       html += '<div class="sec"><div class="sec-title">محتوا</div>' + content + '</div>';
     }
@@ -1504,6 +1700,104 @@
       var s = (e.series && e.series[0]) || { name: '' };
       e.series = [Object.assign({}, s, { values: { source: v } })];
     });
+    // --- table: dataset, per-column header/source/width, add/remove -----------
+    var tblDs = inspectorEl.querySelector('[data-prop="tbldataset"]');
+    if (tblDs)
+      tblDs.addEventListener('change', function () {
+        var v = tblDs.value.trim();
+        // point the table at a (declared) dataset in one undo step
+        store.dispatch(
+          P.composite([
+            ensureDatasetCmd(v),
+            updateCmd(id, function (e) {
+              e.dataset = v;
+              return e;
+            }),
+          ]),
+        );
+      });
+    function editCol(i, fn) {
+      update(id, function (e) {
+        var cols = (e.columns || []).slice();
+        if (!cols[i]) return e;
+        cols[i] = fn(Object.assign({}, cols[i]));
+        e.columns = cols;
+        return e;
+      });
+    }
+    inspectorEl.querySelectorAll('[data-colhead]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        editCol(Number(inp.dataset.colhead), function (c) {
+          c.header = Object.assign({}, c.header, {
+            text: inp.value,
+            styleId: (c.header && c.header.styleId) || 'tblHead',
+          });
+          return c;
+        });
+      });
+    });
+    inspectorEl.querySelectorAll('[data-colsrc]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        editCol(Number(inp.dataset.colsrc), function (c) {
+          c.detail = Object.assign({}, c.detail, {
+            content: { source: inp.value },
+            styleId: (c.detail && c.detail.styleId) || 'tblCell',
+          });
+          return c;
+        });
+      });
+    });
+    inspectorEl.querySelectorAll('[data-colw]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        editCol(Number(inp.dataset.colw), function (c) {
+          c.width = { kind: 'percent', value: Number(inp.value) || 1 };
+          return c;
+        });
+      });
+    });
+    var colAdd = inspectorEl.querySelector('[data-coladd]');
+    if (colAdd)
+      colAdd.addEventListener('click', function () {
+        update(id, function (e) {
+          var cols = (e.columns || []).slice();
+          cols.push({
+            id: 'col-' + uid++,
+            width: { kind: 'percent', value: 20 },
+            header: { text: 'ستون', styleId: 'tblHead' },
+            detail: { content: { source: '' }, styleId: 'tblCell' },
+          });
+          e.columns = cols;
+          return e;
+        });
+      });
+    inspectorEl.querySelectorAll('[data-coldel]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var i = Number(btn.dataset.coldel);
+        update(id, function (e) {
+          var cols = (e.columns || []).slice();
+          cols.splice(i, 1);
+          e.columns = cols;
+          return e;
+        });
+      });
+    });
+    var repHdr = inspectorEl.querySelector('[data-prop="repeathdr"]');
+    if (repHdr)
+      repHdr.addEventListener('change', function () {
+        update(id, function (e) {
+          e.repeatHeader = repHdr.checked;
+          return e;
+        });
+      });
+    var stripe = inspectorEl.querySelector('[data-prop="stripe"]');
+    if (stripe)
+      stripe.addEventListener('change', function () {
+        update(id, function (e) {
+          if (stripe.checked) e.rowStripeStyleId = 'tblCell';
+          else delete e.rowStripeStyleId;
+          return e;
+        });
+      });
     bindProp('rotation', function (e, v) {
       e.rotation = Number(v) || 0;
     });
