@@ -39,7 +39,8 @@ export class ClaudeProvider implements CopilotProvider {
       model: options.model ?? 'claude-sonnet-5',
       maxTokens: options.maxTokens ?? 8192,
       baseUrl: options.baseUrl ?? 'https://api.anthropic.com',
-      fetchImpl: options.fetchImpl ?? fetch,
+      // bound: browsers throw "Illegal invocation" if fetch runs detached from window
+      fetchImpl: options.fetchImpl ?? fetch.bind(globalThis),
     };
   }
 
@@ -87,6 +88,11 @@ export interface OpenAICompatibleProviderOptions {
   model: string;
   /** Bearer key; optional because local runtimes (Ollama, LM Studio) need none. */
   apiKey?: string;
+  /**
+   * When unset, max_tokens is omitted from the request: free tiers (Groq)
+   * count it toward the per-minute token budget and pre-reject the request
+   * when prompt + max_tokens exceeds the window.
+   */
   maxTokens?: number;
   /** Injectable fetch for tests and non-standard runtimes. */
   fetchImpl?: typeof fetch;
@@ -98,9 +104,26 @@ export interface OpenAICompatibleProviderOptions {
  * and Ollama runs fully offline with no key at all. One provider covers them
  * all because they share the /chat/completions wire shape.
  */
+/**
+ * Short wait (in seconds) a 429 asks for, else null. Reads the retry-after
+ * header and Groq's "Please try again in 2m59.56s" / "…in 231ms" message.
+ */
+function retryAfterSeconds(header: string | null, body: string): number | null {
+  if (header && Number.isFinite(Number(header))) return Number(header);
+  const ms = /try again in ([\d.]+)ms/i.exec(body);
+  if (ms) return Number(ms[1]) / 1000;
+  const m = /try again in (?:(\d+)m)?([\d.]+)s/i.exec(body);
+  if (m) return Number(m[1] ?? 0) * 60 + Number(m[2]);
+  return null;
+}
+
 export class OpenAICompatibleProvider implements CopilotProvider {
-  private readonly opts: Required<Omit<OpenAICompatibleProviderOptions, 'apiKey' | 'fetchImpl'>> & {
+  private readonly opts: Omit<
+    Required<OpenAICompatibleProviderOptions>,
+    'apiKey' | 'maxTokens' | 'fetchImpl'
+  > & {
     apiKey?: string;
+    maxTokens?: number;
     fetchImpl: typeof fetch;
   };
 
@@ -108,25 +131,38 @@ export class OpenAICompatibleProvider implements CopilotProvider {
     this.opts = {
       baseUrl: options.baseUrl.replace(/\/+$/, ''),
       model: options.model,
-      maxTokens: options.maxTokens ?? 8192,
-      fetchImpl: options.fetchImpl ?? fetch,
+      // bound: browsers throw "Illegal invocation" if fetch runs detached from window
+      fetchImpl: options.fetchImpl ?? fetch.bind(globalThis),
       ...(options.apiKey ? { apiKey: options.apiKey } : {}),
+      ...(options.maxTokens !== undefined ? { maxTokens: options.maxTokens } : {}),
     };
   }
 
-  async complete(system: string, messages: CopilotMessage[]): Promise<string> {
+  private request(system: string, messages: CopilotMessage[]): Promise<Response> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (this.opts.apiKey) headers['authorization'] = `Bearer ${this.opts.apiKey}`;
-    const res = await this.opts.fetchImpl(`${this.opts.baseUrl}/chat/completions`, {
+    return this.opts.fetchImpl(`${this.opts.baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         model: this.opts.model,
-        max_tokens: this.opts.maxTokens,
+        ...(this.opts.maxTokens !== undefined ? { max_tokens: this.opts.maxTokens } : {}),
         // OpenAI shape carries the system prompt as the first message
         messages: [{ role: 'system', content: system }, ...messages],
       }),
     });
+  }
+
+  async complete(system: string, messages: CopilotMessage[]): Promise<string> {
+    let res = await this.request(system, messages);
+    if (res.status === 429) {
+      // free-tier limits often clear in seconds — honor a short wait once
+      const body = await res.text().catch(() => '');
+      const wait = retryAfterSeconds(res.headers?.get?.('retry-after') ?? null, body);
+      if (wait === null || wait > 30) throw new Error(`LLM API 429: ${body.slice(0, 200)}`);
+      await new Promise((r) => setTimeout(r, (wait + 0.5) * 1000));
+      res = await this.request(system, messages);
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       throw new Error(`LLM API ${res.status}: ${body.slice(0, 200)}`);

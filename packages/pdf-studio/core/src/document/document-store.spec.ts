@@ -1,6 +1,12 @@
 import type { AnyElement } from '../model/elements';
 import type { PdfTemplate } from '../model/template';
-import { addElement, patchElement, setElementBounds } from './commands';
+import {
+  addElement,
+  composite,
+  patchElement,
+  removeElementById,
+  setElementBounds,
+} from './commands';
 import { DocumentStore } from './document-store';
 import { findElement } from './template-ops';
 
@@ -123,5 +129,56 @@ describe('DocumentStore (§8, ADR-0004)', () => {
     expect(findElement(store.getState(), 'b')).toBeDefined();
     store.undo();
     expect(findElement(store.getState(), 'b')).toBeUndefined();
+  });
+});
+
+describe('composite command (atomic multi-element steps)', () => {
+  const template3 = (): PdfTemplate => template([el('a'), el('b'), el('c')]);
+  const ids = (s: PdfTemplate): string[] => s.bands[0]!.elements.map((e) => e.id);
+
+  it('deletes many elements as ONE undo step', () => {
+    const store = new DocumentStore(template3());
+    store.dispatch(composite([el('a'), el('b'), el('c')].map((e) => removeElementById(e.id))));
+    expect(ids(store.getState())).toEqual([]);
+    // a single undo restores all three, in their original order
+    store.undo();
+    expect(ids(store.getState())).toEqual(['a', 'b', 'c']);
+    expect(store.canUndo()).toBe(false);
+    store.redo();
+    expect(ids(store.getState())).toEqual([]);
+  });
+
+  it('duplicates many elements as ONE undo step', () => {
+    const store = new DocumentStore(template3());
+    store.dispatch(composite([addElement('band', el('a2')), addElement('band', el('b2'))]));
+    expect(ids(store.getState())).toEqual(['a', 'b', 'c', 'a2', 'b2']);
+    store.undo();
+    expect(ids(store.getState())).toEqual(['a', 'b', 'c']);
+  });
+
+  it('coalesces group-drag composites of the same gesture into one undo', () => {
+    const store = new DocumentStore(template3());
+    for (let x = 1; x <= 4; x++) {
+      store.dispatch(
+        composite(
+          ['a', 'b'].map((id) => setElementBounds(id, { x, y: x, width: 50, height: 20 })),
+          'drag:group',
+        ),
+      );
+    }
+    expect(findElement(store.getState(), 'a')!.element.bounds.x).toBe(4);
+    expect(findElement(store.getState(), 'b')!.element.bounds.x).toBe(4);
+    store.undo(); // reverts the whole gesture for both elements at once
+    expect(findElement(store.getState(), 'a')!.element.bounds.x).toBe(0);
+    expect(findElement(store.getState(), 'b')!.element.bounds.x).toBe(0);
+    expect(store.canUndo()).toBe(false);
+  });
+
+  it('unwraps to the single command when given one (no coalesce key)', () => {
+    const store = new DocumentStore(template3());
+    store.dispatch(composite([removeElementById('b')]));
+    expect(ids(store.getState())).toEqual(['a', 'c']);
+    store.undo();
+    expect(ids(store.getState())).toEqual(['a', 'b', 'c']);
   });
 });

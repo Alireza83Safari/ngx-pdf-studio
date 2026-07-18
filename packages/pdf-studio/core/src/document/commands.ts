@@ -28,6 +28,35 @@ function captureKeys(source: Record<string, unknown>, keys: string[]): Record<st
   return out;
 }
 
+/**
+ * Bundle several commands into a single, atomically-reversible history step.
+ * Sub-commands apply in order; undo replays their inverses in reverse order,
+ * each captured against the correct intermediate state — so deleting or
+ * duplicating N elements, or dragging a whole selection, is exactly one undo.
+ *
+ * Pass a `coalesceKey` to merge consecutive composites of the same gesture
+ * (e.g. every mouse-move frame of a group drag) into one step.
+ */
+export function composite(commands: Command[], coalesceKey?: string): Command {
+  const kept = commands.filter((c) => c.type !== 'noop');
+  if (kept.length === 1 && coalesceKey === undefined) return kept[0] as Command;
+  return {
+    type: 'composite',
+    ...(coalesceKey !== undefined ? { coalesceKey } : {}),
+    apply: (state) => kept.reduce((s, c) => c.apply(s), state),
+    invert: (state) => {
+      const inverses: Command[] = [];
+      let s = state;
+      for (const c of kept) {
+        inverses.push(c.invert(s));
+        s = c.apply(s);
+      }
+      inverses.reverse();
+      return composite(inverses);
+    },
+  };
+}
+
 /** Shallow-merge a patch of base properties onto an element. */
 export function patchElement(elementId: string, patch: ElementPatch): Command {
   return {

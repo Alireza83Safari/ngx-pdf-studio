@@ -21,6 +21,10 @@
   var GRID = 5;
   var SNAP_EDGE = 4;
   var uid = 1;
+  var dragSeq = 0;
+  var addCascade = 0;
+  var clipboard = [];
+  var pasteSeq = 0;
   var selected = []; // ids, last item drives the inspector
   var sampleData = {
     company: { name: 'شرکت نمونه' },
@@ -128,14 +132,18 @@
 
   // --- toast ----------------------------------------------------------------
   var toastTimer = null;
-  function toast(msg) {
+  function toast(msg, isError) {
     var el = document.getElementById('toast');
     el.textContent = msg;
+    el.classList.toggle('error', !!isError);
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () {
-      el.classList.remove('show');
-    }, 2400);
+    toastTimer = setTimeout(
+      function () {
+        el.classList.remove('show');
+      },
+      isError ? 5000 : 2400,
+    );
   }
 
   // --- right-panel tabs -------------------------------------------------------
@@ -251,11 +259,10 @@
       },
     };
   }
-  function update(id, updater) {
+  function updateCmd(id, updater) {
     var loc = P.findElement(store.getState(), id);
-    if (!loc) return;
-    var before = loc.element;
-    store.dispatch({
+    var before = loc ? loc.element : null;
+    return {
       type: 'update',
       apply: function (t) {
         return P.updateElement(t, id, function (e) {
@@ -263,9 +270,13 @@
         });
       },
       invert: function () {
-        return restoreCmd(id, before);
+        return before ? restoreCmd(id, before) : P.NO_OP;
       },
-    });
+    };
+  }
+  function update(id, updater) {
+    if (!P.findElement(store.getState(), id)) return;
+    store.dispatch(updateCmd(id, updater));
   }
   /** Move several elements by (dx, dy) as one undoable command. */
   function moveManyCmd(ids, dx, dy) {
@@ -390,12 +401,13 @@
       return e.zIndex || 1;
     });
     var z = front ? Math.max.apply(null, zs) + 1 : Math.min.apply(null, zs) - 1;
-    selected.forEach(function (id) {
-      update(id, function (e) {
+    var cmds = selected.map(function (id) {
+      return updateCmd(id, function (e) {
         e.zIndex = z;
         return e;
       });
     });
+    if (cmds.length) store.dispatch(P.composite(cmds));
   }
 
   var DEFAULTS = {
@@ -480,14 +492,58 @@
     var id = 'el-' + uid++;
     var base = { id: id, bounds: { x: 40, y: 80, width: 200, height: 24 }, zIndex: 1 };
     var make = DEFAULTS[type] || DEFAULTS.staticText;
+    var el = make(base);
+    // cascade each new element so repeated adds don't pile up on one spot
+    var d = (addCascade++ % 6) * 16;
+    el.bounds = Object.assign({}, el.bounds, { x: el.bounds.x + d, y: el.bounds.y + d });
     // select first: the store notifies synchronously on dispatch and the
     // subscribers read the selection when re-rendering.
     selected = [id];
-    store.dispatch(P.addElement('main', make(base)));
+    store.dispatch(P.addElement(store.getState().bands[0].id, el));
+  }
+
+  function copySelected() {
+    var t = store.getState();
+    var items = [];
+    selected.forEach(function (id) {
+      var loc = P.findElement(t, id);
+      if (loc) items.push(JSON.parse(JSON.stringify(loc.element)));
+    });
+    if (items.length) {
+      clipboard = items;
+      pasteSeq = 0;
+      toast(items.length + ' مورد کپی شد');
+    }
+  }
+
+  function pasteClipboard() {
+    if (!clipboard.length) return;
+    var bandId = store.getState().bands[0].id;
+    pasteSeq += 1;
+    var d = 12 * pasteSeq;
+    var adds = [];
+    var fresh = [];
+    clipboard.forEach(function (src) {
+      var copy = JSON.parse(JSON.stringify(src));
+      copy.id = 'el-' + uid++;
+      copy.bounds = Object.assign({}, copy.bounds, {
+        x: copy.bounds.x + d,
+        y: copy.bounds.y + d,
+      });
+      adds.push(P.addElement(bandId, copy));
+      fresh.push(copy.id);
+    });
+    // one composite → paste is a single undo step
+    store.dispatch(P.composite(adds));
+    selected = fresh;
+    renderCanvas();
+    renderInspector();
   }
 
   function duplicateSelected() {
     var t = store.getState();
+    var bandId = t.bands[0].id;
+    var adds = [];
     var fresh = [];
     selected.forEach(function (id) {
       var loc = P.findElement(t, id);
@@ -498,10 +554,12 @@
         x: copy.bounds.x + 12,
         y: copy.bounds.y + 12,
       });
-      store.dispatch(P.addElement('main', copy));
+      adds.push(P.addElement(bandId, copy));
       fresh.push(copy.id);
     });
-    if (fresh.length) {
+    if (adds.length) {
+      // one composite → the whole duplicate is a single undo step
+      store.dispatch(P.composite(adds));
       selected = fresh;
       renderCanvas();
       renderInspector();
@@ -566,7 +624,13 @@
       n.remove();
     });
     var band = t.bands[0];
-    band.elements.forEach(function (el) {
+    // Append overlays in paint order (zIndex ascending, array order as the
+    // tiebreak) so the visually top-most element is last in the DOM and wins
+    // the click on overlapping elements — matching what the SVG shows.
+    var ordered = band.elements.slice().sort(function (a, b) {
+      return (a.zIndex || 1) - (b.zIndex || 1);
+    });
+    ordered.forEach(function (el) {
       var node = document.createElement('div');
       node.className = 'el' + (isSelected(el.id) ? ' selected' : '');
       node.dataset.id = el.id;
@@ -786,6 +850,7 @@
         sy: e.clientY,
         starts: starts,
         moved: false,
+        gkey: 'drag' + ++dragSeq,
       };
       setTab('design');
       renderInspector();
@@ -881,17 +946,17 @@
     var fx = sx.v - pb.x;
     var fy = sy.v - pb.y;
     drag.moved = true;
+    // Whole selection moves as ONE coalescing step (all elements share this
+    // gesture's key), so a group drag is a single undo — not one per element.
+    var moves = [];
     drag.ids.forEach(function (id) {
       var b0 = drag.starts[id];
       if (!b0) return;
-      store.dispatch(
-        P.setElementBounds(
-          id,
-          { x: b0.x + fx, y: b0.y + fy, width: b0.width, height: b0.height },
-          true,
-        ),
+      moves.push(
+        P.setElementBounds(id, { x: b0.x + fx, y: b0.y + fy, width: b0.width, height: b0.height }),
       );
     });
+    if (moves.length) store.dispatch(P.composite(moves, drag.gkey));
   });
 
   window.addEventListener('mouseup', function () {
@@ -1020,7 +1085,7 @@
       });
       selected = [id0];
       setTab('design');
-      store.dispatch(P.addElement('main', el0));
+      store.dispatch(P.addElement(store.getState().bands[0].id, el0));
       return;
     }
     var target = e.target.closest ? e.target.closest('.el') : null;
@@ -1044,7 +1109,7 @@
     var id = 'el-' + uid++;
     selected = [id];
     store.dispatch(
-      P.addElement('main', {
+      P.addElement(t.bands[0].id, {
         id: id,
         type: 'dataField',
         bounds: { x: Math.max(0, x), y: Math.max(0, y), width: 180, height: 18 },
@@ -1485,13 +1550,7 @@
     var dup = document.getElementById('dupEl');
     if (dup) dup.addEventListener('click', duplicateSelected);
     var del = document.getElementById('deleteEl');
-    if (del)
-      del.addEventListener('click', function () {
-        selected.slice().forEach(function (sid) {
-          store.dispatch(P.removeElementById(sid));
-        });
-        selected = [];
-      });
+    if (del) del.addEventListener('click', deleteSelected);
     function bindProp(prop, mut) {
       var inp = inspectorEl.querySelector('[data-prop="' + prop + '"]');
       if (!inp || prop === 'bold') return;
@@ -1585,13 +1644,14 @@
     reader.onload = function () {
       var res = P.importTemplate(String(reader.result));
       if (!res.success) {
-        diagEl.textContent =
-          'JSON نامعتبر:\n' +
-          res.issues
-            .map(function (i) {
-              return i.path + ': ' + i.message;
-            })
-            .join('\n');
+        var detail = res.issues
+          .map(function (i) {
+            return i.path + ': ' + i.message;
+          })
+          .join('\n');
+        diagEl.textContent = 'JSON نامعتبر:\n' + detail;
+        // surface it wherever the user is — not just on the hidden data tab
+        toast('واردکردن ناموفق — JSON نامعتبر:\n' + detail.split('\n')[0], true);
         return;
       }
       loadTemplate(res.value);
@@ -1629,6 +1689,7 @@
       );
     } catch (err) {
       diagEl.textContent = err.message;
+      toast('ساخت PDF ناموفق: ' + err.message, true);
     }
   });
   function download(text, name, mime) {
@@ -1654,6 +1715,14 @@
       diagEl.textContent = 'دادهٔ JSON نامعتبر';
     }
   });
+  // keep editor-global shortcuts (Ctrl+Z/D/K…) out of free-text fields so
+  // typing keeps its native undo/redo — same guard docName/palette already use
+  var stopKeys = function (e) {
+    e.stopPropagation();
+  };
+  sampleEl.addEventListener('keydown', stopKeys);
+  var liveUrlEl = document.getElementById('liveUrl');
+  if (liveUrlEl) liveUrlEl.addEventListener('keydown', stopKeys);
 
   // --- theme + values toggles (§8A) -------------------------------------------
   var THEME_KEY = 'pdfstudio.theme';
@@ -1833,9 +1902,11 @@
   });
 
   function deleteSelected() {
-    selected.slice().forEach(function (sid) {
-      store.dispatch(P.removeElementById(sid));
+    // one composite → deleting a whole selection is a single undo step
+    var cmds = selected.map(function (sid) {
+      return P.removeElementById(sid);
     });
+    if (cmds.length) store.dispatch(P.composite(cmds));
     selected = [];
   }
 
@@ -2501,7 +2572,9 @@
       .then(function (res) {
         cpBusy = false;
         if (!res.success) {
-          statusEl.textContent = 'نشد: ' + res.error.slice(0, 180);
+          statusEl.textContent = /429|rate.?limit/i.test(res.error)
+            ? 'سقف رایگان سرویس فعلاً پر شد — یکی دو دقیقه صبر کن و دوباره بزن، یا مدل سبک‌تر (مثل llama-3.1-8b-instant) یا سرویس Gemini را انتخاب کن.'
+            : 'نشد: ' + res.error.slice(0, 180);
           return;
         }
         bumpUid(res.template);
@@ -2540,7 +2613,9 @@
   document.getElementById('shareLink').addEventListener('click', function () {
     var payload = toBase64Url(P.serializeTemplate(store.getState()));
     var url = window.location.href.split('#')[0] + '#t=' + payload;
-    window.location.hash = 't=' + payload;
+    // Reflect the link in the address bar WITHOUT firing hashchange — setting
+    // location.hash would reload the doc from the hash and wipe undo history.
+    window.history.replaceState(null, '', url);
     var done = function () {
       toast('لینک اشتراک کپی شد (' + Math.round(url.length / 1024) + 'KB)');
     };
@@ -2633,15 +2708,47 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       openPalette();
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    } else if (!editing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      // while a text field is focused, leave undo/redo to the browser so the
+      // user's typing — not the document — is what gets reverted
       e.preventDefault();
       e.shiftKey ? store.redo() : store.undo();
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+    } else if (!editing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
       e.preventDefault();
       store.redo();
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && selected.length) {
+    } else if (
+      !editing &&
+      (e.ctrlKey || e.metaKey) &&
+      e.key.toLowerCase() === 'd' &&
+      selected.length
+    ) {
       e.preventDefault();
       duplicateSelected();
+    } else if (
+      !editing &&
+      (e.ctrlKey || e.metaKey) &&
+      e.key.toLowerCase() === 'c' &&
+      selected.length
+    ) {
+      e.preventDefault();
+      copySelected();
+    } else if (
+      !editing &&
+      (e.ctrlKey || e.metaKey) &&
+      e.key.toLowerCase() === 'x' &&
+      selected.length
+    ) {
+      e.preventDefault();
+      copySelected();
+      deleteSelected();
+    } else if (
+      !editing &&
+      (e.ctrlKey || e.metaKey) &&
+      e.key.toLowerCase() === 'v' &&
+      clipboard.length
+    ) {
+      e.preventDefault();
+      pasteClipboard();
     } else if (e.key === 'Escape') {
       if (tourEl.classList.contains('show')) return endTour();
       if (helpEl.classList.contains('show')) return helpEl.classList.remove('show');
@@ -2658,10 +2765,7 @@
       store.dispatch(moveManyCmd(selected.slice(), dx, dy));
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.length && !editing) {
       e.preventDefault();
-      selected.slice().forEach(function (sid) {
-        store.dispatch(P.removeElementById(sid));
-      });
-      selected = [];
+      deleteSelected();
     }
   });
 

@@ -379,9 +379,11 @@ try {
       fail('history did not close after restore');
 
     // --- AI copilot (ROADMAP 3.2) ---
-    // scripted provider: first a broken template, then a valid one (repair loop)
+    // scripted provider: first a broken template, then a valid one (repair loop).
+    // Use `invoice` (a clean, fully on-page template) so the bounds guardrail
+    // doesn't add an extra repair round — `card` bleeds off-page by design.
     const cpValid = JSON.stringify({
-      ...ctx.window.PDFSTUDIO_TEMPLATES.find((t) => t.id === 'card').template,
+      ...ctx.window.PDFSTUDIO_TEMPLATES.find((t) => t.id === 'invoice').template,
       metadata: { name: 'ساختهٔ کوپایلوت' },
     });
     const cpBroken = cpValid.replace(/"bounds":\s*\{[^}]*\},/, '');

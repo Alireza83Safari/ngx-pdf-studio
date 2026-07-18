@@ -4,6 +4,7 @@
  */
 export { type Command, NO_OP } from './command';
 export {
+  composite,
   patchElement,
   setElementBounds,
   setElementZIndex,

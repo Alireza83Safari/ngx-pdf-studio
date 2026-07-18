@@ -1,7 +1,13 @@
-import { extractJson, generateTemplate } from './generate';
+import {
+  extractJson,
+  generateTemplate,
+  outOfBoundsIssues,
+  TEMPLATE_CONTRACT,
+  TEMPLATE_EXAMPLE,
+} from './generate';
 import { OpenAICompatibleProvider } from './provider';
 import type { CopilotMessage, CopilotProvider } from './provider';
-import { serializeTemplate } from '../serialization/serialize';
+import { importTemplate, serializeTemplate } from '../serialization/serialize';
 import type { PdfTemplate } from '../model/template';
 
 const VALID: PdfTemplate = {
@@ -51,6 +57,45 @@ function scripted(replies: string[]): CopilotProvider & { calls: CopilotMessage[
   };
 }
 
+describe('TEMPLATE_CONTRACT few-shot (ROADMAP ۳.۱)', () => {
+  it('teaches the model a template that actually validates', () => {
+    // the worked example we show the model must itself pass import validation,
+    // so the few-shot can never drift out of sync with the schema
+    const res = importTemplate(JSON.stringify(TEMPLATE_EXAMPLE));
+    expect(res.success).toBe(true);
+  });
+
+  it('embeds the worked example inside the contract', () => {
+    expect(TEMPLATE_CONTRACT).toContain('COMPLETE EXAMPLE');
+    expect(TEMPLATE_CONTRACT).toContain('"pageField"');
+    expect(TEMPLATE_CONTRACT).toContain('toWords');
+    // the example JSON is spliced in verbatim
+    expect(TEMPLATE_CONTRACT).toContain('"schemaVersion":"1.0.0"');
+  });
+});
+
+describe('outOfBoundsIssues (layout guardrail)', () => {
+  it('passes a template whose elements all fit the page', () => {
+    expect(outOfBoundsIssues(TEMPLATE_EXAMPLE as unknown as PdfTemplate)).toEqual([]);
+    expect(outOfBoundsIssues(VALID)).toEqual([]);
+  });
+
+  it('flags an element that runs off the right edge', () => {
+    const bad = JSON.parse(VALID_JSON) as PdfTemplate;
+    bad.bands[0]!.elements[0]!.bounds = { x: 0, y: 0, width: 600, height: 24 };
+    const issues = outOfBoundsIssues(bad);
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues[0]).toMatch(/right edge/);
+  });
+
+  it('flags an element that spills below a fixed band', () => {
+    const bad = JSON.parse(VALID_JSON) as PdfTemplate;
+    bad.bands[0]!.elements[0]!.bounds = { x: 0, y: 90, width: 100, height: 40 }; // band is 100 tall
+    const issues = outOfBoundsIssues(bad);
+    expect(issues.some((i) => /below the band/.test(i))).toBe(true);
+  });
+});
+
 describe('extractJson', () => {
   it('takes fenced JSON out of prose', () => {
     expect(extractJson('Sure!\n```json\n{"a":1}\n```\nDone.')).toBe('{"a":1}');
@@ -97,6 +142,26 @@ describe('generateTemplate — validate→repair loop (ROADMAP ۳.۱)', () => {
     }
   });
 
+  it('repairs a valid-but-off-page template through the bounds guardrail', async () => {
+    const overflow = JSON.parse(VALID_JSON) as PdfTemplate;
+    overflow.bands[0]!.elements[0]!.bounds = { x: 0, y: 0, width: 600, height: 24 };
+    const provider = scripted([JSON.stringify(overflow), VALID_JSON]);
+    const res = await generateTemplate({ prompt: 'بساز', provider });
+    expect(res.success).toBe(true);
+    if (res.success) expect(res.attempts).toBe(2);
+    // the second request explained the overflow
+    expect(provider.calls[1]!.at(-1)!.content).toContain('OUTSIDE the page');
+  });
+
+  it('accepts an off-page template rather than failing once repairs run out', async () => {
+    const overflow = JSON.parse(VALID_JSON) as PdfTemplate;
+    overflow.bands[0]!.elements[0]!.bounds = { x: 0, y: 0, width: 600, height: 24 };
+    const provider = scripted([JSON.stringify(overflow)]); // never fixes it
+    const res = await generateTemplate({ prompt: 'بساز', provider, maxRepairs: 1 });
+    // a slightly-overflowing template still beats no result
+    expect(res.success).toBe(true);
+  });
+
   it('includes the current template and sample data in the request when modifying', async () => {
     const provider = scripted([VALID_JSON]);
     await generateTemplate({
@@ -124,19 +189,26 @@ describe('generateTemplate — validate→repair loop (ROADMAP ۳.۱)', () => {
   });
 });
 
-/** fetch stub that records the request and replies with a canned body. */
-function fakeFetch(status: number, body: unknown) {
+/** fetch stub that records requests and replays canned responses in order. */
+function fakeFetchSeq(responses: Array<{ status: number; body: unknown }>) {
   const calls: Array<{ url: string; init: RequestInit }> = [];
+  let i = 0;
   const impl = (async (url: unknown, init: unknown) => {
     calls.push({ url: String(url), init: init as RequestInit });
+    const r = responses[Math.min(i++, responses.length - 1)]!;
     return {
-      ok: status >= 200 && status < 300,
-      status,
-      text: async () => JSON.stringify(body),
-      json: async () => body,
-    } as Response;
+      ok: r.status >= 200 && r.status < 300,
+      status: r.status,
+      headers: { get: () => null },
+      text: async () => (typeof r.body === 'string' ? r.body : JSON.stringify(r.body)),
+      json: async () => r.body,
+    } as unknown as Response;
   }) as typeof fetch;
   return { impl, calls };
+}
+/** Single-response shorthand. */
+function fakeFetch(status: number, body: unknown) {
+  return fakeFetchSeq([{ status, body }]);
 }
 
 describe('OpenAICompatibleProvider (Ollama/Groq/Gemini/OpenRouter)', () => {
@@ -158,9 +230,61 @@ describe('OpenAICompatibleProvider (Ollama/Groq/Gemini/OpenRouter)', () => {
     expect(sent.model).toBe('qwen2.5-coder:7b');
     expect(sent.messages[0]).toEqual({ role: 'system', content: 'you are a copilot' });
     expect(sent.messages[1]).toEqual({ role: 'user', content: 'بساز' });
+    // free tiers count max_tokens toward the minute budget — omit unless asked for
+    expect(sent.max_tokens).toBeUndefined();
     // keyless local server → no Authorization header
     const headers = calls[0]!.init.headers as Record<string, string>;
     expect(headers.authorization).toBeUndefined();
+  });
+
+  it('sends max_tokens only when configured', async () => {
+    const { impl, calls } = fakeFetch(200, reply);
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: 'http://x/v1',
+      model: 'm',
+      maxTokens: 4096,
+      fetchImpl: impl,
+    });
+    await provider.complete('sys', [{ role: 'user', content: 'hi' }]);
+    expect(JSON.parse(calls[0]!.init.body as string).max_tokens).toBe(4096);
+  });
+
+  it('waits out a short 429 and retries once', async () => {
+    const { impl, calls } = fakeFetchSeq([
+      {
+        status: 429,
+        body: { error: { message: 'Rate limit reached. Please try again in 12ms.' } },
+      },
+      { status: 200, body: reply },
+    ]);
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: 'http://x/v1',
+      model: 'm',
+      fetchImpl: impl,
+    });
+    await expect(provider.complete('sys', [{ role: 'user', content: 'hi' }])).resolves.toBe(
+      'سلام از مدل',
+    );
+    expect(calls.length).toBe(2);
+  });
+
+  it('does not retry a 429 that asks for a long wait', async () => {
+    const { impl, calls } = fakeFetchSeq([
+      {
+        status: 429,
+        body: { error: { message: 'Rate limit reached. Please try again in 2m59.56s.' } },
+      },
+      { status: 200, body: reply },
+    ]);
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: 'http://x/v1',
+      model: 'm',
+      fetchImpl: impl,
+    });
+    await expect(provider.complete('sys', [{ role: 'user', content: 'hi' }])).rejects.toThrow(
+      /429/,
+    );
+    expect(calls.length).toBe(1);
   });
 
   it('sends a bearer token when a key is given', async () => {
@@ -198,5 +322,23 @@ describe('OpenAICompatibleProvider (Ollama/Groq/Gemini/OpenRouter)', () => {
     await expect(provider.complete('sys', [{ role: 'user', content: 'hi' }])).rejects.toThrow(
       /no text/,
     );
+  });
+
+  it('calls the default fetch bound, like browsers require', async () => {
+    // browsers throw "Illegal invocation" when fetch runs with a foreign `this`;
+    // Node's fetch does not care, so emulate the check to guard the .bind()
+    const original = globalThis.fetch;
+    globalThis.fetch = function (this: unknown, ...args: Parameters<typeof fetch>) {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      }
+      return fakeFetch(200, { choices: [{ message: { content: 'ok' } }] }).impl(...args);
+    } as typeof fetch;
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: 'http://x/v1', model: 'm' });
+      await expect(provider.complete('sys', [{ role: 'user', content: 'hi' }])).resolves.toBe('ok');
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 });
