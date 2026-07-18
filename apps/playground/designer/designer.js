@@ -25,6 +25,7 @@
   var addCascade = 0;
   var clipboard = [];
   var pasteSeq = 0;
+  var activeBand = 0; // which band the canvas edits (index into template.bands)
   var selected = []; // ids, last item drives the inspector
   var sampleData = {
     company: { name: 'شرکت نمونه' },
@@ -409,7 +410,7 @@
   /** Bring the selection above (or send below) everything else. */
   function reorderSelected(front) {
     var t = store.getState();
-    var zs = t.bands[0].elements.map(function (e) {
+    var zs = getActiveBand(t).elements.map(function (e) {
       return e.zIndex || 1;
     });
     var z = front ? Math.max.apply(null, zs) + 1 : Math.min.apply(null, zs) - 1;
@@ -433,7 +434,9 @@
     dataField: function (base) {
       return Object.assign(base, {
         type: 'dataField',
-        value: { source: 'customer.name' },
+        // bind to a field that actually exists in the current data, so it lands
+        // showing a real value instead of an empty box
+        value: { source: detectField() },
         typography: { fontFamily: 'Vazirmatn', fontSize: 13 },
       });
     },
@@ -557,6 +560,65 @@
     return { name: 'items', keys: ['name', 'qty', 'price'] };
   }
 
+  /** Resolve a dotted path against the current sample data. */
+  function resolvePath(p) {
+    return p.split('.').reduce(function (o, k) {
+      return o == null ? o : o[k];
+    }, sampleData);
+  }
+  /**
+   * A binding that actually resolves in the current data, so a fresh dataField
+   * shows a real value instead of an empty box. Tries common invoice/report
+   * fields, then the first scalar leaf, then a safe fallback.
+   */
+  function detectField() {
+    var candidates = [
+      'company.name',
+      'customer.name',
+      'name',
+      'title',
+      'fullName',
+      'invoice.number',
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      var v = resolvePath(candidates[i]);
+      if (v != null && v !== '') return candidates[i];
+    }
+    var found = null;
+    (function walk(obj, path) {
+      if (found || !obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+      Object.keys(obj).forEach(function (k) {
+        if (found) return;
+        var v = obj[k];
+        var p = path ? path + '.' + k : k;
+        if ((typeof v === 'string' && v !== '') || typeof v === 'number') found = p;
+        else if (v && typeof v === 'object' && !Array.isArray(v)) walk(v, p);
+      });
+    })(sampleData, '');
+    return found || 'customer.name';
+  }
+  /**
+   * First free position (content-left, scanning downward) for a new element, so
+   * clicking a toolbox tool never drops a box on top of the title or other
+   * content. Falls back to the current active band's elements for collision.
+   */
+  function nextSpot(w, h) {
+    var els = getActiveBand(store.getState()).elements;
+    var W = w || 200,
+      H = h || 24,
+      x = 0,
+      y = 0,
+      guard = 0;
+    var hit = function (yy) {
+      return els.some(function (e) {
+        var b = e.bounds;
+        return !(x + W <= b.x || x >= b.x + b.width || yy + H <= b.y || yy >= b.y + b.height);
+      });
+    };
+    while (hit(y) && guard++ < 500) y += 8;
+    return { x: x, y: Math.round(y) };
+  }
+
   /** Add any styles whose id isn't already present; undo removes exactly those. */
   function ensureStylesCmd(newStyles) {
     return {
@@ -631,7 +693,7 @@
 
   /** Dispatch an element add, wiring table cell styles + dataset atomically. */
   function dispatchAddElement(el) {
-    var bandId = store.getState().bands[0].id;
+    var bandId = curBandId();
     if (el.type === 'table') {
       store.dispatch(
         P.composite([
@@ -647,12 +709,13 @@
 
   function addElement(type) {
     var id = 'el-' + uid++;
-    var base = { id: id, bounds: { x: 40, y: 80, width: 200, height: 24 }, zIndex: 1 };
+    var base = { id: id, bounds: { x: 0, y: 0, width: 200, height: 24 }, zIndex: 1 };
     var make = DEFAULTS[type] || DEFAULTS.staticText;
     var el = make(base);
-    // cascade each new element so repeated adds don't pile up on one spot
-    var d = (addCascade++ % 6) * 16;
-    el.bounds = Object.assign({}, el.bounds, { x: el.bounds.x + d, y: el.bounds.y + d });
+    // drop into the first free spot (never on top of the title or other
+    // content) instead of a fixed 40,80 that overlaps whatever is already there
+    var spot = nextSpot(el.bounds.width, el.bounds.height);
+    el.bounds = Object.assign({}, el.bounds, { x: spot.x, y: spot.y });
     // select first: the store notifies synchronously on dispatch and the
     // subscribers read the selection when re-rendering.
     selected = [id];
@@ -675,7 +738,7 @@
 
   function pasteClipboard() {
     if (!clipboard.length) return;
-    var bandId = store.getState().bands[0].id;
+    var bandId = curBandId();
     pasteSeq += 1;
     var d = 12 * pasteSeq;
     var adds = [];
@@ -699,7 +762,7 @@
 
   function duplicateSelected() {
     var t = store.getState();
-    var bandId = t.bands[0].id;
+    var bandId = getActiveBand(t).id;
     var adds = [];
     var fresh = [];
     selected.forEach(function (id) {
@@ -752,8 +815,153 @@
     return clone;
   }
 
+  // --- bands ----------------------------------------------------------------
+  // The engine supports a full band stack (header/detail/footer…); the designer
+  // edits ONE band at a time. The canvas paints just the active band, isolated
+  // at the top so the band-relative overlays line up; the Preview pane shows the
+  // true multi-band paginated result.
+  var BAND_TYPES = [
+    { type: 'reportHeader', name: 'سربرگ گزارش' },
+    { type: 'pageHeader', name: 'سرصفحه' },
+    { type: 'detail', name: 'ردیف داده' },
+    { type: 'pageFooter', name: 'پاصفحه' },
+    { type: 'reportFooter', name: 'پابرگ گزارش' },
+  ];
+  function bandTypeName(type) {
+    var m = BAND_TYPES.filter(function (b) {
+      return b.type === type;
+    })[0];
+    return m ? m.name : type;
+  }
+  function clampActiveBand(t) {
+    if (activeBand >= t.bands.length) activeBand = t.bands.length - 1;
+    if (activeBand < 0) activeBand = 0;
+    return activeBand;
+  }
+  function getActiveBand(t) {
+    return t.bands[clampActiveBand(t)];
+  }
+  function curBandId() {
+    return getActiveBand(store.getState()).id;
+  }
+  function isRowBand(band) {
+    return band.type === 'detail' || band.type === 'groupHeader' || band.type === 'groupFooter';
+  }
+  function resolveDatasetArray(t, dsName) {
+    if (!dsName) return null;
+    var decl = (t.datasets || []).filter(function (d) {
+      return d.name === dsName;
+    })[0];
+    var path = decl && decl.source && decl.source.kind === 'path' ? decl.source.path : dsName;
+    var arr = path.split('.').reduce(function (o, k) {
+      return o == null ? o : o[k];
+    }, sampleData);
+    return Array.isArray(arr) ? arr : null;
+  }
+  /** Data used to preview the active band: detail bands get their first row. */
+  function activeBandData(t) {
+    var band = getActiveBand(t);
+    if (band && band.dataset) {
+      var arr = resolveDatasetArray(t, band.dataset);
+      if (arr && arr.length && typeof arr[0] === 'object')
+        return Object.assign({}, sampleData, arr[0]);
+    }
+    return sampleData;
+  }
+  /** A single-band template that paints the active band at the top of the page. */
+  function activeBandTemplate(t) {
+    var band = getActiveBand(t);
+    var preview = Object.assign({}, band, {
+      type: 'reportHeader',
+      pageBreakBefore: false,
+      pageBreakAfter: false,
+      visibleWhen: undefined,
+      printWhen: undefined,
+    });
+    return Object.assign({}, t, { bands: [preview] });
+  }
+
+  function patchBandCmd(index, patch) {
+    return {
+      type: 'patchBand',
+      apply: function (t) {
+        var bands = t.bands.slice();
+        if (!bands[index]) return t;
+        bands[index] = Object.assign({}, bands[index], patch);
+        return Object.assign({}, t, { bands: bands });
+      },
+      invert: function (t) {
+        var b = t.bands[index];
+        if (!b) return P.NO_OP;
+        var prev = {};
+        Object.keys(patch).forEach(function (k) {
+          prev[k] = b[k];
+        });
+        return patchBandCmd(index, prev);
+      },
+    };
+  }
+  function addBandCmd(band, index) {
+    return {
+      type: 'addBand',
+      apply: function (t) {
+        var bands = t.bands.slice();
+        var i = index == null ? bands.length : index;
+        bands.splice(i, 0, band);
+        return Object.assign({}, t, { bands: bands });
+      },
+      invert: function () {
+        return removeBandByIdCmd(band.id);
+      },
+    };
+  }
+  function removeBandByIdCmd(id) {
+    return {
+      type: 'removeBand',
+      apply: function (t) {
+        return Object.assign({}, t, {
+          bands: t.bands.filter(function (b) {
+            return b.id !== id;
+          }),
+        });
+      },
+      invert: function (t) {
+        var i = t.bands
+          .map(function (b) {
+            return b.id;
+          })
+          .indexOf(id);
+        return i === -1 ? P.NO_OP : addBandCmd(t.bands[i], i);
+      },
+    };
+  }
+  function moveBandCmd(from, to) {
+    return {
+      type: 'moveBand',
+      apply: function (t) {
+        var bands = t.bands.slice();
+        var b = bands.splice(from, 1)[0];
+        if (!b) return t;
+        bands.splice(to, 0, b);
+        return Object.assign({}, t, { bands: bands });
+      },
+      invert: function () {
+        return moveBandCmd(to, from);
+      },
+    };
+  }
+  function setActiveBand(i) {
+    activeBand = i;
+    clampActiveBand(store.getState());
+    selected = [];
+    renderCanvas();
+    renderInspector();
+    renderLayers();
+  }
+
   function renderCanvas() {
     var t = store.getState();
+    clampActiveBand(t);
     var size = pageSize(t);
     pageEl.style.width = size.width * zoom + 'px';
     pageEl.style.height = size.height * zoom + 'px';
@@ -763,9 +971,13 @@
     marginsEl.style.right = m.right * zoom + 'px';
     marginsEl.style.bottom = m.bottom * zoom + 'px';
 
-    // WYSIWYG layer: the engine's own SVG painting of page 1 (§7).
+    // WYSIWYG layer: the engine's own SVG painting of just the active band,
+    // isolated at the top so band-relative overlays line up (§7). The Preview
+    // pane shows the full multi-band paginated document.
     try {
-      var doc = P.layoutDocument(displayTemplate(t), { data: sampleData });
+      var doc = P.layoutDocument(displayTemplate(activeBandTemplate(t)), {
+        data: activeBandData(t),
+      });
       pageSvgEl.innerHTML = doc.pages.length ? P.paintPageToSvg(doc.pages[0]) : '';
       var svgNode = pageSvgEl.querySelector('svg');
       if (svgNode) {
@@ -780,7 +992,18 @@
     Array.prototype.slice.call(pageEl.querySelectorAll('.el')).forEach(function (n) {
       n.remove();
     });
-    var band = t.bands[0];
+    var band = getActiveBand(t);
+    // what each element actually rendered — used to flag empty ones with a hint
+    var renderedText = {};
+    try {
+      var laid = doc && doc.pages && doc.pages[0] ? doc.pages[0].elements : [];
+      laid.forEach(function (le) {
+        if (le && le.id != null)
+          renderedText[le.id] = le.text != null ? le.text : le.lines ? le.lines.join('') : '';
+      });
+    } catch (e) {
+      /* ignore */
+    }
     // Append overlays in paint order (zIndex ascending, array order as the
     // tiebreak) so the visually top-most element is last in the DOM and wins
     // the click on overlapping elements — matching what the SVG shows.
@@ -791,12 +1014,32 @@
       var node = document.createElement('div');
       node.className = 'el' + (isSelected(el.id) ? ' selected' : '');
       node.dataset.id = el.id;
-      node.title = el.type;
+      node.title = faName(el.type);
       var b = el.bounds;
       node.style.left = (m.left + b.x) * zoom + 'px';
       node.style.top = (m.top + b.y) * zoom + 'px';
       node.style.width = Math.max(4, b.width * zoom) + 'px';
       node.style.height = Math.max(4, b.height * zoom) + 'px';
+      // an element that paints nothing is invisible on the canvas — give it a
+      // dashed outline + a hint so it's findable and its purpose is clear
+      var textual = el.type === 'staticText' || el.type === 'dataField' || el.type === 'pageField';
+      if (textual) {
+        var shown = renderedText[el.id];
+        if (shown == null || String(shown).trim() === '') {
+          var ph = document.createElement('div');
+          ph.className = 'el-placeholder';
+          var boundSource = el.value && el.value.source;
+          ph.textContent =
+            el.type === 'dataField'
+              ? boundSource
+                ? '⟨' + boundSource + '⟩'
+                : 'فیلد داده — دوبارکلیک برای بایند'
+              : 'متن خالی — دوبارکلیک';
+          ph.style.direction = el.type === 'dataField' && boundSource ? 'ltr' : 'rtl';
+          node.appendChild(ph);
+          node.classList.add('is-empty');
+        }
+      }
       pageEl.appendChild(node);
       if (selected.length === 1 && isSelected(el.id)) {
         var handle = document.createElement('div');
@@ -875,7 +1118,7 @@
   }
   function renderLayers() {
     var t = store.getState();
-    var els = t.bands[0].elements.slice().reverse();
+    var els = getActiveBand(t).elements.slice().reverse();
     if (!els.length) {
       layersEl.innerHTML =
         '<div class="layers-empty">هنوز الِمانی نداری.<br>از جعبه‌ابزار یکی بکش روی بوم.</div>';
@@ -938,7 +1181,7 @@
   function snapEdges(t, excludeIds) {
     var xs = [];
     var ys = [];
-    t.bands[0].elements.forEach(function (el) {
+    getActiveBand(t).elements.forEach(function (el) {
       if (excludeIds.indexOf(el.id) !== -1) return;
       xs.push(el.bounds.x, el.bounds.x + el.bounds.width);
       ys.push(el.bounds.y, el.bounds.y + el.bounds.height);
@@ -1049,8 +1292,8 @@
     var x1 = Math.max(d.x0, d.x1) - m.left;
     var y1 = Math.max(d.y0, d.y1) - m.top;
     if (x1 - x0 < 3 && y1 - y0 < 3) return; // treat as a plain click
-    selected = t.bands[0].elements
-      .filter(function (el) {
+    selected = getActiveBand(t)
+      .elements.filter(function (el) {
         var b = el.bounds;
         return b.x < x1 && b.x + b.width > x0 && b.y < y1 && b.y + b.height > y0;
       })
@@ -1266,7 +1509,7 @@
     var id = 'el-' + uid++;
     selected = [id];
     store.dispatch(
-      P.addElement(t.bands[0].id, {
+      P.addElement(getActiveBand(t).id, {
         id: id,
         type: 'dataField',
         bounds: { x: Math.max(0, x), y: Math.max(0, y), width: 180, height: 18 },
@@ -1312,14 +1555,173 @@
     return '<div class="row"><label>' + label + '</label>' + inputHtml + '</div>';
   }
 
+  // The band strip + active-band settings live at the top of the inspector.
+  function bandBarHtml(t) {
+    var chips = t.bands
+      .map(function (band, i) {
+        return (
+          '<button class="band-chip' +
+          (i === activeBand ? ' active' : '') +
+          '" data-band="' +
+          i +
+          '" title="ویرایش این باند">' +
+          esc(bandTypeName(band.type)) +
+          '<small>' +
+          band.elements.length +
+          '</small></button>'
+        );
+      })
+      .join('');
+    return (
+      '<div class="sec"><div class="sec-title">باندها <small class="hint">· بخش‌های گزارش</small></div>' +
+      '<div class="band-bar">' +
+      chips +
+      '<button class="band-add" data-band-add title="افزودن باند ردیف داده">+</button>' +
+      '</div></div>'
+    );
+  }
+  function bandSettingsHtml(t) {
+    var band = getActiveBand(t);
+    var i = activeBand;
+    var h = band.height && band.height.mode === 'fixed' ? band.height.value : '';
+    var typeOpts = BAND_TYPES.map(function (bt) {
+      return (
+        '<option value="' +
+        bt.type +
+        '"' +
+        (bt.type === band.type ? ' selected' : '') +
+        '>' +
+        bt.name +
+        '</option>'
+      );
+    }).join('');
+    var s =
+      '<div class="sec head"><span class="el-ico">▤</span><div><b>' +
+      esc(bandTypeName(band.type)) +
+      '</b><small>باند · ' +
+      band.elements.length +
+      ' الِمان</small></div></div>';
+    s += '<div class="sec"><div class="sec-title">تنظیمات باند</div>';
+    s += field('نوع', '<select data-band-type>' + typeOpts + '</select>');
+    s += field(
+      'ارتفاع',
+      '<input type="number" min="8" data-band-height title="ارتفاع باند (pt)" value="' +
+        (h === '' ? '' : Math.round(h)) +
+        '">',
+    );
+    if (isRowBand(band)) {
+      s += field(
+        'دیتاست ردیف',
+        '<input dir="ltr" data-band-dataset title="نام آرایهٔ داده که این باند به‌ازای هر عضو آن تکرار می‌شود" value="' +
+          esc(band.dataset || '') +
+          '">',
+      );
+    }
+    s +=
+      '<div class="btnrow">' +
+      '<button data-band-up title="جابه‌جایی به بالا"' +
+      (i === 0 ? ' disabled' : '') +
+      '>↑ بالا</button>' +
+      '<button data-band-down title="جابه‌جایی به پایین"' +
+      (i === t.bands.length - 1 ? ' disabled' : '') +
+      '>↓ پایین</button>' +
+      '<button data-band-del title="حذف این باند"' +
+      (t.bands.length <= 1 ? ' disabled' : '') +
+      '>حذف باند</button>' +
+      '</div></div>';
+    s +=
+      '<p class="empty"><span class="glyph">⬚</span>الِمانی انتخاب نشده<br>' +
+      'از جعبه‌ابزار روی این باند بکش، یا روی بوم کلیک کن.</p>';
+    return s;
+  }
+  function addBand() {
+    var id = 'band-' + uid++;
+    var ds = detectDataset();
+    var newBand = {
+      id: id,
+      type: 'detail',
+      height: { mode: 'fixed', value: 60 },
+      dataset: ds.name,
+      elements: [],
+    };
+    var idx = store.getState().bands.length;
+    store.dispatch(P.composite([ensureDatasetCmd(ds.name), addBandCmd(newBand, idx)]));
+    setActiveBand(idx);
+  }
+  function wireBandBar() {
+    inspectorEl.querySelectorAll('[data-band]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        setActiveBand(Number(chip.dataset.band));
+      });
+    });
+    var addBtn = inspectorEl.querySelector('[data-band-add]');
+    if (addBtn) addBtn.addEventListener('click', addBand);
+  }
+  function wireBandSettings() {
+    var i = activeBand;
+    var typeSel = inspectorEl.querySelector('[data-band-type]');
+    if (typeSel)
+      typeSel.addEventListener('change', function () {
+        var patch = { type: typeSel.value };
+        if (typeSel.value === 'detail' && !getActiveBand(store.getState()).dataset) {
+          var ds = detectDataset();
+          patch.dataset = ds.name;
+          store.dispatch(P.composite([ensureDatasetCmd(ds.name), patchBandCmd(i, patch)]));
+        } else {
+          store.dispatch(patchBandCmd(i, patch));
+        }
+        renderCanvas();
+        renderInspector();
+      });
+    var hInp = inspectorEl.querySelector('[data-band-height]');
+    if (hInp)
+      hInp.addEventListener('change', function () {
+        store.dispatch(
+          patchBandCmd(i, { height: { mode: 'fixed', value: Number(hInp.value) || 8 } }),
+        );
+      });
+    var dsInp = inspectorEl.querySelector('[data-band-dataset]');
+    if (dsInp)
+      dsInp.addEventListener('change', function () {
+        var v = dsInp.value.trim();
+        store.dispatch(P.composite([ensureDatasetCmd(v), patchBandCmd(i, { dataset: v })]));
+        renderCanvas();
+        renderInspector();
+      });
+    var up = inspectorEl.querySelector('[data-band-up]');
+    if (up)
+      up.addEventListener('click', function () {
+        if (i <= 0) return;
+        store.dispatch(moveBandCmd(i, i - 1));
+        setActiveBand(i - 1);
+      });
+    var down = inspectorEl.querySelector('[data-band-down]');
+    if (down)
+      down.addEventListener('click', function () {
+        if (i >= store.getState().bands.length - 1) return;
+        store.dispatch(moveBandCmd(i, i + 1));
+        setActiveBand(i + 1);
+      });
+    var del = inspectorEl.querySelector('[data-band-del]');
+    if (del)
+      del.addEventListener('click', function () {
+        var st = store.getState();
+        if (st.bands.length <= 1) return;
+        store.dispatch(removeBandByIdCmd(getActiveBand(st).id));
+        setActiveBand(Math.min(i, store.getState().bands.length - 1));
+      });
+  }
+
   function renderInspector() {
     var t = store.getState();
+    clampActiveBand(t);
     var id = lastSelected();
     var loc = id ? P.findElement(t, id) : null;
     if (!loc) {
-      inspectorEl.innerHTML =
-        '<p class="empty"><span class="glyph">⬚</span>الِمانی انتخاب نشده<br>' +
-        'از جعبه‌ابزار بکش روی بوم، یا از <b>قالب‌ها</b> شروع کن.</p>';
+      inspectorEl.innerHTML = bandBarHtml(t) + bandSettingsHtml(t);
+      wireBandBar();
+      wireBandSettings();
+      upgradeTooltips(inspectorEl);
       return;
     }
     var el = loc.element,
@@ -1328,6 +1730,7 @@
     var multi = selected.length > 1 ? ' · ' + selected.length + ' الِمان انتخاب شده' : '';
 
     var html =
+      bandBarHtml(t) +
       '<div class="sec head"><span class="el-ico">' +
       typeIcon(el.type, 18) +
       '</span><div><b>' +
@@ -1609,6 +2012,7 @@
       '</div></div>';
     inspectorEl.innerHTML = html;
     wireInspector(el);
+    wireBandBar();
     upgradeTooltips(inspectorEl);
   }
   var BOUND_TIPS = {
@@ -3167,6 +3571,7 @@
   }
   function loadTemplate(t) {
     bumpUid(t);
+    activeBand = 0;
     store = new P.DocumentStore(t);
     store.subscribe(function () {
       rerender();

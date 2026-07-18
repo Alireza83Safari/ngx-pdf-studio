@@ -454,6 +454,25 @@
         border-color: var(--accent);
         box-shadow: 0 0 0 1px var(--accent);
       }
+      /* an element that paints nothing: make it findable + explain itself */
+      .el.is-empty {
+        border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+        border-style: dashed;
+        background: color-mix(in srgb, var(--accent) 5%, transparent);
+      }
+      .el-placeholder {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        padding: 0 5px;
+        font-size: 11px;
+        font-style: italic;
+        color: var(--faint);
+        pointer-events: none;
+        overflow: hidden;
+        white-space: nowrap;
+      }
       .el .handle {
         position: absolute;
         inset-inline-end: -5px;
@@ -644,6 +663,54 @@
         font-weight: 400;
         letter-spacing: 0;
         color: var(--accent);
+      }
+      /* band strip */
+      .band-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .band-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--field);
+        color: var(--ink);
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .band-chip:hover {
+        border-color: var(--border-strong);
+      }
+      .band-chip.active {
+        border-color: var(--accent);
+        background: var(--accent-weak);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .band-chip small {
+        font-size: 10px;
+        opacity: 0.7;
+        font-variant-numeric: tabular-nums;
+      }
+      .band-add {
+        font-size: 15px;
+        line-height: 1;
+        padding: 6px 11px;
+        border: 1px dashed var(--border-strong, var(--border));
+        border-radius: 8px;
+        background: transparent;
+        color: var(--accent);
+        cursor: pointer;
+      }
+      .band-add:hover {
+        background: var(--accent-weak);
       }
       .sec.head {
         display: flex;
