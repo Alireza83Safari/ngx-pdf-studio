@@ -1130,6 +1130,10 @@
         bottom: 46px;
         inset-inline-start: 50%;
         translate: -50% 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        max-width: min(520px, 90vw);
         background: var(--ink);
         color: var(--bg);
         font-size: 12.5px;
@@ -1143,6 +1147,34 @@
           translate 0.25s;
         z-index: 200;
       }
+      #toast .t-ico {
+        display: inline-flex;
+        flex: none;
+      }
+      #toast.success .t-ico {
+        color: var(--ok);
+      }
+      #toast .t-msg {
+        white-space: pre-line;
+        text-align: start;
+      }
+      #toast .t-action {
+        flex: none;
+        margin-inline-start: 3px;
+        border: 1px solid color-mix(in srgb, var(--bg) 40%, transparent);
+        background: transparent;
+        color: var(--bg);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 3px 11px;
+        border-radius: 7px;
+        cursor: pointer;
+        transition: background 0.12s;
+      }
+      #toast .t-action:hover {
+        background: color-mix(in srgb, var(--bg) 16%, transparent);
+      }
       html[dir='rtl'] #toast {
         translate: 50% 6px;
       }
@@ -1155,9 +1187,13 @@
       #toast.error {
         background: #e5484d;
         color: #fff;
-        white-space: pre-line;
-        max-width: min(520px, 90vw);
-        text-align: start;
+      }
+      #toast.error .t-action {
+        border-color: rgba(255, 255, 255, 0.5);
+        color: #fff;
+      }
+      #toast.error .t-action:hover {
+        background: rgba(255, 255, 255, 0.16);
       }
 
       /* ================= gallery ================= */

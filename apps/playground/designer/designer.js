@@ -133,18 +133,50 @@
 
   // --- toast ----------------------------------------------------------------
   var toastTimer = null;
-  function toast(msg, isError) {
+  // toast(msg)                         → info
+  // toast(msg, true)                   → error (back-compat)
+  // toast(msg, { type, action:{label,onClick} })  → typed + optional inline action
+  var TOAST_ICONS = {
+    info: '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 9.2v4"/><path d="M10 6.6h.01"/></svg>',
+    success:
+      '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="m6.5 10.2 2.3 2.3 4.7-5"/></svg>',
+    error:
+      '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 6.3v4.4"/><path d="M10 13.6h.01"/></svg>',
+  };
+  function hideToast() {
     var el = document.getElementById('toast');
-    el.textContent = msg;
-    el.classList.toggle('error', !!isError);
+    el.classList.remove('show');
+    el.style.pointerEvents = 'none';
+  }
+  function toast(msg, opts) {
+    var o = typeof opts === 'boolean' ? { type: opts ? 'error' : 'info' } : opts || {};
+    var type = o.type || 'info';
+    var el = document.getElementById('toast');
+    el.classList.remove('error', 'success', 'info');
+    el.classList.add(type);
+    el.innerHTML =
+      '<span class="t-ico">' +
+      (TOAST_ICONS[type] || TOAST_ICONS.info) +
+      '</span><span class="t-msg"></span>';
+    el.querySelector('.t-msg').textContent = msg; // text node — safe for dynamic messages
+    var hasAction = o.action && o.action.label && typeof o.action.onClick === 'function';
+    if (hasAction) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 't-action';
+      btn.textContent = o.action.label;
+      btn.addEventListener('click', function () {
+        hideToast();
+        o.action.onClick();
+      });
+      el.appendChild(btn);
+      el.style.pointerEvents = 'auto';
+    } else {
+      el.style.pointerEvents = 'none';
+    }
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(
-      function () {
-        el.classList.remove('show');
-      },
-      isError ? 5000 : 2400,
-    );
+    toastTimer = setTimeout(hideToast, hasAction ? 6000 : type === 'error' ? 5000 : 2400);
   }
 
   // --- right-panel tabs -------------------------------------------------------
@@ -816,7 +848,7 @@
     if (items.length) {
       clipboard = items;
       pasteSeq = 0;
-      toast(items.length + ' مورد کپی شد');
+      toast(items.length + ' مورد کپی شد', { type: 'success' });
     }
   }
 
@@ -2691,6 +2723,7 @@
         res.diagnostics.length
           ? 'PDF با ' + res.diagnostics.length + ' هشدار ساخته شد'
           : 'PDF ساخته شد و در حال دانلود است',
+        { type: res.diagnostics.length ? 'info' : 'success' },
       );
     } catch (err) {
       diagEl.textContent = err.message;
@@ -2927,12 +2960,23 @@
   });
 
   function deleteSelected() {
+    var n = selected.length;
     // one composite → deleting a whole selection is a single undo step
     var cmds = selected.map(function (sid) {
       return P.removeElementById(sid);
     });
     if (cmds.length) store.dispatch(P.composite(cmds));
     selected = [];
+    if (n) {
+      toast(n === 1 ? 'الِمان حذف شد' : n + ' الِمان حذف شد', {
+        action: {
+          label: 'واگرد',
+          onClick: function () {
+            store.undo();
+          },
+        },
+      });
+    }
   }
 
   // --- help center (§8A) -------------------------------------------------------
@@ -3325,7 +3369,7 @@
     loadTemplate(JSON.parse(JSON.stringify(entry.template)));
     galleryEl.classList.remove('show');
     setTab('design');
-    toast('قالب «' + entry.name + '» لود شد');
+    toast('قالب «' + entry.name + '» لود شد', { type: 'success' });
   }
   document.getElementById('openGallery').addEventListener('click', function () {
     renderGallery();
@@ -3432,7 +3476,7 @@
     if (res.success) {
       loadTemplate(res.value);
       historyEl.classList.remove('show');
-      toast('نسخهٔ انتخابی بازگردانی شد');
+      toast('نسخهٔ انتخابی بازگردانی شد', { type: 'success' });
     } else {
       toast('این نسخه قابل بازگردانی نیست');
     }
@@ -3615,7 +3659,16 @@
             (mode === 'new' ? 'ساخت' : 'به‌روزرسانی کرد') +
             ' (تلاش ' +
             res.attempts +
-            ') — Ctrl+Z برمی‌گرداند',
+            ')',
+          {
+            type: 'success',
+            action: {
+              label: 'واگرد',
+              onClick: function () {
+                store.undo();
+              },
+            },
+          },
         );
       })
       .catch(function (err) {
@@ -3645,7 +3698,7 @@
     // location.hash would reload the doc from the hash and wipe undo history.
     window.history.replaceState(null, '', url);
     var done = function () {
-      toast('لینک اشتراک کپی شد (' + Math.round(url.length / 1024) + 'KB)');
+      toast('لینک اشتراک کپی شد (' + Math.round(url.length / 1024) + 'KB)', { type: 'success' });
     };
     if (window.navigator.clipboard && window.navigator.clipboard.writeText) {
       window.navigator.clipboard.writeText(url).then(done, done);
@@ -3660,7 +3713,7 @@
       var res = P.importTemplate(fromBase64Url(hash.slice(3)));
       if (!res.success) return false;
       loadTemplate(res.value);
-      toast('قالب از لینک اشتراک لود شد');
+      toast('قالب از لینک اشتراک لود شد', { type: 'success' });
       return true;
     } catch (err) {
       return false;
@@ -3690,10 +3743,10 @@
         renderFieldPicker();
         renderCanvas();
         renderPreview();
-        toast('دادهٔ زنده دریافت شد');
+        toast('دادهٔ زنده دریافت شد', { type: 'success' });
       })
       .catch(function (err) {
-        toast('دریافت داده ناموفق بود: ' + err.message);
+        toast('دریافت داده ناموفق بود: ' + err.message, true);
       })
       .finally(function () {
         liveBusy = false;
