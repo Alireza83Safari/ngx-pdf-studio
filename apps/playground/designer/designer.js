@@ -1099,6 +1099,11 @@
       node.className = 'el' + (isSelected(el.id) ? ' selected' : '');
       node.dataset.id = el.id;
       node.title = faName(el.type);
+      // keyboard access (design-review 1.3): Tab reaches elements, Enter/Space selects
+      node.tabIndex = 0;
+      node.setAttribute('role', 'button');
+      node.setAttribute('aria-label', faName(el.type));
+      node.setAttribute('aria-pressed', isSelected(el.id) ? 'true' : 'false');
       var b = el.bounds;
       node.style.left = (m.left + b.x) * zoom + 'px';
       node.style.top = (m.top + b.y) * zoom + 'px';
@@ -1213,6 +1218,8 @@
         return (
           '<div class="layer' +
           (isSelected(el.id) ? ' selected' : '') +
+          '" role="button" tabindex="0" aria-pressed="' +
+          (isSelected(el.id) ? 'true' : 'false') +
           '" title="کلیک: انتخاب · Shift+کلیک: افزودن به انتخاب" data-id="' +
           esc(el.id) +
           '"><span class="l-ico">' +
@@ -1227,11 +1234,9 @@
       .join('');
     upgradeTooltips(layersEl);
   }
-  layersEl.addEventListener('click', function (e) {
-    var row = e.target.closest ? e.target.closest('.layer') : null;
-    if (!row) return;
-    var id = row.dataset.id;
-    if (e.shiftKey) {
+  // shared selection used by layer rows + canvas elements (mouse and keyboard)
+  function selectById(id, additive) {
+    if (additive) {
       var i = selected.indexOf(id);
       if (i === -1) selected.push(id);
       else selected.splice(i, 1);
@@ -1241,6 +1246,37 @@
     renderCanvas();
     renderInspector();
     renderLayers();
+    renderStatus(); // keep the status bar's selection info in sync
+  }
+  function refocusById(container, id) {
+    var safe = window.CSS && CSS.escape ? CSS.escape(id) : id;
+    var again = container.querySelector('[data-id="' + safe + '"]');
+    if (again) again.focus();
+  }
+  function isActivateKey(e) {
+    return e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar';
+  }
+  layersEl.addEventListener('click', function (e) {
+    var row = e.target.closest ? e.target.closest('.layer') : null;
+    if (!row) return;
+    selectById(row.dataset.id, e.shiftKey);
+  });
+  layersEl.addEventListener('keydown', function (e) {
+    if (!isActivateKey(e)) return;
+    var row = e.target.closest ? e.target.closest('.layer') : null;
+    if (!row) return;
+    e.preventDefault();
+    selectById(row.dataset.id, e.shiftKey);
+    refocusById(layersEl, row.dataset.id); // rows are rebuilt on render — keep focus
+  });
+  // canvas: Enter/Space on a focused element selects it (design-review 1.3)
+  pageEl.addEventListener('keydown', function (e) {
+    if (!isActivateKey(e)) return;
+    var node = e.target.closest ? e.target.closest('.el') : null;
+    if (!node) return;
+    e.preventDefault();
+    selectById(node.dataset.id, e.shiftKey);
+    refocusById(pageEl, node.dataset.id);
   });
 
   /** Status bar: page info + selection info. */
