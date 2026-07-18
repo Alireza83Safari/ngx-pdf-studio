@@ -278,6 +278,18 @@
     if (!P.findElement(store.getState(), id)) return;
     store.dispatch(updateCmd(id, updater));
   }
+  /** Apply the same mutation to every selected element in one undo step. */
+  function updateSelected(updater) {
+    var ids = selected.length ? selected : [lastSelected()];
+    var cmds = ids
+      .filter(function (sid) {
+        return sid && P.findElement(store.getState(), sid);
+      })
+      .map(function (sid) {
+        return updateCmd(sid, updater);
+      });
+    if (cmds.length) store.dispatch(P.composite(cmds));
+  }
   /** Move several elements by (dx, dy) as one undoable command. */
   function moveManyCmd(ids, dx, dy) {
     return {
@@ -1555,7 +1567,11 @@
       );
     }
     if (looks) {
-      html += '<div class="sec"><div class="sec-title">ظاهر</div>' + looks + '</div>';
+      var looksTitle =
+        selected.length > 1
+          ? 'ظاهر <small class="hint">· روی هر ' + selected.length + ' الِمان</small>'
+          : 'ظاهر';
+      html += '<div class="sec"><div class="sec-title">' + looksTitle + '</div>' + looks + '</div>';
     }
 
     // conditions (ROADMAP ۲.۳): engine-side visibleWhen + one style rule
@@ -1645,39 +1661,55 @@
     bindProp('source', function (e, v) {
       e.value = { source: v };
     });
-    bindProp('viswhen', function (e, v) {
-      if (v.trim()) e.visibleWhen = { source: v.trim() };
-      else delete e.visibleWhen;
-    });
-    bindProp('condwhen', function (e, v) {
-      var prev = (e.conditionalStyles || [])[0];
-      if (v.trim()) {
+    bindProp(
+      'viswhen',
+      function (e, v) {
+        if (v.trim()) e.visibleWhen = { source: v.trim() };
+        else delete e.visibleWhen;
+      },
+      true,
+    );
+    bindProp(
+      'condwhen',
+      function (e, v) {
+        var prev = (e.conditionalStyles || [])[0];
+        if (v.trim()) {
+          e.conditionalStyles = [
+            {
+              when: { source: v.trim() },
+              typography: prev && prev.typography ? prev.typography : { color: rgb(214, 69, 69) },
+            },
+          ];
+        } else {
+          delete e.conditionalStyles;
+        }
+      },
+      true,
+    );
+    bindProp(
+      'condcolor',
+      function (e, v) {
+        var prev = (e.conditionalStyles || [])[0];
+        if (!prev) return; // color only applies once a condition exists
         e.conditionalStyles = [
           {
-            when: { source: v.trim() },
-            typography: prev && prev.typography ? prev.typography : { color: rgb(214, 69, 69) },
+            when: prev.when,
+            typography: Object.assign({}, prev.typography, { color: hexToRgb(v) }),
           },
         ];
-      } else {
-        delete e.conditionalStyles;
-      }
-    });
-    bindProp('condcolor', function (e, v) {
-      var prev = (e.conditionalStyles || [])[0];
-      if (!prev) return; // color only applies once a condition exists
-      e.conditionalStyles = [
-        {
-          when: prev.when,
-          typography: Object.assign({}, prev.typography, { color: hexToRgb(v) }),
-        },
-      ];
-    });
-    bindProp('fmt', function (e, v) {
-      if (v === '') delete e.format;
-      else if (v === 'rial') e.format = { kind: 'money' };
-      else if (v === 'toman') e.format = { kind: 'money', options: { unit: 'toman' } };
-      else e.format = { kind: v };
-    });
+      },
+      true,
+    );
+    bindProp(
+      'fmt',
+      function (e, v) {
+        if (v === '') delete e.format;
+        else if (v === 'rial') e.format = { kind: 'money' };
+        else if (v === 'toman') e.format = { kind: 'money', options: { unit: 'toman' } };
+        else e.format = { kind: v };
+      },
+      true,
+    );
     bindProp('imgsource', function (e, v) {
       e.source = { source: v };
     });
@@ -1801,25 +1833,46 @@
     bindProp('rotation', function (e, v) {
       e.rotation = Number(v) || 0;
     });
-    bindProp('fontSize', function (e, v) {
-      e.typography = Object.assign({}, e.typography, { fontSize: Number(v) });
-    });
-    bindProp('color', function (e, v) {
-      e.typography = Object.assign({}, e.typography, { color: hexToRgb(v) });
-    });
-    bindProp('align', function (e, v) {
-      e.typography = Object.assign({}, e.typography, { align: v });
-    });
-    bindProp('fill', function (e, v) {
-      e.box = Object.assign({}, e.box, { fill: { color: hexToRgb(v) } });
-    });
-    bindProp('stroke', function (e, v) {
-      e.stroke = Object.assign({ width: 1.5 }, e.stroke, { color: hexToRgb(v) });
-    });
+    bindProp(
+      'fontSize',
+      function (e, v) {
+        e.typography = Object.assign({}, e.typography, { fontSize: Number(v) });
+      },
+      true,
+    );
+    bindProp(
+      'color',
+      function (e, v) {
+        e.typography = Object.assign({}, e.typography, { color: hexToRgb(v) });
+      },
+      true,
+    );
+    bindProp(
+      'align',
+      function (e, v) {
+        e.typography = Object.assign({}, e.typography, { align: v });
+      },
+      true,
+    );
+    bindProp(
+      'fill',
+      function (e, v) {
+        e.box = Object.assign({}, e.box, { fill: { color: hexToRgb(v) } });
+      },
+      true,
+    );
+    bindProp(
+      'stroke',
+      function (e, v) {
+        e.stroke = Object.assign({ width: 1.5 }, e.stroke, { color: hexToRgb(v) });
+      },
+      true,
+    );
     var boldInp = inspectorEl.querySelector('[data-prop="bold"]');
     if (boldInp)
       boldInp.addEventListener('change', function () {
-        update(id, function (e) {
+        // bold fans out to the whole selection like the other appearance controls
+        updateSelected(function (e) {
           e.typography = Object.assign({}, e.typography, {
             fontWeight: boldInp.checked ? 'bold' : 'normal',
           });
@@ -1845,14 +1898,18 @@
     if (dup) dup.addEventListener('click', duplicateSelected);
     var del = document.getElementById('deleteEl');
     if (del) del.addEventListener('click', deleteSelected);
-    function bindProp(prop, mut) {
+    function bindProp(prop, mut, bulk) {
       var inp = inspectorEl.querySelector('[data-prop="' + prop + '"]');
       if (!inp || prop === 'bold') return;
       inp.addEventListener('change', function () {
-        update(id, function (e) {
+        var apply = function (e) {
           mut(e, inp.value);
           return e;
-        });
+        };
+        // appearance/format/conditions fan out to the whole selection; content
+        // identity (text, bindings, columns…) stays on the primary element.
+        if (bulk) updateSelected(apply);
+        else update(id, apply);
       });
     }
   }
