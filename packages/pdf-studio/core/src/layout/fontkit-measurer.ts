@@ -8,8 +8,15 @@
  * The default {@link SimpleTextMeasurer} stays the zero-config fallback when no
  * font bytes are available.
  */
-import * as fontkit from '@pdf-lib/fontkit';
+import * as fontkitNs from '@pdf-lib/fontkit';
 import type { MeasureStyle, MeasuredText, TextMeasurer } from './measure';
+
+// esbuild's browser bundle nests this CJS module under `.default`; Node keeps
+// it on the namespace. Use whichever object actually exposes `create`.
+const fontkit =
+  typeof (fontkitNs as { create?: unknown }).create === 'function'
+    ? fontkitNs
+    : (fontkitNs as unknown as { default: typeof fontkitNs }).default;
 
 interface FkGlyphPosition {
   xAdvance: number;

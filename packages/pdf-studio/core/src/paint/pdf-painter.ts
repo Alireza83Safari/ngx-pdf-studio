@@ -35,8 +35,18 @@ import {
   type PDFPage,
   type PDFRef,
 } from 'pdf-lib';
-import * as fontkit from '@pdf-lib/fontkit';
+import * as fontkitNs from '@pdf-lib/fontkit';
 import type { ExpressionDiagnostic } from '../expression/errors';
+
+// esbuild's browser IIFE bundle wraps this CJS module under `.default`, so the
+// namespace itself has no `create`; Node keeps the API on the namespace. Pick
+// whichever object actually carries the fontkit API so `registerFontkit` works
+// in both the browser designer and Node.
+const fontkit = (
+  typeof (fontkitNs as { create?: unknown }).create === 'function'
+    ? fontkitNs
+    : (fontkitNs as unknown as { default: typeof fontkitNs }).default
+) as typeof fontkitNs;
 import { getVisualRuns } from '../i18n/bidi';
 import { iconBox, iconTrianglePoints } from '../layout/conditional-visuals';
 import type {
