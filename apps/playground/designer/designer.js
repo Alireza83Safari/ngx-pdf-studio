@@ -2651,7 +2651,18 @@
     };
     reader.readAsText(file);
   });
+  // async-button loading state (design-review 2.4): spinner + aria-busy + re-entry guard
+  function setLoading(btn, on) {
+    if (!btn) return;
+    btn.classList.toggle('is-loading', on);
+    if (on) btn.setAttribute('aria-busy', 'true');
+    else btn.removeAttribute('aria-busy');
+  }
+  var pdfBusy = false;
   document.getElementById('downloadPdf').addEventListener('click', async function () {
+    if (pdfBusy) return;
+    pdfBusy = true;
+    setLoading(this, true);
     try {
       var fonts = window.VAZIRMATN_BASE64
         ? [{ family: 'Vazirmatn', bytes: base64ToBytes(window.VAZIRMATN_BASE64) }]
@@ -2683,6 +2694,9 @@
     } catch (err) {
       diagEl.textContent = err.message;
       toast('ساخت PDF ناموفق: ' + err.message, true);
+    } finally {
+      pdfBusy = false;
+      setLoading(document.getElementById('downloadPdf'), false);
     }
   });
   function download(text, name, mime) {
@@ -3575,12 +3589,14 @@
       return;
     }
     cpBusy = true;
+    setLoading(document.getElementById('cpRun'), true);
     statusEl.textContent = 'در حال ساخت… (ممکن است تا یک دقیقه طول بکشد)';
     var opts = { prompt: promptText, provider: provider, sampleData: sampleData };
     if (mode !== 'new') opts.currentTemplate = store.getState();
     P.generateTemplate(opts)
       .then(function (res) {
         cpBusy = false;
+        setLoading(document.getElementById('cpRun'), false);
         if (!res.success) {
           statusEl.textContent = /429|rate.?limit/i.test(res.error)
             ? 'سقف رایگان سرویس فعلاً پر شد — یکی دو دقیقه صبر کن و دوباره بزن، یا مدل سبک‌تر (مثل llama-3.1-8b-instant) یا سرویس Gemini را انتخاب کن.'
@@ -3603,6 +3619,7 @@
       })
       .catch(function (err) {
         cpBusy = false;
+        setLoading(document.getElementById('cpRun'), false);
         statusEl.textContent = 'خطا: ' + (err && err.message ? err.message : err);
       });
   });
@@ -3651,9 +3668,14 @@
   window.addEventListener('hashchange', tryLoadFromHash);
 
   // --- live data from a URL (ROADMAP ۲.۲) --------------------------------------
+  var liveBusy = false;
   document.getElementById('liveFetch').addEventListener('click', function () {
+    if (liveBusy) return;
     var url = document.getElementById('liveUrl').value.trim();
     if (!url) return toast('اول آدرس API را بنویس');
+    var btn = this;
+    liveBusy = true;
+    setLoading(btn, true);
     window
       .fetch(url)
       .then(function (r) {
@@ -3671,6 +3693,10 @@
       })
       .catch(function (err) {
         toast('دریافت داده ناموفق بود: ' + err.message);
+      })
+      .finally(function () {
+        liveBusy = false;
+        setLoading(btn, false);
       });
   });
   function restoreDraft() {
