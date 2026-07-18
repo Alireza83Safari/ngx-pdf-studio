@@ -440,6 +440,44 @@
         typography: { fontFamily: 'Vazirmatn', fontSize: 13 },
       });
     },
+    // A ready "label + value in a box": a container that paints a bordered box
+    // with a caption above the bound value — the everyday invoice/form field.
+    labeledField: function (base) {
+      var src = detectField();
+      var w = 210,
+        h = 48;
+      return Object.assign(base, {
+        type: 'container',
+        bounds: { x: base.bounds.x, y: base.bounds.y, width: w, height: h },
+        box: {
+          fill: { color: rgb(248, 250, 252) },
+          border: { all: { width: 1, color: rgb(203, 213, 225) } },
+        },
+        children: [
+          {
+            id: 'el-' + uid++,
+            type: 'staticText',
+            bounds: { x: 10, y: 7, width: w - 20, height: 13 },
+            zIndex: 1,
+            text: labelFor(src),
+            typography: { fontFamily: 'Vazirmatn', fontSize: 9, color: rgb(100, 116, 139) },
+          },
+          {
+            id: 'el-' + uid++,
+            type: 'dataField',
+            bounds: { x: 10, y: 22, width: w - 20, height: 18 },
+            zIndex: 2,
+            value: { source: src },
+            typography: {
+              fontFamily: 'Vazirmatn',
+              fontSize: 13,
+              fontWeight: 'bold',
+              color: rgb(15, 23, 42),
+            },
+          },
+        ],
+      });
+    },
     rectangle: function (base) {
       return Object.assign(base, {
         type: 'rectangle',
@@ -596,6 +634,43 @@
       });
     })(sampleData, '');
     return found || 'customer.name';
+  }
+  var FIELD_LABELS = {
+    'company.name': 'نام شرکت',
+    'company.address': 'آدرس',
+    'customer.name': 'نام مشتری',
+    'customer.phone': 'تلفن',
+    'invoice.number': 'شماره فاکتور',
+    'invoice.date': 'تاریخ',
+    name: 'نام',
+    title: 'عنوان',
+    total: 'جمع کل',
+    qty: 'تعداد',
+    price: 'قیمت',
+    phone: 'تلفن',
+    email: 'ایمیل',
+    address: 'آدرس',
+    date: 'تاریخ',
+  };
+  /** A friendly Persian caption for a bound field path, for labeled fields. */
+  function labelFor(src) {
+    if (FIELD_LABELS[src]) return FIELD_LABELS[src];
+    var last = String(src || '')
+      .split('.')
+      .pop();
+    return FIELD_LABELS[last] || 'برچسب';
+  }
+  // A labeled field is a container whose caption is its first staticText child
+  // and whose value is its first dataField child.
+  function labeledLabel(el) {
+    return (el.children || []).filter(function (c) {
+      return c.type === 'staticText';
+    })[0];
+  }
+  function labeledValue(el) {
+    return (el.children || []).filter(function (c) {
+      return c.type === 'dataField';
+    })[0];
   }
   /**
    * First free position (content-left, scanning downward) for a new element, so
@@ -1729,12 +1804,14 @@
       ty = el.typography || {};
     var multi = selected.length > 1 ? ' · ' + selected.length + ' الِمان انتخاب شده' : '';
 
+    var displayName =
+      el.type === 'container' && labeledValue(el) ? 'فیلد برچسب‌دار' : faName(el.type);
     var html =
       bandBarHtml(t) +
       '<div class="sec head"><span class="el-ico">' +
       typeIcon(el.type, 18) +
       '</span><div><b>' +
-      faName(el.type) +
+      displayName +
       '</b><small>' +
       el.type +
       multi +
@@ -1922,12 +1999,44 @@
           '>',
       );
     }
+    if (el.type === 'container') {
+      var lblCh = labeledLabel(el);
+      var valCh = labeledValue(el);
+      if (lblCh)
+        content += field(
+          'برچسب',
+          '<input data-prop="lbltext" value="' + esc(lblCh.text || '') + '">',
+        );
+      if (valCh)
+        content += field(
+          'مقدار',
+          '<input dir="ltr" title="عبارت داده — مثل company.name" data-prop="lblvalue" value="' +
+            esc(valCh.value ? valCh.value.source : '') +
+            '">',
+        );
+    }
     if (content) {
       html += '<div class="sec"><div class="sec-title">محتوا</div>' + content + '</div>';
     }
 
     // --- appearance ---------------------------------------------------------
     var looks = '';
+    if (el.type === 'container') {
+      looks += field(
+        'رنگ پُری',
+        '<input type="color" data-prop="cfill" value="' +
+          (el.box && el.box.fill ? rgbToHex(el.box.fill.color) : '#f8fafc') +
+          '">',
+      );
+      looks += field(
+        'رنگ کادر',
+        '<input type="color" data-prop="cborder" value="' +
+          (el.box && el.box.border && el.box.border.all
+            ? rgbToHex(el.box.border.all.color)
+            : '#cbd5e1') +
+          '">',
+      );
+    }
     if (el.type === 'line') {
       looks += field(
         'رنگ خط',
@@ -2272,6 +2381,34 @@
       },
       true,
     );
+    // labeled field (container): edit its caption + bound value + box colours
+    bindProp('lbltext', function (e, v) {
+      var ch = (e.children || []).slice();
+      for (var i = 0; i < ch.length; i++)
+        if (ch[i].type === 'staticText') {
+          ch[i] = Object.assign({}, ch[i], { text: v });
+          break;
+        }
+      e.children = ch;
+    });
+    bindProp('lblvalue', function (e, v) {
+      var ch = (e.children || []).slice();
+      for (var i = 0; i < ch.length; i++)
+        if (ch[i].type === 'dataField') {
+          ch[i] = Object.assign({}, ch[i], { value: { source: v } });
+          break;
+        }
+      e.children = ch;
+    });
+    bindProp('cfill', function (e, v) {
+      e.box = Object.assign({}, e.box, { fill: { color: hexToRgb(v) } });
+    });
+    bindProp('cborder', function (e, v) {
+      var prev = (e.box && e.box.border && e.box.border.all) || { width: 1 };
+      e.box = Object.assign({}, e.box, {
+        border: { all: Object.assign({}, prev, { color: hexToRgb(v) }) },
+      });
+    });
     var boldInp = inspectorEl.querySelector('[data-prop="bold"]');
     if (boldInp)
       boldInp.addEventListener('change', function () {
