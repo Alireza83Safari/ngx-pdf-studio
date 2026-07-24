@@ -93,3 +93,23 @@ describe('stampVerification', () => {
     expect(pages.join('')).toContain(short);
   });
 });
+
+describe('render option { verify } (F1.3)', () => {
+  it('stamps the deterministic short code only when verify is on', () => {
+    const tpl = baseTemplate();
+    const input = { data: { total: 100 } };
+    const { short } = hashDocument(tpl, input);
+
+    expect(renderToSvg(tpl, input).pages.join('')).not.toContain(short);
+    expect(renderToSvg(tpl, input, { verify: true }).pages.join('')).toContain(short);
+  });
+
+  it('accepts verify presentation options (URL) through render options', () => {
+    const tpl = baseTemplate();
+    const input = { data: { total: 100 } };
+    const out = renderToSvg(tpl, input, { verify: { verifyUrl: 'https://v.example/d' } });
+    expect(out.pages.length).toBeGreaterThan(0);
+    // the printed short code still matches the original document's hash
+    expect(out.pages.join('')).toContain(hashDocument(tpl, input).short);
+  });
+});

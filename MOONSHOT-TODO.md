@@ -29,8 +29,9 @@
   - payload: `{ v, hash, docId?, issuedAt? }`. یک helper که سرِ رندر، هش را از **همان دادهٔ رندرشده** محاسبه و یک المانِ QR (بایندشده به payload) + کدِ خوانا (۸ کاراکترِ اولِ هش) تزریق کند.
   - در هر دو painter (SVG + PDF) درست بنشیند.
   - **انجام‌شده:** `stampVerification(template, options) → PdfTemplate` در `verify/stamp.ts`. هش را از templateِ **اصلی** حساب می‌کند (بدونِ چرخه)، بعد یک باندِ `pageFooter` با المانِ **QR** (حاملِ hash یا `verifyUrl?h=…` به‌صورتِ literalِ escape‌شدهٔ DSL) + متنِ **کدِ کوتاه** (با `locale:{digits:'latn'}` تا hex همیشه لاتین) اضافه می‌کند. sections را هم پوشش می‌دهد؛ templateِ اصلی را mutate نمی‌کند. **۵ تستِ جدید** (ساختِ باند، عدم‌جهش، هشِ اصل، URL، **رندرِ واقعیِ SVG با کد در خروجی**). typecheck + lint تمیز.
-- [ ] **۱.۳ — گزینهٔ رندر** ⬜
+- [x] **۱.۳ — گزینهٔ رندر** ✅
   - `renderToPdf(..., { verify: { enabled, position, docId? } })` در `render.ts`؛ هش از همان resolved data تا **دقیق** باشد.
+  - **انجام‌شده:** `RenderOptions.verify?: boolean | VerifyRenderOptions` اضافه شد؛ در `layoutDocument` (نقطهٔ مشترکِ PDF+SVG) قبل از paginate، `withVerification` مهر را می‌زند و `data/parameters/now` را از همان render input می‌گیرد تا هش دقیق باشد. **۲ تستِ جدید** (فقط با verify کد ظاهر می‌شود؛ verifyUrl). **کلِ ۳۷۹ تستِ core سبز** (بدونِ رگرسیون).
 - [ ] **۱.۴ — تابع و صفحهٔ Verify** ⬜
   - `verifyDocument(template, data) → { hash, matches(expected) }`.
   - یک `verify.html` سبک (کنارِ designer): کد/QR + JSON را بده → بازمحاسبه → ✓/✗.
@@ -73,8 +74,8 @@
 ---
 
 ## پیشرفت
-- F1 Verifiable: ۲/۶ (۱.۱، ۱.۲ ✅)
+- F1 Verifiable: ۳/۶ (۱.۱–۱.۳ ✅)
 - F2 Format Cloner: ۰/۶
-- **کل: ۲/۱۲**
+- **کل: ۳/۱۲**
 
 > شروع از **۱.۱** (ماژولِ هشِ کانونیک) — خودکفا و پایهٔ بقیهٔ F1.
