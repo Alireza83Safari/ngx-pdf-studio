@@ -59,6 +59,11 @@
         --sp-8: 24px;
         --sp-9: 32px;
         --sp-10: 40px;
+
+        /* ---- control heights (design-review 3.3) ---- */
+        --h-sm: 28px;
+        --h-md: 34px;
+        --h-lg: 40px;
       }
       body[data-theme='dark'] {
         --bg: #131519;
@@ -254,7 +259,7 @@
         align-items: center;
         justify-content: center;
         gap: var(--sp-3);
-        height: 34px;
+        height: var(--h-md);
         padding: 0 var(--sp-5);
         border: 1px solid transparent;
         border-radius: var(--r-md);
@@ -332,7 +337,7 @@
       }
       .menu .btn {
         justify-content: flex-start;
-        height: 32px;
+        height: var(--h-md);
         border-radius: var(--r-md);
         width: 100%;
       }
@@ -646,7 +651,7 @@
       }
       .tab {
         flex: 1;
-        height: 34px;
+        height: var(--h-md);
         border: 0;
         background: transparent;
         color: var(--muted);
@@ -942,7 +947,7 @@
       }
       .btnrow button {
         flex: 1;
-        height: 30px;
+        height: var(--h-md);
         border: 1px solid var(--border);
         border-radius: var(--r-md);
         background: var(--field);
@@ -1422,7 +1427,7 @@
         flex: 1;
       }
       #startTour {
-        height: 32px;
+        height: var(--h-md);
       }
       .help-body {
         flex: 1;
@@ -1634,7 +1639,7 @@
         width: 16px;
       }
       #tourCard button {
-        height: 30px;
+        height: var(--h-md);
         padding: 0 var(--sp-5);
         border-radius: var(--r-md);
         border: 1px solid var(--border);
@@ -1678,7 +1683,7 @@
         flex: 1;
       }
       .hist-row button {
-        height: 28px;
+        height: var(--h-sm);
         padding: 0 var(--sp-5);
         border-radius: var(--r-md);
         border: 1px solid var(--border);
@@ -2384,7 +2389,7 @@
               data-tip="آدرس یک API که JSON برمی‌گرداند — دادهٔ نمونه با پاسخ آن جایگزین می‌شود"
             >
               <input id="liveUrl" dir="ltr" placeholder="https://api.example.com/invoice/42" />
-              <button id="liveFetch" class="btn outline" style="flex: none; height: 30px">
+              <button id="liveFetch" class="btn outline" style="flex: none; height: var(--h-md)">
                 دریافت
               </button>
             </div>
@@ -2539,7 +2544,7 @@
           </div>
           <div id="cpStatus" style="font-size: var(--fs-xs); color: var(--muted); min-height: 16px"></div>
           <div class="btnrow" style="margin: 0">
-            <button id="cpRun" class="btn primary" style="flex: 1; height: 36px">
+            <button id="cpRun" class="btn primary" style="flex: 1; height: var(--h-md)">
               <svg
                 width="16"
                 height="16"
