@@ -836,6 +836,17 @@
       aside textarea:hover {
         border-color: var(--border-strong);
       }
+      /* custom select — drop the native chrome for a consistent look (3.4).
+         chevron sits at the inline-end (left in this RTL UI). */
+      .row select {
+        appearance: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+        padding-inline-end: var(--sp-8);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 20 20' fill='none' stroke='%238a8a96' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 8 5 5 5-5'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: left var(--sp-3) center;
+      }
       .row input:focus,
       .row select:focus,
       aside textarea:focus {
@@ -917,10 +928,23 @@
         background: var(--accent-weak);
       }
       .row input[type='color'] {
+        appearance: none;
+        -webkit-appearance: none;
         padding: var(--sp-0);
         height: 30px;
         cursor: pointer;
         flex: 0 0 46px;
+      }
+      .row input[type='color']::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      .row input[type='color']::-webkit-color-swatch {
+        border: none;
+        border-radius: var(--r-sm);
+      }
+      .row input[type='color']::-moz-color-swatch {
+        border: none;
+        border-radius: var(--r-sm);
       }
       .row input[type='checkbox'] {
         flex: none;
