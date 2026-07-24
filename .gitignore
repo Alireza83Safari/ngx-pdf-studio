@@ -11,3 +11,6 @@ apps/playground/designer/engine.global.js
 apps/playground/designer/vazirmatn.js
 *.tsbuildinfo
 release/
+
+# Claude Code personal project settings (memory-reconcile hook)
+.claude/settings.local.json

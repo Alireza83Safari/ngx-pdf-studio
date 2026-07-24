@@ -9,6 +9,7 @@ export * from './model';
 export * from './expression';
 export * from './barcode';
 export * from './copilot';
+export * from './pdf-import';
 export * from './binding';
 export * from './document';
 export * from './i18n';
