@@ -32,9 +32,10 @@
 - [x] **۱.۳ — گزینهٔ رندر** ✅
   - `renderToPdf(..., { verify: { enabled, position, docId? } })` در `render.ts`؛ هش از همان resolved data تا **دقیق** باشد.
   - **انجام‌شده:** `RenderOptions.verify?: boolean | VerifyRenderOptions` اضافه شد؛ در `layoutDocument` (نقطهٔ مشترکِ PDF+SVG) قبل از paginate، `withVerification` مهر را می‌زند و `data/parameters/now` را از همان render input می‌گیرد تا هش دقیق باشد. **۲ تستِ جدید** (فقط با verify کد ظاهر می‌شود؛ verifyUrl). **کلِ ۳۷۹ تستِ core سبز** (بدونِ رگرسیون).
-- [ ] **۱.۴ — تابع و صفحهٔ Verify** ⬜
+- [x] **۱.۴ — تابع و صفحهٔ Verify** ✅
   - `verifyDocument(template, data) → { hash, matches(expected) }`.
   - یک `verify.html` سبک (کنارِ designer): کد/QR + JSON را بده → بازمحاسبه → ✓/✗.
+  - **انجام‌شده:** `verifyDocument` از قبل بود. `apps/playground/designer/verify.html` ساخته شد — RTL، دارک‌مود، هم‌سبکِ دیزاینر؛ قالب + داده + کد را می‌گیرد و با `PdfStudio.verifyDocument` بازمحاسبه → **✓ معتبر / ✕ ناهمخوان / خطا / خنثی**. کدِ کوتاه یا هشِ کامل (uppercase/space) هر دو پذیرفته می‌شوند. **۸ چکِ jsdom با اجرای واقعیِ فلو سبز** (معتبر، دستکاری، JSONِ نامعتبر، خالی). (نیازِ `npm run designer:build` چون `engine.global.js` گیت‌ایگنور است.)
 - [ ] **۱.۵ — اتصال به دیزاینر** ⬜
   - سوییچِ «مهرِ تأیید (QR)» در تنظیماتِ صفحه؛ هنگام Download PDF مهر بخورد و کد در UI دیده شود.
 - [ ] **۱.۶ — تست‌های تعیّن + دستکاری + golden** ⬜
@@ -74,8 +75,8 @@
 ---
 
 ## پیشرفت
-- F1 Verifiable: ۳/۶ (۱.۱–۱.۳ ✅)
+- F1 Verifiable: ۴/۶ (۱.۱–۱.۴ ✅)
 - F2 Format Cloner: ۰/۶
-- **کل: ۳/۱۲**
+- **کل: ۴/۱۲**
 
 > شروع از **۱.۱** (ماژولِ هشِ کانونیک) — خودکفا و پایهٔ بقیهٔ F1.

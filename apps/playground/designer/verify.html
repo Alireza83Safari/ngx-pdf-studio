@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>تأیید اصالت سند — PDF Studio</title>
+    <style>
+      :root {
+        --bg: #f2f3f5;
+        --surface: #ffffff;
+        --ink: #16161b;
+        --muted: #575761;
+        --faint: #6b7280;
+        --border: #e3e6eb;
+        --border-strong: #cfd4dc;
+        --accent: #2f6bf0;
+        --accent-weak: rgba(47, 107, 240, 0.1);
+        --ok: #1f9d61;
+        --ok-weak: rgba(31, 157, 97, 0.12);
+        --bad: #d64545;
+        --bad-weak: rgba(214, 69, 69, 0.1);
+        --field: #f5f6f8;
+        --shadow: 0 12px 30px -14px rgba(20, 20, 35, 0.28);
+        --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --sans: "Vazirmatn", "Segoe UI", Tahoma, system-ui, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121216;
+          --surface: #1a1a20;
+          --ink: #ecebe9;
+          --muted: #a1a1ad;
+          --faint: #8a93a3;
+          --border: #2a2f3a;
+          --border-strong: #39404d;
+          --accent: #5b94f6;
+          --accent-weak: rgba(91, 148, 246, 0.16);
+          --ok: #3fbf82;
+          --ok-weak: rgba(63, 191, 130, 0.16);
+          --bad: #e06c5f;
+          --bad-weak: rgba(224, 108, 95, 0.15);
+          --field: #161920;
+          --shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--sans);
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.7;
+        display: flex;
+        justify-content: center;
+        padding: clamp(16px, 5vw, 56px) 16px 80px;
+      }
+      .wrap {
+        width: 100%;
+        max-width: 620px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 22px;
+      }
+      .mark {
+        width: 40px;
+        height: 40px;
+        flex: none;
+        border-radius: 11px;
+        background: var(--accent);
+        color: #fff;
+        display: grid;
+        place-items: center;
+      }
+      header h1 {
+        font-size: 19px;
+        margin: 0;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+      }
+      header p {
+        margin: 2px 0 0;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        padding: 20px 22px 22px;
+      }
+      label {
+        display: block;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--faint);
+        letter-spacing: 0.02em;
+        margin: 14px 0 6px;
+      }
+      label:first-child {
+        margin-top: 0;
+      }
+      textarea,
+      input {
+        width: 100%;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        color: var(--ink);
+        background: var(--field);
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        padding: 9px 11px;
+        direction: ltr;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      textarea {
+        min-height: 92px;
+        resize: vertical;
+        line-height: 1.6;
+      }
+      textarea#tpl {
+        min-height: 130px;
+      }
+      textarea:focus,
+      input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-weak);
+      }
+      button {
+        margin-top: 18px;
+        width: 100%;
+        height: 42px;
+        border: 0;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        font-family: var(--sans);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: filter 0.15s;
+      }
+      button:hover {
+        filter: brightness(1.07);
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      #result {
+        margin-top: 18px;
+      }
+      .res {
+        border-radius: 12px;
+        padding: 16px 18px;
+        display: flex;
+        gap: 13px;
+        align-items: flex-start;
+        border: 1px solid var(--border);
+      }
+      .res .ic {
+        flex: none;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        color: #fff;
+      }
+      .res b {
+        font-size: 14.5px;
+        display: block;
+      }
+      .res p {
+        margin: 3px 0 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .res .codes {
+        margin-top: 9px;
+        font-family: var(--mono);
+        font-size: 11px;
+        direction: ltr;
+        word-break: break-all;
+        color: var(--faint);
+        line-height: 1.7;
+      }
+      .res .codes span {
+        color: var(--ink);
+      }
+      .res.ok {
+        background: var(--ok-weak);
+        border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+      }
+      .res.ok .ic {
+        background: var(--ok);
+      }
+      .res.bad {
+        background: var(--bad-weak);
+        border-color: color-mix(in srgb, var(--bad) 35%, transparent);
+      }
+      .res.bad .ic {
+        background: var(--bad);
+      }
+      .res.neutral .ic {
+        background: var(--muted);
+      }
+      .res.error {
+        background: var(--bad-weak);
+        border-color: color-mix(in srgb, var(--bad) 35%, transparent);
+      }
+      .res.error .ic {
+        background: var(--bad);
+      }
+      .hint {
+        margin: 16px 2px 0;
+        font-size: 11.5px;
+        color: var(--faint);
+        line-height: 1.9;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <header>
+        <span class="mark" aria-hidden="true">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 3 4 6v5c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-3Z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+        </span>
+        <div>
+          <h1>تأیید اصالت سند</h1>
+          <p>قالب و داده را بده، کدِ روی سند را وارد کن — بازمحاسبه می‌کنیم و می‌گوییم دستکاری شده یا نه.</p>
+        </div>
+      </header>
+
+      <section class="card">
+        <label for="tpl">قالب (JSON طرح)</label>
+        <textarea id="tpl" spellcheck="false" placeholder='{ "schemaVersion": "1.0.0", ... }'></textarea>
+
+        <label for="data">داده (JSON)</label>
+        <textarea id="data" spellcheck="false">{}</textarea>
+
+        <label for="code">کد تأیید (از روی سند / QR)</label>
+        <input id="code" dir="ltr" spellcheck="false" placeholder="مثلاً a3f2b1c4d5 یا هشِ کامل" />
+
+        <button id="run">تأیید کن</button>
+        <div id="result"></div>
+
+        <p class="hint">
+          کد می‌تواند «کدِ کوتاه» (۱۰ کاراکتر، زیرِ سند) یا هشِ کاملِ ۶۴ کاراکتری داخلِ QR باشد. اگر
+          کد را خالی بگذاری، فقط هشِ بازمحاسبه‌شده نشان داده می‌شود.
+        </p>
+      </section>
+    </main>
+
+    <script src="./engine.global.js"></script>
+    <script>
+      (function () {
+        var P = window.PdfStudio;
+        var resultEl = document.getElementById('result');
+
+        function esc(s) {
+          return String(s).replace(/[&<>]/g, function (c) {
+            return c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;';
+          });
+        }
+        function show(kind, ic, title, msg, hash, short) {
+          var codes =
+            hash != null
+              ? '<div class="codes">هش: <span>' +
+                esc(hash) +
+                '</span><br>کد کوتاه: <span>' +
+                esc(short) +
+                '</span></div>'
+              : '';
+          resultEl.innerHTML =
+            '<div class="res ' +
+            kind +
+            '"><span class="ic">' +
+            ic +
+            '</span><div><b>' +
+            esc(title) +
+            '</b>' +
+            (msg ? '<p>' + esc(msg) + '</p>' : '') +
+            codes +
+            '</div></div>';
+        }
+
+        document.getElementById('run').addEventListener('click', function () {
+          var template;
+          try {
+            template = P.deserializeTemplate(document.getElementById('tpl').value);
+          } catch (e) {
+            return show('error', '!', 'قالبِ JSON نامعتبر است', e && e.message ? e.message : String(e));
+          }
+          var data;
+          try {
+            data = JSON.parse(document.getElementById('data').value || '{}');
+          } catch (e) {
+            return show('error', '!', 'دادهٔ JSON نامعتبر است', e && e.message ? e.message : String(e));
+          }
+          var code = document.getElementById('code').value.trim();
+          var res;
+          try {
+            res = P.hashDocument(template, { data: data });
+          } catch (e) {
+            return show('error', '!', 'محاسبهٔ هش ناموفق بود', e && e.message ? e.message : String(e));
+          }
+          if (!code) {
+            return show('neutral', '#', 'هشِ بازمحاسبه‌شده', 'کدی وارد نشد؛ فقط هش نمایش داده شد.', res.hash, res.short);
+          }
+          var ok = P.verifyDocument(template, { data: data }, code);
+          if (ok) {
+            show('ok', '✓', 'سند معتبر است', 'کد با قالب و دادهٔ داده‌شده می‌خواند — دستکاری نشده.', res.hash, res.short);
+          } else {
+            show('bad', '✕', 'ناهمخوان', 'کد با این قالب/داده نمی‌خواند — سند یا داده تغییر کرده، یا کد اشتباه است.', res.hash, res.short);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
