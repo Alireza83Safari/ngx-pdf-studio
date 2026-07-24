@@ -25,9 +25,10 @@
   - `hashDocument(...) → sha256 hex`. **مهم:** پیاده‌سازیِ هشِ **یکسان روی Node و مرورگر** (sha256 خالصِ JS یا لایهٔ نازک روی `crypto.subtle` با fallback) — چون تعیّن، کلِ داستان است.
   - تست: ورودی یکسان → هشِ یکسان روی هر دو پلتفرم؛ تغییرِ یک فیلد → هشِ متفاوت.
   - **انجام‌شده:** `core/src/verify/` با `sha256Hex` (SHA-256 + UTF-8 دست‌نویس → تعیّنِ مطلقِ Node=Browser، بدونِ وابستگی)، `canonicalize` (JSONِ کلید-مرتبِ بازگشتی)، `hashDocument(template,{data,parameters,now}) → {hash, short}`، و `verifyDocument(...)`. صادرشده از `core/index.ts`. **۹ تست سبز** (بردارهای NIST، UTF-8 فارسی، استقلال از ترتیبِ کلید، تشخیصِ دستکاری) + typecheck + lint تمیز.
-- [ ] **۱.۲ — بارِ تأیید + رندرِ مهر** ⬜
+- [x] **۱.۲ — بارِ تأیید + رندرِ مهر** ✅
   - payload: `{ v, hash, docId?, issuedAt? }`. یک helper که سرِ رندر، هش را از **همان دادهٔ رندرشده** محاسبه و یک المانِ QR (بایندشده به payload) + کدِ خوانا (۸ کاراکترِ اولِ هش) تزریق کند.
   - در هر دو painter (SVG + PDF) درست بنشیند.
+  - **انجام‌شده:** `stampVerification(template, options) → PdfTemplate` در `verify/stamp.ts`. هش را از templateِ **اصلی** حساب می‌کند (بدونِ چرخه)، بعد یک باندِ `pageFooter` با المانِ **QR** (حاملِ hash یا `verifyUrl?h=…` به‌صورتِ literalِ escape‌شدهٔ DSL) + متنِ **کدِ کوتاه** (با `locale:{digits:'latn'}` تا hex همیشه لاتین) اضافه می‌کند. sections را هم پوشش می‌دهد؛ templateِ اصلی را mutate نمی‌کند. **۵ تستِ جدید** (ساختِ باند، عدم‌جهش، هشِ اصل، URL، **رندرِ واقعیِ SVG با کد در خروجی**). typecheck + lint تمیز.
 - [ ] **۱.۳ — گزینهٔ رندر** ⬜
   - `renderToPdf(..., { verify: { enabled, position, docId? } })` در `render.ts`؛ هش از همان resolved data تا **دقیق** باشد.
 - [ ] **۱.۴ — تابع و صفحهٔ Verify** ⬜
@@ -72,8 +73,8 @@
 ---
 
 ## پیشرفت
-- F1 Verifiable: ۱/۶ (۱.۱ ✅)
+- F1 Verifiable: ۲/۶ (۱.۱، ۱.۲ ✅)
 - F2 Format Cloner: ۰/۶
-- **کل: ۱/۱۲**
+- **کل: ۲/۱۲**
 
 > شروع از **۱.۱** (ماژولِ هشِ کانونیک) — خودکفا و پایهٔ بقیهٔ F1.

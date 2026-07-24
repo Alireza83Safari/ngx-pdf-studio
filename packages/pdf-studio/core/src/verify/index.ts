@@ -11,3 +11,4 @@ export {
   type VerifyInput,
   type DocumentHash,
 } from './verify';
+export { stampVerification, type StampOptions } from './stamp';
