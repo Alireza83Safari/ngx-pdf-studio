@@ -16,6 +16,7 @@ export * from './i18n';
 export * from './layout';
 export * from './paint';
 export * from './render';
+export * from './verify';
 export { templateSchema } from './validation/template.schema';
 export { elementSchema } from './validation/element.schema';
 export {
