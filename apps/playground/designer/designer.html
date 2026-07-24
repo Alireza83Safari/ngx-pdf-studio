@@ -29,6 +29,15 @@
         --shadow-bar: 0 4px 18px -6px rgba(15, 20, 30, 0.28);
         --dot: rgba(27, 31, 39, 0.11);
         --guide: #f43f5e;
+
+        /* ---- type scale (design-review 3.1) — theme-independent ---- */
+        --fs-2xs: 11px;
+        --fs-xs: 12px;
+        --fs-sm: 13px;
+        --fs-md: 14px;
+        --fs-lg: 15px;
+        --fs-xl: 17px;
+        --fs-2xl: 19px;
       }
       body[data-theme='dark'] {
         --bg: #131519;
@@ -69,7 +78,7 @@
           system-ui,
           -apple-system,
           sans-serif;
-        font-size: 13px;
+        font-size: var(--fs-sm);
         background: var(--bg);
         color: var(--ink);
         display: flex;
@@ -122,7 +131,7 @@
         transform: translateX(-50%);
         background: var(--ink);
         color: var(--bg);
-        font-size: 11px;
+        font-size: var(--fs-2xs);
         font-weight: 500;
         line-height: 1.7;
         padding: 5px 10px;
@@ -174,14 +183,14 @@
         display: grid;
         place-items: center;
         font-weight: 800;
-        font-size: 14px;
+        font-size: var(--fs-md);
       }
       #docName {
         border: 1px solid transparent;
         background: transparent;
         border-radius: 8px;
         padding: 5px 9px;
-        font-size: 13px;
+        font-size: var(--fs-sm);
         font-weight: 600;
         width: 190px;
         color: var(--ink);
@@ -198,7 +207,7 @@
         outline: none;
       }
       #saveState {
-        font-size: 11px;
+        font-size: var(--fs-2xs);
         color: var(--faint);
         margin-inline-start: 2px;
         white-space: nowrap;
@@ -232,7 +241,7 @@
         color: var(--ink);
         cursor: pointer;
         white-space: nowrap;
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
         transition:
           background 0.15s,
           border-color 0.15s,
@@ -361,7 +370,7 @@
         translate: 0 -50%;
         background: var(--ink);
         color: var(--bg);
-        font-size: 11px;
+        font-size: var(--fs-2xs);
         font-weight: 500;
         padding: 5px 10px;
         border-radius: 7px;
@@ -471,7 +480,7 @@
         display: flex;
         align-items: center;
         padding: 0 5px;
-        font-size: 11px;
+        font-size: var(--fs-2xs);
         font-style: italic;
         color: var(--faint);
         pointer-events: none;
@@ -499,7 +508,7 @@
         justify-content: center;
         gap: 6px;
         color: #98a1b2;
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
         line-height: 2;
         text-align: center;
         pointer-events: none;
@@ -509,7 +518,7 @@
         display: flex;
       }
       #canvasHint span {
-        font-size: 15px;
+        font-size: var(--fs-lg);
         font-weight: 600;
         color: #6b7382;
       }
@@ -517,7 +526,7 @@
         position: absolute;
         z-index: 55;
         font: inherit;
-        font-size: 13px;
+        font-size: var(--fs-sm);
         padding: 4px 7px;
         border: 1.5px solid var(--accent);
         border-radius: 7px;
@@ -620,7 +629,7 @@
         border: 0;
         background: transparent;
         color: var(--muted);
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
         font-weight: 500;
         cursor: pointer;
         border-radius: 9px 9px 0 0;
@@ -658,7 +667,7 @@
         border-bottom: 1px solid var(--border);
       }
       .sec-title {
-        font-size: 10.5px;
+        font-size: var(--fs-2xs);
         font-weight: 600;
         letter-spacing: 0.06em;
         color: var(--faint);
@@ -670,14 +679,14 @@
         color: var(--accent);
       }
       .tinyhint {
-        font-size: 10.5px;
+        font-size: var(--fs-2xs);
         color: var(--muted);
         line-height: 1.75;
         margin: 8px 0 0;
       }
       .tinyhint code {
         font-family: ui-monospace, Menlo, Consolas, monospace;
-        font-size: 10px;
+        font-size: var(--fs-2xs);
         background: var(--field);
         border: 1px solid var(--border);
         border-radius: 4px;
@@ -695,7 +704,7 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        font-size: 12px;
+        font-size: var(--fs-xs);
         padding: 6px 10px;
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -716,12 +725,12 @@
         font-weight: 600;
       }
       .band-chip small {
-        font-size: 10px;
+        font-size: var(--fs-2xs);
         opacity: 0.7;
         font-variant-numeric: tabular-nums;
       }
       .band-add {
-        font-size: 15px;
+        font-size: var(--fs-lg);
         line-height: 1;
         padding: 6px 11px;
         border: 1px dashed var(--border-strong, var(--border));
@@ -750,12 +759,12 @@
         flex: none;
       }
       .sec.head b {
-        font-size: 13.5px;
+        font-size: var(--fs-md);
         font-weight: 600;
         display: block;
       }
       .sec.head small {
-        font-size: 10.5px;
+        font-size: var(--fs-2xs);
         color: var(--faint);
         direction: ltr;
         display: block;
@@ -772,7 +781,7 @@
       }
       .row label {
         flex: 0 0 56px;
-        font-size: 11.5px;
+        font-size: var(--fs-xs);
         color: var(--muted);
       }
       .row input,
@@ -780,7 +789,7 @@
       aside textarea {
         flex: 1;
         min-width: 0;
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
         padding: 6px 9px;
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -809,7 +818,7 @@
       }
       .col-block > label {
         display: block;
-        font-size: 11.5px;
+        font-size: var(--fs-xs);
         color: var(--muted);
         margin-bottom: 6px;
       }
@@ -825,7 +834,7 @@
       }
       .col-row input {
         min-width: 0;
-        font-size: 12px;
+        font-size: var(--fs-xs);
         padding: 5px 7px;
         border: 1px solid var(--border);
         border-radius: 7px;
@@ -862,7 +871,7 @@
       }
       .col-add {
         align-self: flex-start;
-        font-size: 12px;
+        font-size: var(--fs-xs);
         padding: 5px 10px;
         border: 1px dashed var(--border-strong, var(--border));
         border-radius: 7px;
@@ -899,7 +908,7 @@
         flex-basis: 15px;
         text-align: center;
         font-family: ui-monospace, monospace;
-        font-size: 10px;
+        font-size: var(--fs-2xs);
         color: var(--faint);
       }
       .btnrow {
@@ -917,7 +926,7 @@
         border-radius: 8px;
         background: var(--field);
         color: var(--ink);
-        font-size: 12px;
+        font-size: var(--fs-xs);
         cursor: pointer;
         transition:
           background 0.15s,
@@ -929,7 +938,7 @@
       }
       #inspector .empty {
         color: var(--muted);
-        font-size: 12px;
+        font-size: var(--fs-xs);
         line-height: 2.1;
         text-align: center;
         padding: 34px 14px;
@@ -943,7 +952,7 @@
         color: var(--faint);
         display: grid;
         place-items: center;
-        font-size: 19px;
+        font-size: var(--fs-2xl);
       }
       #inspector .empty .empty-cta {
         display: flex;
@@ -953,7 +962,7 @@
       }
       #inspector .empty .empty-cta button {
         font: inherit;
-        font-size: 12px;
+        font-size: var(--fs-xs);
         padding: 7px 12px;
         border-radius: 8px;
         border: 1px solid var(--border);
@@ -1021,20 +1030,20 @@
       .layer .l-name {
         flex: 1;
         min-width: 0;
-        font-size: 12px;
+        font-size: var(--fs-xs);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
       .layer .l-type {
-        font-size: 9.5px;
+        font-size: var(--fs-2xs);
         color: var(--faint);
         direction: ltr;
       }
       .layers-empty {
         color: var(--faint);
         text-align: center;
-        font-size: 11.5px;
+        font-size: var(--fs-xs);
         padding: 26px 10px;
         line-height: 2;
       }
@@ -1043,7 +1052,7 @@
         width: 100%;
         min-height: 120px;
         font-family: ui-monospace, 'Cascadia Code', monospace;
-        font-size: 11.5px;
+        font-size: var(--fs-xs);
         line-height: 1.65;
         direction: ltr;
         resize: vertical;
@@ -1054,7 +1063,7 @@
         gap: 5px;
       }
       .fp-item {
-        font-size: 10.5px;
+        font-size: var(--fs-2xs);
         font-family: ui-monospace, monospace;
         background: var(--accent-weak);
         color: var(--accent);
@@ -1075,14 +1084,14 @@
         cursor: grabbing;
       }
       .hint {
-        font-size: 10.5px;
+        font-size: var(--fs-2xs);
         color: var(--faint);
         margin-top: 9px;
         line-height: 1.95;
       }
       .hint kbd {
         font-family: inherit;
-        font-size: 10px;
+        font-size: var(--fs-2xs);
         border: 1px solid var(--border);
         border-bottom-width: 2px;
         border-radius: 4px;
@@ -1092,7 +1101,7 @@
       }
       .diag {
         color: #c77d1e;
-        font-size: 11px;
+        font-size: var(--fs-2xs);
         margin-top: 8px;
         white-space: pre-wrap;
         direction: ltr;
@@ -1109,7 +1118,7 @@
         padding: 0 12px;
         background: var(--surface);
         border-top: 1px solid var(--border);
-        font-size: 11.5px;
+        font-size: var(--fs-xs);
         color: var(--muted);
         z-index: 60;
       }
@@ -1138,7 +1147,7 @@
         text-align: center;
         font-variant-numeric: tabular-nums;
         color: var(--ink);
-        font-size: 11.5px;
+        font-size: var(--fs-xs);
       }
       #pageInfo,
       #selInfo {
@@ -1164,7 +1173,7 @@
         max-width: min(520px, 90vw);
         background: var(--ink);
         color: var(--bg);
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
         padding: 9px 16px;
         border-radius: 10px;
         box-shadow: var(--shadow-pop);
@@ -1193,7 +1202,7 @@
         background: transparent;
         color: var(--bg);
         font: inherit;
-        font-size: 12px;
+        font-size: var(--fs-xs);
         font-weight: 600;
         padding: 3px 11px;
         border-radius: 7px;
@@ -1257,12 +1266,12 @@
         border-bottom: 1px solid var(--border);
       }
       .gallery-head strong {
-        font-size: 14.5px;
+        font-size: var(--fs-lg);
         font-weight: 700;
       }
       .gallery-head p {
         margin: 3px 0 0;
-        font-size: 11.5px;
+        font-size: var(--fs-xs);
         color: var(--muted);
         font-weight: 400;
       }
@@ -1274,7 +1283,7 @@
         background: var(--field);
         color: var(--muted);
         cursor: pointer;
-        font-size: 13px;
+        font-size: var(--fs-sm);
         transition:
           background 0.15s,
           color 0.15s;
@@ -1326,12 +1335,12 @@
       }
       .tpl-meta strong {
         display: block;
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
         font-weight: 600;
         margin-bottom: 2px;
       }
       .tpl-meta span {
-        font-size: 11px;
+        font-size: var(--fs-2xs);
         color: var(--muted);
       }
 
@@ -1377,15 +1386,15 @@
         display: grid;
         place-items: center;
         font-weight: 800;
-        font-size: 16px;
+        font-size: var(--fs-xl);
       }
       .help-head strong {
-        font-size: 14.5px;
+        font-size: var(--fs-lg);
         display: block;
       }
       .help-head p {
         margin: 2px 0 0;
-        font-size: 11px;
+        font-size: var(--fs-2xs);
         color: var(--muted);
       }
       .help-head .spacer {
@@ -1417,7 +1426,7 @@
         border: 0;
         background: transparent;
         color: var(--muted);
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
         padding: 8px 10px;
         border-radius: 9px;
         cursor: pointer;
@@ -1443,21 +1452,21 @@
         overflow-y: auto;
         padding: 22px 26px 30px;
         line-height: 2.1;
-        font-size: 13px;
+        font-size: var(--fs-sm);
       }
       .help-content h3 {
         margin: 0 0 4px;
-        font-size: 17px;
+        font-size: var(--fs-xl);
         font-weight: 700;
       }
       .help-content .lead {
         color: var(--muted);
-        font-size: 12px;
+        font-size: var(--fs-xs);
         margin: 0 0 16px;
       }
       .help-content h4 {
         margin: 20px 0 6px;
-        font-size: 13.5px;
+        font-size: var(--fs-md);
         font-weight: 600;
         color: var(--accent);
       }
@@ -1474,7 +1483,7 @@
       }
       .help-content code {
         font-family: ui-monospace, monospace;
-        font-size: 11.5px;
+        font-size: var(--fs-xs);
         background: var(--field);
         border: 1px solid var(--border);
         border-radius: 5px;
@@ -1484,7 +1493,7 @@
       }
       .help-content kbd {
         font-family: inherit;
-        font-size: 11px;
+        font-size: var(--fs-2xs);
         border: 1px solid var(--border);
         border-bottom-width: 2px;
         border-radius: 5px;
@@ -1500,23 +1509,23 @@
         border-radius: 11px;
         padding: 10px 14px;
         margin: 12px 0;
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
       }
       .callout .c-ico {
         flex: none;
-        font-size: 15px;
+        font-size: var(--fs-lg);
       }
       .htable {
         width: 100%;
         border-collapse: collapse;
         margin: 10px 0 14px;
-        font-size: 12px;
+        font-size: var(--fs-xs);
       }
       .htable th {
         text-align: start;
         color: var(--faint);
         font-weight: 600;
-        font-size: 10.5px;
+        font-size: var(--fs-2xs);
         padding: 6px 10px;
         border-bottom: 1px solid var(--border);
       }
@@ -1565,18 +1574,18 @@
           left 0.3s;
       }
       #tourCard .t-step {
-        font-size: 10.5px;
+        font-size: var(--fs-2xs);
         color: var(--accent);
         font-weight: 700;
         margin-bottom: 4px;
       }
       #tourCard h4 {
         margin: 0 0 6px;
-        font-size: 14.5px;
+        font-size: var(--fs-lg);
       }
       #tourCard p {
         margin: 0 0 12px;
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
         color: var(--muted);
         line-height: 2;
       }
@@ -1610,7 +1619,7 @@
         border: 1px solid var(--border);
         background: var(--field);
         color: var(--ink);
-        font-size: 12px;
+        font-size: var(--fs-xs);
         cursor: pointer;
       }
       #tourCard button.primary {
@@ -1636,12 +1645,12 @@
         background: var(--raised);
       }
       .hist-row b {
-        font-size: 12.5px;
+        font-size: var(--fs-sm);
         display: block;
       }
       .hist-row small {
         color: var(--muted);
-        font-size: 10.5px;
+        font-size: var(--fs-2xs);
         direction: ltr;
       }
       .hist-row .spacer {
@@ -1654,7 +1663,7 @@
         border: 1px solid var(--border);
         background: var(--field);
         color: var(--accent);
-        font-size: 12px;
+        font-size: var(--fs-xs);
         cursor: pointer;
       }
       .hist-row button:hover {
@@ -1690,7 +1699,7 @@
         border: 0;
         border-bottom: 1px solid var(--border);
         padding: 15px 18px;
-        font-size: 14px;
+        font-size: var(--fs-md);
         background: transparent;
         color: var(--ink);
         outline: none;
@@ -1709,7 +1718,7 @@
         padding: 10px 13px;
         border-radius: 10px;
         cursor: pointer;
-        font-size: 13px;
+        font-size: var(--fs-sm);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -1722,7 +1731,7 @@
       }
       .palette li small {
         color: var(--faint);
-        font-size: 10.5px;
+        font-size: var(--fs-2xs);
       }
 
       /* ---------- loading state for async buttons ---------- */
@@ -2469,7 +2478,7 @@
               width: 100%;
               min-height: 96px;
               font: inherit;
-              font-size: 13px;
+              font-size: var(--fs-sm);
               padding: 10px 12px;
               border: 1px solid var(--border);
               border-radius: 10px;
@@ -2507,7 +2516,7 @@
             <label>کلید API</label>
             <input id="cpKey" type="password" dir="ltr" placeholder="sk-ant-…" />
           </div>
-          <div id="cpStatus" style="font-size: 11.5px; color: var(--muted); min-height: 16px"></div>
+          <div id="cpStatus" style="font-size: var(--fs-xs); color: var(--muted); min-height: 16px"></div>
           <div class="btnrow" style="margin: 0">
             <button id="cpRun" class="btn primary" style="flex: 1; height: 36px">
               <svg
