@@ -9,6 +9,18 @@ export {
   type PdfImportResult,
 } from './convert';
 export { extractPdfContent } from './extract';
+export {
+  classifyPage,
+  detectValueKind,
+  looksLikeLabel,
+  keyFromLabel,
+  type PageClassification,
+  type TextClassification,
+  type TableRegion,
+  type DetectedColumn,
+  type TextRole,
+  type ValueKind,
+} from './classify';
 export type {
   ExtractedPage,
   ExtractedRect,

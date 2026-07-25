@@ -55,9 +55,10 @@
 **چرا تو:** `pdf-import` (extract متن با transform/dir/font + rect + convert) و `copilot` (`CopilotProvider` + validate→repair) را داری.
 
 ### MVP
-- [ ] **۲.۱ — هیوریستیکِ static-vs-dynamic (بدونِ AI، اول این)** ⬜
+- [x] **۲.۱ — هیوریستیکِ static-vs-dynamic (بدونِ AI، اول این)** ✅
   - در مسیرِ `pdfContentToTemplate`: تشخیصِ ردیف‌های **تکرارشونده** (جدول)، جفتِ **label:value** (برچسبِ ثابت + مقدارِ متغیرنما)، و تاریخ/عدد/ارز با regex → پیشنهادِ binding.
   - ارزان، آفلاین، هم‌راستا با اتوسِ «provider رایگان/لوکال».
+  - **انجام‌شده:** `core/src/pdf-import/classify.ts` — تابعِ خالصِ `classifyPage(page) → { texts: TextClassification[], tables: TableRegion[] }` با سه سیگنالِ ارزان‌به‌گران: (۱) `detectValueKind` با regex برای date/currency/number/percent/email/phone/IBAN (همه بعد از `toLatinDigits`، پس ارقامِ فارسی هم)، (۲) جفتِ **label:value** (متنِ مختوم به «:» + رانِ همجوار در جهتِ خواندن — RTL چپ، LTR راست؛ کلیدِ ascii از برچسب یا fallback به kind+شمارنده)، (۳) تشخیصِ **جدول** (ردیف‌های متوالیِ هم‌ستون). تقدم با فرم تا بلاکِ دوستونیِ «:» با جدول اشتباه نشود. صادرشده از core. **۱۲ تستِ جدید سبز؛ کلِ ۴۰۱ تستِ core سبز** + typecheck تمیز (خطای lintِ irregular-whitespace در `convert.ts` از قبل بوده، بی‌ربط).
 - [ ] **۲.۲ — طبقه‌بندِ AI (escalation برای مبهم‌ها)** ⬜
   - `PdfImportOptions.classifier?: CopilotProvider`. ساختارِ استخراج‌شده (متن + مختصات + الگوی تکرار) را با یک contractِ سخت بفرست → per-segment `{ role: 'static'|'field'|'tableColumn'|…, fieldPath, format }`.
   - از `extractJson` + الگوی validate→repairِ `generate.ts` بازاستفاده کن.
@@ -78,7 +79,7 @@
 
 ## پیشرفت
 - F1 Verifiable: ۶/۶ ✅ (کامل)
-- F2 Format Cloner: ۰/۶
-- **کل: ۶/۱۲**
+- F2 Format Cloner: ۱/۶ (۲.۱ ✅)
+- **کل: ۷/۱۲**
 
 > شروع از **۱.۱** (ماژولِ هشِ کانونیک) — خودکفا و پایهٔ بقیهٔ F1.
