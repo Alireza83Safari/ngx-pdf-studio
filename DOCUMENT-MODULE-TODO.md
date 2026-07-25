@@ -32,7 +32,7 @@ command model» نه — نصفِ واژگان واقعی بیرون از core �
 
 ## 🔴 دستهٔ ۱ — بلاکرِ «طراحی کامل» (بدونِ اینها دیزاینر نمی‌تواند از قابلیت‌های مدل استفاده کند)
 
-- [ ] **۱.۱ — پشتیبانیِ تودرتو (nested containers) در `template-ops.ts`**
+- [x] **۱.۱ — پشتیبانیِ تودرتو (nested containers) در `template-ops.ts`** ✅ (`ae781f1`)
   - `findElement`/`updateElement`/`removeElement`/`insertElement` باید بازگشتی به
     `ContainerElement.children` هم سرک بکشند، نه فقط `band.elements`.
   - `ElementLocation` باید یک `path` (زنجیرهٔ containerId ها) نگه دارد نه فقط `bandIndex`،
@@ -42,7 +42,7 @@ command model» نه — نصفِ واژگان واقعی بیرون از core �
   - چرا مهم: بدونِ این، **گروه‌بندی (۱.۳)** بی‌فایده است — عناصرِ داخلِ گروه غیرقابل‌ویرایش
     می‌مانند مگر با گشتنِ اختصاصی که در بالای core تکرار شود.
 
-- [ ] **۱.۲ — کوچ‌دادنِ کامندهای واقعیِ دیزاینر به core**
+- [x] **۱.۲ — کوچ‌دادنِ کامندهای واقعیِ دیزاینر به core** ✅ (`27c7f85`)
   دقیقاً همین‌ها را (با همین سمانتیک) از `designer.js` به `commands.ts` منتقل کن — با تست:
   - `renameTemplate(name)` — پچِ `metadata.name`، معادلِ `renameCmd`.
   - `patchBand(bandIndex یا bandId, patch)`، `addBand(band, index?)`،
@@ -57,7 +57,7 @@ command model» نه — نصفِ واژگان واقعی بیرون از core �
   - پذیرش: `designer.js` این توابع را دیگر بازتعریف نکند، فقط از `P.<name>` صدا بزند؛
     `commands.spec.ts` هرکدام را با round-trip تست کند (الگوی تست‌های موجود، خط ۴۹–۱۰۵).
 
-- [ ] **۱.۳ — کامندِ Group/Ungroup**
+- [x] **۱.۳ — کامندِ Group/Ungroup** ✅
   از TODO.md ریشه («⬜ group/ungroup» در بخشِ Multi-select) — الان اصلاً هیچ‌جا (نه core نه
   designer.js) پیاده نشده.
   - `groupElements(ids, containerId)`: باندینگ‌باکسِ انتخاب را حساب کن، یک `ContainerElement`
@@ -66,6 +66,15 @@ command model» نه — نصفِ واژگان واقعی بیرون از core �
   - `ungroupContainer(containerId)`: عکسِ بالا — فرزندان را با bounds مطلق به همان band/
     کانتینرِ والد برگردان و کانتینر را حذف کن.
   - پذیرش: گروه‌کردن ۳ عنصر → یک undo → دقیقاً برمی‌گردند به bounds/ترتیبِ اصلی‌شان.
+  - **انجام‌شده:** `groupElements(ids, containerId)` / `ungroupContainer(id)` در `commands.ts`؛
+    مختصات هنگام گروه‌شدن به فضای کانتینر rebase می‌شود و هنگام باز شدن برمی‌گردد، چون لایوت
+    فرزندان را نسبت به origin والد می‌کشد (`paginate.ts`). گروه‌بندی بینِ دو والدِ متفاوت رد
+    می‌شود (bounds مبنای متفاوت دارند). UI: دکمه در اینسپکتور (چندانتخابی / گروهِ انتخاب‌شده)،
+    `Ctrl+G` / `Ctrl+Shift+G`، آیتم‌های command palette، آیکون + برچسبِ «گروه · N الِمان» در پنل
+    لایه‌ها. ۲۲ تستِ core — از جمله یکی که **geometryِ واقعیِ لایوت** را قبل/بعد مقایسه می‌کند تا
+    ثابت شود رندر عوض نمی‌شود — و پوششِ smoke روی UI واقعی.
+  - ⬜ باقی‌مانده (پولیشِ Figma-وار، عمداً بیرونِ این آیتم): **ورود به گروه با دابل‌کلیک** تا
+    فرزند مستقیماً روی بوم انتخاب/ویرایش شود. الان برای ویرایشِ فرزند باید گروه را باز کرد.
 
 ---
 

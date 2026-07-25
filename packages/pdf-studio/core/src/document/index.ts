@@ -16,6 +16,9 @@ export {
   addElement,
   removeElementById,
   setStaticText,
+  // grouping
+  groupElements,
+  ungroupContainer,
   // band
   patchBand,
   addBand,

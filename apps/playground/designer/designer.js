@@ -108,6 +108,9 @@
     chart: '<path d="M4 4v12h12"/><path d="M7.5 13V9M11 13V6.5M14.5 13v-3"/>',
     table: '<rect x="3.5" y="4" width="13" height="12" rx="1.5"/><path d="M3.5 8.5h13M8.5 4v12"/>',
     toc: '<path d="M4 5h9M4 10h12M4 15h7"/><circle cx="16" cy="5" r="0.8"/>',
+    // a group: dashed frame around two stacked children
+    container:
+      '<path d="M3.5 6V4.5A1 1 0 0 1 4.5 3.5H6M14 3.5h1.5a1 1 0 0 1 1 1V6M16.5 14v1.5a1 1 0 0 1-1 1H14M6 16.5H4.5a1 1 0 0 1-1-1V14"/><rect x="6.5" y="6.5" width="7" height="7" rx="1"/>',
   };
   function typeIcon(type, size) {
     var d = ICON_PATHS[type] || '<rect x="4" y="4" width="12" height="12" rx="2"/>';
@@ -387,6 +390,39 @@
       return P.setElementZIndex(id, z);
     });
     if (cmds.length) store.dispatch(P.composite(cmds));
+  }
+
+  /** The single selected element, when it is a group (container). */
+  function selectedContainer() {
+    if (selected.length !== 1) return null;
+    var loc = P.findElement(store.getState(), selected[0]);
+    return loc && loc.element.type === 'container' ? loc.element : null;
+  }
+
+  /** Wrap the selection in a group; the new group becomes the selection. */
+  function groupSelected() {
+    if (selected.length < 2) return;
+    var id = 'grp-' + uid++;
+    store.dispatch(P.groupElements(selected.slice(), id));
+    if (!P.findElement(store.getState(), id)) return; // nothing was groupable
+    selected = [id];
+    renderCanvas();
+    renderInspector();
+    toast('گروه ساخته شد', { type: 'success' });
+  }
+
+  /** Dissolve the selected group; its children become the selection. */
+  function ungroupSelected() {
+    var group = selectedContainer();
+    if (!group) return;
+    var childIds = group.children.map(function (c) {
+      return c.id;
+    });
+    store.dispatch(P.ungroupContainer(group.id));
+    selected = childIds;
+    renderCanvas();
+    renderInspector();
+    toast('گروه باز شد', { type: 'success' });
   }
 
   var DEFAULTS = {
@@ -1034,6 +1070,7 @@
     if (el.type === 'staticText' && el.text) return el.text;
     if (el.value && el.value.source) return el.value.source;
     if (el.type === 'chart') return faName(el.type) + ' · ' + (el.chartKind || '');
+    if (el.type === 'container') return faName(el.type) + ' · ' + el.children.length + ' الِمان';
     return faName(el.type);
   }
   function renderLayers() {
@@ -1777,7 +1814,24 @@
           '<button data-dist="v">توزیع عمودی</button>' +
           '</div>';
       }
+      html +=
+        '<div class="btnrow">' +
+        '<button data-group="1" title="این الِمان‌ها را یک گروه کن — با هم جابه‌جا می‌شوند (Ctrl+G)">' +
+        'گروه‌بندی</button>' +
+        '</div>';
       html += '</div>';
+    }
+
+    // --- group (a single selected container) ----------------------------------
+    if (selectedContainer()) {
+      html +=
+        '<div class="sec"><div class="sec-title">گروه</div>' +
+        '<p class="tinyhint">' +
+        selectedContainer().children.length +
+        ' الِمان داخل این گروه است؛ جابه‌جایی گروه همه را با خود می‌برد.</p>' +
+        '<div class="btnrow">' +
+        '<button data-ungroup="1" title="گروه را باز کن (Ctrl+Shift+G)">باز کردنِ گروه</button>' +
+        '</div></div>';
     }
 
     // --- content ---------------------------------------------------------------
@@ -2381,6 +2435,10 @@
         reorderSelected(btn.dataset.z === 'front');
       });
     });
+    var grpBtn = inspectorEl.querySelector('[data-group]');
+    if (grpBtn) grpBtn.addEventListener('click', groupSelected);
+    var ungrpBtn = inspectorEl.querySelector('[data-ungroup]');
+    if (ungrpBtn) ungrpBtn.addEventListener('click', ungroupSelected);
     var dup = document.getElementById('dupEl');
     if (dup) dup.addEventListener('click', duplicateSelected);
     var del = document.getElementById('deleteEl');
@@ -2886,6 +2944,16 @@
         { label: 'بیار جلو', hint: 'انتخاب', run: () => reorderSelected(true) },
         { label: 'بفرست عقب', hint: 'انتخاب', run: () => reorderSelected(false) },
       );
+      if (selected.length > 1) {
+        cmds.unshift({ label: 'گروه‌بندی (Ctrl+G)', hint: 'انتخاب', run: groupSelected });
+      }
+      if (selectedContainer()) {
+        cmds.unshift({
+          label: 'باز کردنِ گروه (Ctrl+Shift+G)',
+          hint: 'انتخاب',
+          run: ungroupSelected,
+        });
+      }
     }
     return cmds;
   }
@@ -3804,6 +3872,10 @@
     ) {
       e.preventDefault();
       duplicateSelected();
+    } else if (!editing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+      // Ctrl+G groups the selection, Ctrl+Shift+G dissolves the selected group
+      e.preventDefault();
+      e.shiftKey ? ungroupSelected() : groupSelected();
     } else if (
       !editing &&
       (e.ctrlKey || e.metaKey) &&

@@ -14,7 +14,7 @@
  */
 import type { Band } from '../model/band';
 import type { ElementBase } from '../model/element-base';
-import type { AnyElement } from '../model/elements';
+import type { AnyElement, ContainerElement } from '../model/elements';
 import type { DatasetDef } from '../model/dataset';
 import type { TemplateMetadata } from '../model/metadata';
 import type { PageSetup } from '../model/page';
@@ -28,6 +28,7 @@ import {
   patchPage,
   removeElement,
   updateElement,
+  type ElementLocation,
 } from './template-ops';
 
 type ElementPatch = Partial<ElementBase>;
@@ -219,6 +220,104 @@ export function removeElementById(elementId: string): Command {
       return addElement(loc.parentId, loc.element, loc.index);
     },
   };
+}
+
+// --- grouping --------------------------------------------------------------
+// A group is a `container` element: children ride along when it moves, and the
+// layout engine paints them relative to its top-left (`paginate.ts`). Grouping
+// therefore rebases each child into container-local coordinates, and ungrouping
+// puts the offset back — so the rendered result is pixel-identical either way.
+
+/**
+ * Wrap several elements in a new `container` sized to their bounding box.
+ * The elements must be **siblings** (same band or same container); ids that are
+ * missing, or that live elsewhere, are ignored. Fewer than two survivors leaves
+ * the template untouched — there is nothing to group.
+ *
+ * The container lands at the position of the frontmost member, inherits the
+ * highest `zIndex` of the group, and children keep their relative order.
+ */
+export function groupElements(elementIds: string[], containerId: string): Command {
+  return {
+    type: 'groupElements',
+    apply: (state) => {
+      const members = resolveSiblings(state, elementIds);
+      if (members.length < 2) return state;
+      const [{ parentId, index }] = members as [ElementLocation];
+      const box = boundingBox(members.map((m) => m.element.bounds));
+      const container: ContainerElement = {
+        id: containerId,
+        type: 'container',
+        bounds: box,
+        zIndex: Math.max(...members.map((m) => m.element.zIndex)),
+        children: members.map((m) => rebase(m.element, -box.x, -box.y)),
+      };
+      const without = members.reduce((s, m) => removeElement(s, m.element.id), state);
+      return insertElement(without, parentId, container, index);
+    },
+    invert: () => ungroupContainer(containerId),
+  };
+}
+
+/**
+ * Dissolve a `container`, returning its children to the container's own parent
+ * at its position, with the container's offset folded back into their bounds.
+ * A missing container, or a non-container id, is a no-op.
+ */
+export function ungroupContainer(containerId: string): Command {
+  return {
+    type: 'ungroupContainer',
+    apply: (state) => {
+      const loc = findElement(state, containerId);
+      if (!loc || loc.element.type !== 'container') return state;
+      const { bounds, children } = loc.element;
+      const without = removeElement(state, containerId);
+      return children.reduce(
+        (s, child, offset) =>
+          insertElement(s, loc.parentId, rebase(child, bounds.x, bounds.y), loc.index + offset),
+        without,
+      );
+    },
+    invert: (state) => {
+      const loc = findElement(state, containerId);
+      if (!loc || loc.element.type !== 'container') return NO_OP;
+      return groupElements(
+        loc.element.children.map((c) => c.id),
+        containerId,
+      );
+    },
+  };
+}
+
+/** Shift an element (and any subtree it owns rides along) by a delta. */
+function rebase(element: AnyElement, dx: number, dy: number): AnyElement {
+  return asElement({
+    ...element,
+    bounds: { ...element.bounds, x: element.bounds.x + dx, y: element.bounds.y + dy },
+  });
+}
+
+/** The smallest rect covering every input rect. */
+function boundingBox(rects: Rect[]): Rect {
+  const x = Math.min(...rects.map((r) => r.x));
+  const y = Math.min(...rects.map((r) => r.y));
+  const right = Math.max(...rects.map((r) => r.x + r.width));
+  const bottom = Math.max(...rects.map((r) => r.y + r.height));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+/**
+ * Locate the requested elements, keep only those sharing the **first** one's
+ * parent, and return them in document order — grouping across two different
+ * parents has no meaning, since bounds are relative to different origins.
+ */
+function resolveSiblings(state: PdfTemplate, elementIds: string[]): ElementLocation[] {
+  const found = elementIds
+    .map((id) => findElement(state, id))
+    .filter((loc): loc is ElementLocation => loc !== undefined);
+  const first = found[0];
+  if (!first) return [];
+  return found.filter((loc) => loc.parentId === first.parentId).sort((a, b) => a.index - b.index);
 }
 
 /** Patch the page setup (size, margins, orientation, direction, …). */

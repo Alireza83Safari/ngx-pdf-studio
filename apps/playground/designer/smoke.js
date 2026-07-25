@@ -637,6 +637,55 @@ try {
     store.undo();
     if (xOf('sm-1') !== 10) fail('moveElementsBy undo failed: ' + xOf('sm-1'));
 
+    // --- group / ungroup (§8A) ---
+    // select both via the layers panel, then group through the inspector button
+    const layerRow = (id) => doc.querySelector('#layers [data-id="' + id + '"]');
+    if (!layerRow('sm-1')) fail('layers panel missing the test elements');
+    layerRow('sm-1').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    layerRow('sm-2').dispatchEvent(
+      new window.MouseEvent('click', { bubbles: true, shiftKey: true }),
+    );
+    const groupBtn = doc.querySelector('[data-group]');
+    if (!groupBtn) fail('group button missing for a multi-selection');
+    groupBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    const grp = store.getState().bands[0].elements.filter((e) => e.type === 'container')[0];
+    if (!grp) fail('grouping did not create a container');
+    if (grp.children.length !== 2) fail('group has ' + grp.children.length + ' children, want 2');
+    // the bounding box of (10,10,40,16) and (10,60,40,16)
+    if (grp.bounds.x !== 10 || grp.bounds.height !== 66)
+      fail('group bounds wrong: ' + JSON.stringify(grp.bounds));
+    // children are container-local now
+    if (P.findElement(store.getState(), 'sm-1').element.bounds.y !== 0)
+      fail('group child was not rebased into container-local coordinates');
+    // the group shows as ONE row in the layers panel, labelled with its size
+    if (!layerRow(grp.id) || !/گروه · 2/.test(layerRow(grp.id).textContent))
+      fail('layers panel does not show the group row');
+    // dragging the group carries the children: nudge it and check the painted svg
+    const paintedBefore = doc.querySelector('#pageSvg').innerHTML;
+    store.dispatch(P.moveElementsBy([grp.id], 20, 0));
+    if (doc.querySelector('#pageSvg').innerHTML === paintedBefore)
+      fail('moving the group did not repaint its children');
+    store.undo();
+
+    // ungroup restores absolute bounds and the original layer rows
+    doc
+      .querySelector('#layers [data-id="' + grp.id + '"]')
+      .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const ungroupBtn = doc.querySelector('[data-ungroup]');
+    if (!ungroupBtn) fail('ungroup button missing for a selected group');
+    ungroupBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (P.findElement(store.getState(), grp.id)) fail('ungroup left the container behind');
+    if (P.findElement(store.getState(), 'sm-1').element.bounds.y !== 10)
+      fail('ungroup did not fold the container offset back into the child');
+
+    // one undo per gesture: undo re-groups, undo again restores the flat band
+    store.undo();
+    if (!P.findElement(store.getState(), grp.id)) fail('undo did not restore the group');
+    store.undo();
+    if (P.findElement(store.getState(), grp.id)) fail('second undo did not ungroup again');
+    if (P.findElement(store.getState(), 'sm-1').element.bounds.y !== 10)
+      fail('undo left the child in container-local coordinates');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

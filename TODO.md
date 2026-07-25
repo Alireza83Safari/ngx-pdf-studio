@@ -41,7 +41,7 @@ Legend: ✅ انجام‌شده · 🟡 ناقص/جزئی · ⬜ شروع‌نش
 - ✅ **Canvas WYSIWYG** (SVG موتور + margins) + **پوستهٔ حرفه‌ای v3**: پنل **لایه‌ها**، تب‌بندی پنل (طراحی/لایه‌ها/داده)، **تولبار شناور روی انتخاب**، نوار وضعیت (زوم/فیت/اندازهٔ صفحه/انتخاب/ذخیره)، نام سند قابل‌ویرایش (undoable)، منوی فایل، toast، **درگ المان از ریل به بوم**، اینسپکتور سکشن‌بندی فارسی — ⬜ rulers، نمایش چندبندی
 - ✅ **جابه‌جایی/resize با دستگیره + rotate از inspector** — ⬜ drag از toolbox، دستگیرهٔ چرخش روی بوم
 - ✅ **Snap** به grid + لبهٔ المان‌ها با خط راهنمای زنده
-- ✅ **Multi-select** — shift-click + **marquee** (کادر کشیدن روی بوم) + حذف/جابه‌جایی گروهی + **align** (۶ جهت) + **distribute** افقی/عمودی (undoable یک‌مرحله‌ای) — ⬜ group/ungroup
+- ✅ **Multi-select** — shift-click + **marquee** (کادر کشیدن روی بوم) + حذف/جابه‌جایی گروهی + **align** (۶ جهت) + **distribute** افقی/عمودی (undoable یک‌مرحله‌ای) + ✅ **group/ungroup** (`Ctrl+G` / `Ctrl+Shift+G`، کانتینرِ §5 با مختصاتِ نسبی؛ یک قدمِ undo) — ⬜ ورود به گروه با دابل‌کلیک برای ویرایشِ فرزند روی بوم
 - ✅ **Z-order** (بیار جلو / بفرست عقب در inspector؛ بازتاب فوری در بوم WYSIWYG)
 - ✅ **Inspector** وابسته به نوع المان (geometry, rotation, typography, color, binding, symbology, chartKind, fit)
 - ✅ **Field picker / data explorer** + **drag-to-bind** — چیپ‌های مسیر داده از JSON نمونه (شامل `items[0].name` و `len(items)`)؛ رها کردن روی بوم = فیلد بایندشدهٔ جدید، روی المان = تغییر بایند همان
