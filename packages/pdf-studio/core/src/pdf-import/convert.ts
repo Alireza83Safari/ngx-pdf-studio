@@ -40,7 +40,12 @@ const ASCENT_FACTOR = 0.8;
 /** Matches `DEFAULT_LINE_HEIGHT` in `paint/paint-style.ts`. */
 const LINE_HEIGHT = 1.2;
 
-const ARABIC_SCRIPT = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
+/**
+ * Arabic-script ranges (Arabic, Supplement, Extended-A, Presentation Forms A/B).
+ * Written as escapes: the literal range ends at U+FEFF, an invisible character
+ * that lints as irregular whitespace and is unreadable in source.
+ */
+const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
 const round = (v: number): number => Math.round(v * 100) / 100;
 const isBlack = (c: RgbColor | undefined): boolean =>
