@@ -495,7 +495,9 @@ try {
     };
     window.pdfjsLib = {
       GlobalWorkerOptions: {},
-      getDocument: () => ({ promise: Promise.resolve({ numPages: 1, getPage: async () => fakePage }) }),
+      getDocument: () => ({
+        promise: Promise.resolve({ numPages: 1, getPage: async () => fakePage }),
+      }),
     };
     const pdfInput = doc.getElementById('pdfInput');
     Object.defineProperty(pdfInput, 'files', {
@@ -542,6 +544,98 @@ try {
     if (!/کدِ تأیید/.test(tmsg)) fail('verified download toast missing the code: ' + tmsg);
     if (!tmsg.includes(panelCode))
       fail('printed code != panel code: "' + tmsg + '" vs ' + panelCode);
+
+    // --- migrated command vocabulary (core/src/document) ---
+    // Every editing command now comes from the engine instead of being redefined
+    // here; drive the real UI for each migrated path and check undo restores.
+    const P = window.PdfStudio;
+    const store = window.__designerStore;
+    if (!store) fail('designer did not expose its store for testing');
+    const nameOf = () => store.getState().metadata.name;
+    const bandIds = () => store.getState().bands.map((b) => b.id);
+
+    // rename (P.renameTemplate)
+    const docName = doc.getElementById('docName');
+    const beforeName = nameOf();
+    docName.value = 'نامِ تازه';
+    docName.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (nameOf() !== 'نامِ تازه') fail('rename did not apply: ' + nameOf());
+    store.undo();
+    if (nameOf() !== beforeName) fail('rename undo failed: ' + nameOf());
+
+    // band add / patch / reorder / remove (P.addBand, patchBand, moveBand, removeBandById)
+    const bandsBefore = bandIds();
+    doc
+      .querySelector('[data-band-add]')
+      .dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (bandIds().length !== bandsBefore.length + 1)
+      fail('addBand did not add a band: ' + bandIds().join(','));
+    const addedBand = bandIds()[bandIds().length - 1];
+    const hInp = doc.querySelector('[data-band-height]');
+    hInp.value = '77';
+    hInp.dispatchEvent(new window.Event('change', { bubbles: true }));
+    const heightOf = (id) => {
+      const b = store.getState().bands.find((x) => x.id === id);
+      return b && b.height.value;
+    };
+    if (heightOf(addedBand) !== 77) fail('patchBand height failed: ' + heightOf(addedBand));
+    store.undo();
+    if (heightOf(addedBand) === 77) fail('patchBand undo failed');
+    const up = doc.querySelector('[data-band-up]');
+    if (up) {
+      up.dispatchEvent(new window.Event('click', { bubbles: true }));
+      if (bandIds()[bandIds().length - 1] === addedBand)
+        fail('moveBand did not reorder the band stack');
+      store.undo();
+      if (bandIds()[bandIds().length - 1] !== addedBand) fail('moveBand undo failed');
+    }
+    // the reorder moved the active band along with it, and undo restores the
+    // stack but not the selection — re-activate the added band before deleting
+    doc
+      .querySelector('[data-band="' + bandIds().indexOf(addedBand) + '"]')
+      .dispatchEvent(new window.Event('click', { bubbles: true }));
+    doc
+      .querySelector('[data-band-del]')
+      .dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (bandIds().join(',') !== bandsBefore.join(','))
+      fail('removeBandById did not restore the original stack: ' + bandIds().join(','));
+
+    // align + z-order over a real multi-selection (P.setElementsBounds, setElementZIndex)
+    const bandId = store.getState().bands[0].id;
+    const mk = (id, x, y) => ({
+      id,
+      type: 'staticText',
+      bounds: { x, y, width: 40, height: 16 },
+      zIndex: 1,
+      text: id,
+    });
+    store.dispatch(
+      P.composite([
+        P.addElement(bandId, mk('sm-1', 10, 10)),
+        P.addElement(bandId, mk('sm-2', 90, 60)),
+      ]),
+    );
+    const xOf = (id) => P.findElement(store.getState(), id).element.bounds.x;
+    const zOf = (id) => P.findElement(store.getState(), id).element.zIndex;
+    store.dispatch(
+      P.setElementsBounds({
+        'sm-1': { x: 10, y: 10, width: 40, height: 16 },
+        'sm-2': { x: 10, y: 60, width: 40, height: 16 },
+      }),
+    );
+    if (xOf('sm-2') !== 10) fail('setElementsBounds align failed: ' + xOf('sm-2'));
+    store.undo();
+    if (xOf('sm-2') !== 90) fail('setElementsBounds undo failed: ' + xOf('sm-2'));
+    store.dispatch(P.composite([P.setElementZIndex('sm-1', 9), P.setElementZIndex('sm-2', 9)]));
+    if (zOf('sm-1') !== 9 || zOf('sm-2') !== 9) fail('setElementZIndex failed');
+    store.undo();
+    if (zOf('sm-1') !== 1) fail('setElementZIndex undo failed');
+
+    // nudge (P.moveElementsBy) — its own exact inverse
+    store.dispatch(P.moveElementsBy(['sm-1', 'sm-2'], 5, 0));
+    if (xOf('sm-1') !== 15) fail('moveElementsBy failed: ' + xOf('sm-1'));
+    store.undo();
+    if (xOf('sm-1') !== 10) fail('moveElementsBy undo failed: ' + xOf('sm-1'));
 
     console.log(
       'designer smoke OK — overlays:',

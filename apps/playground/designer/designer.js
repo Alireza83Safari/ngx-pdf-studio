@@ -263,53 +263,25 @@
   }
 
   var store = new P.DocumentStore(freshTemplate());
-
-  /** Rename the document (undoable). */
-  function renameCmd(name, prev) {
-    return {
-      type: 'rename',
-      apply: function (t) {
-        return Object.assign({}, t, { metadata: Object.assign({}, t.metadata, { name: name }) });
-      },
-      invert: function () {
-        return renameCmd(prev, name);
-      },
-    };
-  }
+  // Test seam: smoke.js drives the real UI and then asserts on the store.
+  window.__designerStore = store;
 
   // --- commands ------------------------------------------------------------
-  function restoreCmd(id, element) {
-    return {
-      type: 'restore',
-      apply: function (t) {
-        return P.updateElement(t, id, function () {
-          return element;
-        });
-      },
-      invert: function (t) {
-        var loc = P.findElement(t, id);
-        return restoreCmd(id, loc ? loc.element : element);
-      },
-    };
-  }
-  function updateCmd(id, updater) {
-    var loc = P.findElement(store.getState(), id);
-    var before = loc ? loc.element : null;
-    return {
-      type: 'update',
-      apply: function (t) {
-        return P.updateElement(t, id, function (e) {
-          return updater(Object.assign({}, e));
-        });
-      },
-      invert: function () {
-        return before ? restoreCmd(id, before) : P.NO_OP;
-      },
+  // The whole editing vocabulary lives in the engine (`core/src/document/`), so
+  // every mutation here is one of its reversible commands — nothing rebuilds an
+  // apply/invert pair locally.
+  // Inspector updaters are written in the mutate-and-return style
+  // (`e.text = v; return e`), but `modifyElement` requires a pure updater — it
+  // captures the pre-apply element for undo, so mutating it in place would
+  // corrupt the inverse. Hand every updater its own shallow copy.
+  function pure(updater) {
+    return function (e) {
+      return updater(Object.assign({}, e));
     };
   }
   function update(id, updater) {
     if (!P.findElement(store.getState(), id)) return;
-    store.dispatch(updateCmd(id, updater));
+    store.dispatch(P.modifyElement(id, pure(updater)));
   }
   /** Apply the same mutation to every selected element in one undo step. */
   function updateSelected(updater) {
@@ -319,44 +291,9 @@
         return sid && P.findElement(store.getState(), sid);
       })
       .map(function (sid) {
-        return updateCmd(sid, updater);
+        return P.modifyElement(sid, pure(updater));
       });
     if (cmds.length) store.dispatch(P.composite(cmds));
-  }
-  /** Move several elements by (dx, dy) as one undoable command. */
-  function moveManyCmd(ids, dx, dy) {
-    return {
-      type: 'moveMany',
-      apply: function (t) {
-        return ids.reduce(function (acc, id) {
-          return P.updateElement(acc, id, function (e) {
-            var b = e.bounds;
-            return Object.assign({}, e, {
-              bounds: { x: b.x + dx, y: b.y + dy, width: b.width, height: b.height },
-            });
-          });
-        }, t);
-      },
-      invert: function () {
-        return moveManyCmd(ids, -dx, -dy);
-      },
-    };
-  }
-  /** Set several elements' bounds at once (align/distribute), undoable. */
-  function boundsManyCmd(next, prev) {
-    return {
-      type: 'boundsMany',
-      apply: function (t) {
-        return Object.keys(next).reduce(function (acc, id) {
-          return P.updateElement(acc, id, function (e) {
-            return Object.assign({}, e, { bounds: next[id] });
-          });
-        }, t);
-      },
-      invert: function () {
-        return boundsManyCmd(prev, next);
-      },
-    };
   }
 
   function selectedBounds() {
@@ -404,7 +341,7 @@
       else if (kind === 'middle') b.y = minY + (maxB - minY - b.height) / 2;
       next[id] = b;
     });
-    store.dispatch(boundsManyCmd(next, prev));
+    store.dispatch(P.setElementsBounds(next));
   }
 
   /** Distribute the selection evenly: h|v (needs 3+). */
@@ -436,7 +373,7 @@
       }
       next[id] = b;
     });
-    store.dispatch(boundsManyCmd(next, prev));
+    store.dispatch(P.setElementsBounds(next));
   }
 
   /** Bring the selection above (or send below) everything else. */
@@ -447,10 +384,7 @@
     });
     var z = front ? Math.max.apply(null, zs) + 1 : Math.min.apply(null, zs) - 1;
     var cmds = selected.map(function (id) {
-      return updateCmd(id, function (e) {
-        e.zIndex = z;
-        return e;
-      });
+      return P.setElementZIndex(id, z);
     });
     if (cmds.length) store.dispatch(P.composite(cmds));
   }
@@ -735,86 +669,14 @@
     return { x: x, y: Math.round(y) };
   }
 
-  /** Add any styles whose id isn't already present; undo removes exactly those. */
-  function ensureStylesCmd(newStyles) {
-    return {
-      type: 'ensureStyles',
-      apply: function (t) {
-        var have = {};
-        (t.styles || []).forEach(function (s) {
-          have[s.id] = true;
-        });
-        var add = newStyles.filter(function (s) {
-          return !have[s.id];
-        });
-        return add.length ? Object.assign({}, t, { styles: (t.styles || []).concat(add) }) : t;
-      },
-      invert: function (t) {
-        var have = {};
-        (t.styles || []).forEach(function (s) {
-          have[s.id] = true;
-        });
-        var addedIds = newStyles
-          .filter(function (s) {
-            return !have[s.id];
-          })
-          .map(function (s) {
-            return s.id;
-          });
-        return {
-          type: 'removeStyles',
-          apply: function (t2) {
-            return Object.assign({}, t2, {
-              styles: (t2.styles || []).filter(function (s) {
-                return addedIds.indexOf(s.id) === -1;
-              }),
-            });
-          },
-          invert: function () {
-            return ensureStylesCmd(newStyles);
-          },
-        };
-      },
-    };
-  }
-
-  /** Declare a path-backed dataset by name if the template doesn't have it yet. */
-  function ensureDatasetCmd(name) {
-    return {
-      type: 'ensureDataset',
-      apply: function (t) {
-        var nm = (name || '').trim();
-        if (!nm || (t.datasets || []).some((d) => d.name === nm)) return t;
-        return Object.assign({}, t, {
-          datasets: (t.datasets || []).concat([{ name: nm, source: { kind: 'path', path: nm } }]),
-        });
-      },
-      invert: function (t) {
-        var nm = (name || '').trim();
-        if (!nm || (t.datasets || []).some((d) => d.name === nm)) return P.NO_OP;
-        return {
-          type: 'removeDataset',
-          apply: function (t2) {
-            return Object.assign({}, t2, {
-              datasets: (t2.datasets || []).filter((d) => d.name !== nm),
-            });
-          },
-          invert: function () {
-            return ensureDatasetCmd(name);
-          },
-        };
-      },
-    };
-  }
-
   /** Dispatch an element add, wiring table cell styles + dataset atomically. */
   function dispatchAddElement(el) {
     var bandId = curBandId();
     if (el.type === 'table') {
       store.dispatch(
         P.composite([
-          ensureStylesCmd(TABLE_STYLES),
-          ensureDatasetCmd(el.dataset),
+          P.ensureStyles(TABLE_STYLES),
+          P.ensureDataset(el.dataset),
           P.addElement(bandId, el),
         ]),
       );
@@ -997,74 +859,10 @@
     return Object.assign({}, t, { bands: [preview] });
   }
 
-  function patchBandCmd(index, patch) {
-    return {
-      type: 'patchBand',
-      apply: function (t) {
-        var bands = t.bands.slice();
-        if (!bands[index]) return t;
-        bands[index] = Object.assign({}, bands[index], patch);
-        return Object.assign({}, t, { bands: bands });
-      },
-      invert: function (t) {
-        var b = t.bands[index];
-        if (!b) return P.NO_OP;
-        var prev = {};
-        Object.keys(patch).forEach(function (k) {
-          prev[k] = b[k];
-        });
-        return patchBandCmd(index, prev);
-      },
-    };
-  }
-  function addBandCmd(band, index) {
-    return {
-      type: 'addBand',
-      apply: function (t) {
-        var bands = t.bands.slice();
-        var i = index == null ? bands.length : index;
-        bands.splice(i, 0, band);
-        return Object.assign({}, t, { bands: bands });
-      },
-      invert: function () {
-        return removeBandByIdCmd(band.id);
-      },
-    };
-  }
-  function removeBandByIdCmd(id) {
-    return {
-      type: 'removeBand',
-      apply: function (t) {
-        return Object.assign({}, t, {
-          bands: t.bands.filter(function (b) {
-            return b.id !== id;
-          }),
-        });
-      },
-      invert: function (t) {
-        var i = t.bands
-          .map(function (b) {
-            return b.id;
-          })
-          .indexOf(id);
-        return i === -1 ? P.NO_OP : addBandCmd(t.bands[i], i);
-      },
-    };
-  }
-  function moveBandCmd(from, to) {
-    return {
-      type: 'moveBand',
-      apply: function (t) {
-        var bands = t.bands.slice();
-        var b = bands.splice(from, 1)[0];
-        if (!b) return t;
-        bands.splice(to, 0, b);
-        return Object.assign({}, t, { bands: bands });
-      },
-      invert: function () {
-        return moveBandCmd(to, from);
-      },
-    };
+  /** Patch the band at a canvas index — the engine addresses bands by id. */
+  function patchBandAt(index, patch) {
+    var band = store.getState().bands[index];
+    return band ? P.patchBand(band.id, patch) : P.NO_OP;
   }
   function setActiveBand(i) {
     activeBand = i;
@@ -1836,7 +1634,7 @@
       elements: [],
     };
     var idx = store.getState().bands.length;
-    store.dispatch(P.composite([ensureDatasetCmd(ds.name), addBandCmd(newBand, idx)]));
+    store.dispatch(P.composite([P.ensureDataset(ds.name), P.addBand(newBand, idx)]));
     setActiveBand(idx);
   }
   function wireBandBar() {
@@ -1857,9 +1655,9 @@
         if (typeSel.value === 'detail' && !getActiveBand(store.getState()).dataset) {
           var ds = detectDataset();
           patch.dataset = ds.name;
-          store.dispatch(P.composite([ensureDatasetCmd(ds.name), patchBandCmd(i, patch)]));
+          store.dispatch(P.composite([P.ensureDataset(ds.name), patchBandAt(i, patch)]));
         } else {
-          store.dispatch(patchBandCmd(i, patch));
+          store.dispatch(patchBandAt(i, patch));
         }
         renderCanvas();
         renderInspector();
@@ -1868,19 +1666,19 @@
     if (hInp)
       hInp.addEventListener('change', function () {
         store.dispatch(
-          patchBandCmd(i, { height: { mode: 'fixed', value: Number(hInp.value) || 8 } }),
+          patchBandAt(i, { height: { mode: 'fixed', value: Number(hInp.value) || 8 } }),
         );
       });
     var masterSel = inspectorEl.querySelector('[data-band-master]');
     if (masterSel)
       masterSel.addEventListener('change', function () {
-        store.dispatch(patchBandCmd(i, { master: masterSel.value }));
+        store.dispatch(patchBandAt(i, { master: masterSel.value }));
       });
     var dsInp = inspectorEl.querySelector('[data-band-dataset]');
     if (dsInp)
       dsInp.addEventListener('change', function () {
         var v = dsInp.value.trim();
-        store.dispatch(P.composite([ensureDatasetCmd(v), patchBandCmd(i, { dataset: v })]));
+        store.dispatch(P.composite([P.ensureDataset(v), patchBandAt(i, { dataset: v })]));
         renderCanvas();
         renderInspector();
       });
@@ -1888,14 +1686,14 @@
     if (up)
       up.addEventListener('click', function () {
         if (i <= 0) return;
-        store.dispatch(moveBandCmd(i, i - 1));
+        store.dispatch(P.moveBand(i, i - 1));
         setActiveBand(i - 1);
       });
     var down = inspectorEl.querySelector('[data-band-down]');
     if (down)
       down.addEventListener('click', function () {
         if (i >= store.getState().bands.length - 1) return;
-        store.dispatch(moveBandCmd(i, i + 1));
+        store.dispatch(P.moveBand(i, i + 1));
         setActiveBand(i + 1);
       });
     var del = inspectorEl.querySelector('[data-band-del]');
@@ -1903,7 +1701,7 @@
       del.addEventListener('click', function () {
         var st = store.getState();
         if (st.bands.length <= 1) return;
-        store.dispatch(removeBandByIdCmd(getActiveBand(st).id));
+        store.dispatch(P.removeBandById(getActiveBand(st).id));
         setActiveBand(Math.min(i, store.getState().bands.length - 1));
       });
   }
@@ -2398,11 +2196,14 @@
         // point the table at a (declared) dataset in one undo step
         store.dispatch(
           P.composite([
-            ensureDatasetCmd(v),
-            updateCmd(id, function (e) {
-              e.dataset = v;
-              return e;
-            }),
+            P.ensureDataset(v),
+            P.modifyElement(
+              id,
+              pure(function (e) {
+                e.dataset = v;
+                return e;
+              }),
+            ),
           ]),
         );
       });
@@ -2710,7 +2511,8 @@
     var chip =
       'display:inline-flex;gap:6px;align-items:baseline;margin:0 0 6px 6px;padding:4px 9px;' +
       'border:1px solid var(--border);border-radius:var(--r-pill);background:var(--field);font-size:var(--fs-xs)';
-    var mono = 'font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent);direction:ltr';
+    var mono =
+      'font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent);direction:ltr';
     var parts = [];
     parts.push(
       '<div><div class="sec-title">فیلدها <span class="hint">' +
@@ -2729,7 +2531,9 @@
                   esc(f.path) +
                   '</b>' +
                   (f.kind ? '<span style="color:var(--faint)">' + esc(f.kind) + '</span>' : '') +
-                  (val != null ? '<span style="color:var(--muted)">= ' + esc(val) + '</span>' : '') +
+                  (val != null
+                    ? '<span style="color:var(--muted)">= ' + esc(val) + '</span>'
+                    : '') +
                   '</span>'
                 );
               })
@@ -3682,18 +3486,6 @@
 
   // --- AI copilot (ROADMAP ۳.۲–۳.۳) ---------------------------------------------
   var copilotEl = document.getElementById('copilot');
-  /** Replace the whole template as ONE undoable command. */
-  function replaceTemplateCmd(next, prev) {
-    return {
-      type: 'copilot',
-      apply: function () {
-        return next;
-      },
-      invert: function () {
-        return replaceTemplateCmd(prev, next);
-      },
-    };
-  }
   /** Free-tier friendly presets for the OpenAI-compatible path (ROADMAP ۳). */
   var CP_PRESETS = {
     groq: {
@@ -3847,7 +3639,7 @@
           return;
         }
         bumpUid(res.template);
-        store.dispatch(replaceTemplateCmd(res.template, store.getState()));
+        store.dispatch(P.replaceTemplate(res.template));
         selected = [];
         copilotEl.classList.remove('show');
         statusEl.textContent = '';
@@ -4050,7 +3842,7 @@
       var step = e.shiftKey ? 10 : 1;
       var dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
       var dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
-      store.dispatch(moveManyCmd(selected.slice(), dx, dy));
+      store.dispatch(P.moveElementsBy(selected.slice(), dx, dy));
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.length && !editing) {
       e.preventDefault();
       deleteSelected();
@@ -4062,7 +3854,7 @@
   docNameEl.addEventListener('change', function () {
     var prev = store.getState().metadata.name;
     if (docNameEl.value.trim() && docNameEl.value !== prev) {
-      store.dispatch(renameCmd(docNameEl.value.trim(), prev));
+      store.dispatch(P.renameTemplate(docNameEl.value.trim()));
     }
   });
   docNameEl.addEventListener('keydown', function (e) {
@@ -4103,14 +3895,16 @@
       });
     });
   }
+  /**
+   * Swap the document in place. Replacing the whole template is a single
+   * engine command, so the store (and its one subscription) lives for the
+   * session — and loading a gallery template or a Copilot result stays
+   * undoable instead of silently discarding the user's work.
+   */
   function loadTemplate(t) {
     bumpUid(t);
     activeBand = 0;
-    store = new P.DocumentStore(t);
-    store.subscribe(function () {
-      rerender();
-      renderInspector();
-    });
+    store.dispatch(P.replaceTemplate(t));
     selected = [];
     rerender();
     renderInspector();

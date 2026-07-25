@@ -5,13 +5,29 @@
 export { type Command, NO_OP } from './command';
 export {
   composite,
+  // element
   patchElement,
+  replaceElement,
+  modifyElement,
   setElementBounds,
+  setElementsBounds,
+  moveElementsBy,
   setElementZIndex,
   addElement,
   removeElementById,
-  patchPageSetup,
   setStaticText,
+  // band
+  patchBand,
+  addBand,
+  removeBandById,
+  moveBand,
+  // document
+  patchPageSetup,
+  patchMetadata,
+  renameTemplate,
+  ensureStyles,
+  ensureDataset,
+  replaceTemplate,
 } from './commands';
 export {
   findElement,
