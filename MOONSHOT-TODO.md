@@ -69,8 +69,9 @@
 - [x] **۲.۴ — auto-binding به المان‌ها** ✅
   - segmentها → `dataField`/`labeledField`/`table` بایندشده به pathهای استنتاج‌شده (از ساختِ المانِ موجود در `convert.ts` استفاده کن).
   - **انجام‌شده:** `pdf-import/clone.ts` — `cloneFormat(pages, {classifier?, aiOptions?, name?, …})` و راحتیِ یک‌فراخوانیِ `cloneFormatDocument(doc, …)`. کلِ خط را می‌بندد: extract → classify (هیوریستیک یا AI) → infer → **bind**. هندسه را از `pdfContentToTemplate` بازاستفاده می‌کند، بعد رانهای **field** را به `dataField` (بایند به path)، منطقهٔ **جدول** را به یک المانِ `table`ِ بایندشده (ستون‌ها→`detail.content`، سرستون→`header`، dataset اعلام‌شده) و بقیه را `staticText` نگه می‌دارد. `inferredData` آینهٔ سند است. **۶ تستِ F2.4 + ۴ تستِ F2.3** (شاملِ **اعتبارسنجیِ schema** با `validateTemplate` و مسیرِ **بی‌کلید**). **۴۴۳ تستِ core سبز** + typecheck/lint تمیز. *(۲.۳ و ۲.۴ چون به‌شدت جفت‌اند در یک کامیت آمدند تا تاریخچه build‌شدنی بماند.)*
-- [ ] **۲.۵ — UX دیزاینر: «کلونِ فرمت»** ⬜
+- [x] **۲.۵ — UX دیزاینر: «کلونِ فرمت»** ✅
   - انداختنِ PDF → import+classify → لودِ قالب + `inferredData` → یک مرحلهٔ **مرورِ bindingها** (چیپ: چه متنی فیلد شد). از الگوی مُدالِ گالری/کوپایلوت استفاده کن.
+  - **انجام‌شده:** دکمهٔ «کلونِ فرمت (از PDF)» در منویِ فایل + inputِ PDF. pdfjs (نسخهٔ ۳.۱۱، UMD → `window.pdfjsLib`) و workerش در `designer:build` از node_modules کنارِ صفحه کپی می‌شوند (گیت‌ایگنور، مثل engine). فلو: فایل → `pdfjsLib.getDocument` → `P.cloneFormatDocument` → ست‌کردنِ `sampleData` + `renderFieldPicker` + `loadTemplate` (آینهٔ لودِ گالری) → **مُدالِ مرور** با چیپِ فیلدها (path/kind/نمونه) و جدول‌ها (ستون‌ها·تعداد ردیف). مُدال از کلاسِ `gallery-backdrop` استفاده می‌کند پس a11y/focus-trapِ موجود خودکار پوششش می‌دهد. **smoke توسعه یافت** با pdfjsِ ساختگی → کلونِ یک فاکتور: مُدال باز شد، چیپِ `invoice_no`/`items`، نامِ سند، دادهٔ نمونه، و رندرِ مقدارِ بایندشده روی بوم — **سبز**.
 - [ ] **۲.۶ — تستِ round-trip روی fixtureِ فاکتورِ واقعی** ⬜
   - assert: N فیلد، جدولِ اقلام، شکلِ `sampleData`؛ import→render شبیهِ اصل.
 
@@ -82,7 +83,7 @@
 
 ## پیشرفت
 - F1 Verifiable: ۶/۶ ✅ (کامل)
-- F2 Format Cloner: ۴/۶ (۲.۱–۲.۴ ✅)
-- **کل: ۱۰/۱۲**
+- F2 Format Cloner: ۵/۶ (۲.۱–۲.۵ ✅)
+- **کل: ۱۱/۱۲**
 
 > شروع از **۱.۱** (ماژولِ هشِ کانونیک) — خودکفا و پایهٔ بقیهٔ F1.

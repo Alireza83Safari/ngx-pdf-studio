@@ -466,6 +466,66 @@ try {
       fail('key row should hide for keyless Ollama');
     doc.getElementById('closeCopilot').dispatchEvent(new window.Event('click', { bubbles: true }));
 
+    // --- Format Cloner (F2.5) ---
+    // jsdom has no real pdfjs; inject a structural fake that yields an invoice
+    // (header field + a 3-column table) so the clone → bind → review flow runs.
+    const item = (str, x, y) => ({
+      str,
+      dir: 'ltr',
+      transform: [10, 0, 0, 10, x, y],
+      width: str.length * 5,
+    });
+    const fakeItems = [
+      item('Invoice No:', 40, 800),
+      item('INV-1024', 140, 800),
+      item('Item', 40, 700),
+      item('Qty', 300, 700),
+      item('Price', 420, 700),
+      item('widget', 40, 680),
+      item('2', 300, 680),
+      item('1,000', 420, 680),
+      item('gadget', 40, 660),
+      item('5', 300, 660),
+      item('2,000', 420, 660),
+    ];
+    const fakePage = {
+      getViewport: () => ({ width: 595, height: 842 }),
+      getOperatorList: async () => ({ fnArray: [], argsArray: [] }),
+      getTextContent: async () => ({ items: fakeItems }),
+    };
+    window.pdfjsLib = {
+      GlobalWorkerOptions: {},
+      getDocument: () => ({ promise: Promise.resolve({ numPages: 1, getPage: async () => fakePage }) }),
+    };
+    const pdfInput = doc.getElementById('pdfInput');
+    Object.defineProperty(pdfInput, 'files', {
+      configurable: true,
+      value: [{ name: 'invoice.pdf', arrayBuffer: async () => new ArrayBuffer(0) }],
+    });
+    pdfInput.dispatchEvent(new window.Event('change', { bubbles: true }));
+    // wait for the async clone pipeline to finish
+    for (let i = 0; i < 80; i++) {
+      await new Promise((r) => setTimeout(r, 25));
+      if (doc.getElementById('cloneReview').classList.contains('show')) break;
+    }
+    if (!doc.getElementById('cloneReview').classList.contains('show'))
+      fail('clone review modal did not open');
+    const reviewHtml = doc.getElementById('cloneReviewBody').innerHTML;
+    if (!reviewHtml.includes('invoice_no')) fail('clone review missing the invoice_no field chip');
+    if (!reviewHtml.includes('items')) fail('clone review missing the items table chip');
+    if (doc.getElementById('docName').value !== 'invoice')
+      fail('cloned template name not applied: ' + doc.getElementById('docName').value);
+    if (!doc.getElementById('sampleData').value.includes('INV-1024'))
+      fail('inferred sample data not loaded into the data tab');
+    const clonedSvg = doc.querySelector('#pageSvg').innerHTML;
+    if (!clonedSvg.includes('INV-1024')) fail('cloned bound field did not render its sample value');
+    if (!clonedSvg.includes('widget')) fail('cloned table did not render its rows');
+    doc
+      .getElementById('closeCloneReview')
+      .dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (doc.getElementById('cloneReview').classList.contains('show'))
+      fail('clone review did not close');
+
     // --- verified PDF download (F1.5) ---
     // verify is still ON from the sync block; the download must stamp the mark
     // and surface the same short code shown live in the panel (same input path).

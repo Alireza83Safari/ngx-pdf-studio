@@ -9,6 +9,8 @@ coverage/
 apps/playground/output/
 apps/playground/designer/engine.global.js
 apps/playground/designer/vazirmatn.js
+apps/playground/designer/pdfjs.global.js
+apps/playground/designer/pdf.worker.min.js
 *.tsbuildinfo
 release/
 

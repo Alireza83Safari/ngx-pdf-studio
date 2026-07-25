@@ -2033,6 +2033,9 @@
         <div id="fileMenu" class="menu">
           <button id="newDoc" class="btn quiet">سند نو</button>
           <button id="importJson" class="btn quiet">بارگذاری طرح (JSON)</button>
+          <button id="cloneFormat" class="btn quiet" data-tip="یک PDF موجود را بینداز؛ سیستم فیلدها و جدول را تشخیص می‌دهد و یک قالبِ بایندشده می‌سازد">
+            کلونِ فرمت (از PDF)
+          </button>
           <button id="exportJson" class="btn quiet">ذخیرهٔ طرح (JSON)</button>
           <button id="shareLink" class="btn quiet">کپی لینک اشتراک</button>
           <button id="openHistory" class="btn quiet">تاریخچهٔ نسخه‌ها</button>
@@ -2661,7 +2664,29 @@
     </div>
 
     <input id="fileInput" type="file" accept="application/json" style="display: none" />
+    <input id="pdfInput" type="file" accept="application/pdf" style="display: none" />
+
+    <div id="cloneReview" class="gallery-backdrop">
+      <div
+        class="gallery-panel"
+        style="width: min(560px, 92vw)"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cloneReviewTitle"
+      >
+        <div class="gallery-head">
+          <div>
+            <strong id="cloneReviewTitle">مرورِ کلونِ فرمت</strong>
+            <p>این‌ها از روی PDF فیلد یا جدول تشخیص داده شدند و بایند شدند.</p>
+          </div>
+          <button id="closeCloneReview" aria-label="بستن">✕</button>
+        </div>
+        <div id="cloneReviewBody" style="padding: var(--sp-7); display: flex; flex-direction: column; gap: var(--sp-5)"></div>
+      </div>
+    </div>
+
     <script src="./engine.global.js"></script>
+    <script src="./pdfjs.global.js"></script>
     <script src="./vazirmatn.js"></script>
     <script src="./templates.js"></script>
     <script src="./designer.js"></script>

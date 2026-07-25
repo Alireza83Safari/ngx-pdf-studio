@@ -2695,6 +2695,138 @@
     };
     reader.readAsText(file);
   });
+
+  // --- Format Cloner (F2.5): drop a PDF → bound template ----------------------
+  var cloneReviewEl = document.getElementById('cloneReview');
+  function showCloneReview(result) {
+    var data = result.inferredData || {};
+    var fields = (result.schema && result.schema.fields) || [];
+    var tables = (result.schema && result.schema.tables) || [];
+    function esc(s) {
+      return String(s).replace(/[&<>]/g, function (c) {
+        return c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;';
+      });
+    }
+    var chip =
+      'display:inline-flex;gap:6px;align-items:baseline;margin:0 0 6px 6px;padding:4px 9px;' +
+      'border:1px solid var(--border);border-radius:var(--r-pill);background:var(--field);font-size:var(--fs-xs)';
+    var mono = 'font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent);direction:ltr';
+    var parts = [];
+    parts.push(
+      '<div><div class="sec-title">فیلدها <span class="hint">' +
+        fields.length +
+        '</span></div>' +
+        (fields.length
+          ? fields
+              .map(function (f) {
+                var val = data[f.path];
+                return (
+                  '<span style="' +
+                  chip +
+                  '"><b style="' +
+                  mono +
+                  '">' +
+                  esc(f.path) +
+                  '</b>' +
+                  (f.kind ? '<span style="color:var(--faint)">' + esc(f.kind) + '</span>' : '') +
+                  (val != null ? '<span style="color:var(--muted)">= ' + esc(val) + '</span>' : '') +
+                  '</span>'
+                );
+              })
+              .join('')
+          : '<p class="tinyhint">فیلدی تشخیص داده نشد.</p>') +
+        '</div>',
+    );
+    parts.push(
+      '<div><div class="sec-title">جدول‌ها <span class="hint">' +
+        tables.length +
+        '</span></div>' +
+        (tables.length
+          ? tables
+              .map(function (t) {
+                var rows = Array.isArray(data[t.path]) ? data[t.path].length : 0;
+                return (
+                  '<span style="' +
+                  chip +
+                  '"><b style="' +
+                  mono +
+                  '">' +
+                  esc(t.path) +
+                  '</b><span style="color:var(--muted)">' +
+                  esc(t.columns.join(' · ')) +
+                  ' · ' +
+                  rows +
+                  ' ردیف</span></span>'
+                );
+              })
+              .join('')
+          : '<p class="tinyhint">جدولی تشخیص داده نشد.</p>') +
+        '</div>',
+    );
+    if (result.warnings && result.warnings.length) {
+      parts.push(
+        '<p class="tinyhint">' +
+          esc(result.warnings.length) +
+          ' هشدار هنگام استخراج (منحنی/تصویر/نشانه‌های ریز نادیده گرفته شدند).</p>',
+      );
+    }
+    document.getElementById('cloneReviewBody').innerHTML = parts.join('');
+    cloneReviewEl.classList.add('show');
+  }
+  function closeCloneReview() {
+    cloneReviewEl.classList.remove('show');
+  }
+  document.getElementById('closeCloneReview').addEventListener('click', closeCloneReview);
+  cloneReviewEl.addEventListener('click', function (e) {
+    if (e.target === cloneReviewEl) closeCloneReview();
+  });
+
+  document.getElementById('cloneFormat').addEventListener('click', function () {
+    if (!window.pdfjsLib) {
+      toast('pdfjs بارگذاری نشد — اول `npm run designer:build` را اجرا کن', true);
+      return;
+    }
+    document.getElementById('pdfInput').click();
+  });
+  var cloneBusy = false;
+  document.getElementById('pdfInput').addEventListener('change', async function (e) {
+    var file = e.target.files[0];
+    e.target.value = ''; // allow re-picking the same file later
+    if (!file || cloneBusy) return;
+    cloneBusy = true;
+    var btn = document.getElementById('cloneFormat');
+    setLoading(btn, true);
+    try {
+      if (window.pdfjsLib.GlobalWorkerOptions) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
+      }
+      var buf = await file.arrayBuffer();
+      var doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+      var name = file.name.replace(/\.pdf$/i, '') || 'Cloned format';
+      var result = await P.cloneFormatDocument(doc, { name: name });
+      // load the faithful sample data + the bound template (mirror gallery load)
+      sampleData = result.inferredData || {};
+      sampleEl.value = JSON.stringify(sampleData, null, 2);
+      renderFieldPicker();
+      loadTemplate(result.template);
+      setTab('design');
+      showCloneReview(result);
+      toast(
+        'کلون شد: ' +
+          result.schema.fields.length +
+          ' فیلد، ' +
+          result.schema.tables.length +
+          ' جدول',
+        { type: 'success' },
+      );
+    } catch (err) {
+      toast('کلونِ فرمت ناموفق: ' + (err && err.message ? err.message : String(err)), true);
+    } finally {
+      cloneBusy = false;
+      setLoading(btn, false);
+    }
+  });
+
   // async-button loading state (design-review 2.4): spinner + aria-busy + re-entry guard
   function setLoading(btn, on) {
     if (!btn) return;

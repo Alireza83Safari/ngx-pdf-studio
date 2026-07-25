@@ -9,7 +9,7 @@
  * Then open apps/playground/designer/designer.html in a browser.
  */
 import { build } from 'esbuild';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,5 +34,11 @@ writeFileSync(
   `window.VAZIRMATN_BASE64=${JSON.stringify(ttf.toString('base64'))};`,
 );
 
-console.log('Built engine.global.js + vazirmatn.js');
+// pdfjs (UMD → window.pdfjsLib) + its worker, for the "Clone Format" flow
+// (F2.5). Copied from node_modules so the standalone page needs no fetch/CDN.
+const pdfjsDir = join(repoRoot, 'node_modules/pdfjs-dist/build');
+copyFileSync(join(pdfjsDir, 'pdf.min.js'), join(here, 'pdfjs.global.js'));
+copyFileSync(join(pdfjsDir, 'pdf.worker.min.js'), join(here, 'pdf.worker.min.js'));
+
+console.log('Built engine.global.js + vazirmatn.js + pdfjs.global.js + pdf.worker.min.js');
 console.log('Open apps/playground/designer/designer.html in a browser.');
