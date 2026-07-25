@@ -18,6 +18,10 @@ const { window } = dom;
 // jsdom lacks these occasionally-used APIs
 window.URL.createObjectURL = () => 'blob:x';
 window.URL.revokeObjectURL = () => {};
+// pdf-lib/fontkit reach for TextEncoder/TextDecoder, absent in jsdom's vm ctx
+const { TextEncoder, TextDecoder } = require('node:util');
+window.TextEncoder = TextEncoder;
+window.TextDecoder = TextDecoder;
 // jsdom's opaque-origin localStorage throws — give the app a real in-memory one
 const mem = new Map();
 Object.defineProperty(window, 'localStorage', {
@@ -334,6 +338,32 @@ try {
     /* jsdom file:// has no localStorage — the designer guards this the same way */
   }
 
+  // --- verifiable documents: stamp toggle + live code (F1.5) ---
+  const vChk = doc.getElementById('verifyStamp');
+  if (!vChk) fail('verify stamp checkbox missing');
+  if (vChk.checked) fail('verify stamp should default off');
+  if (doc.getElementById('verifyCodeRow').style.display !== 'none')
+    fail('verify code row should be hidden when off');
+  vChk.checked = true;
+  vChk.dispatchEvent(new window.Event('change', { bubbles: true }));
+  if (doc.getElementById('verifyCodeRow').style.display === 'none')
+    fail('verify code row should show when on');
+  const vCode = doc.getElementById('verifyCode').textContent;
+  if (!/^[0-9a-f]{10}$/.test(vCode)) fail('verify code not a 10-char hash prefix: ' + vCode);
+  try {
+    if (window.localStorage.getItem('pdfstudio.verify') !== '1')
+      fail('verify toggle not persisted');
+  } catch (e) {
+    /* jsdom file:// has no localStorage — guarded the same way in the app */
+  }
+  // the live code is content-derived: editing the document changes it
+  doc
+    .querySelector('[data-add="staticText"]')
+    .dispatchEvent(new window.Event('click', { bubbles: true }));
+  const vCode2 = doc.getElementById('verifyCode').textContent;
+  if (!/^[0-9a-f]{10}$/.test(vCode2)) fail('verify code invalid after edit: ' + vCode2);
+  if (vCode2 === vCode) fail('verify code did not change after editing the document');
+
   (async () => {
     // --- share as link (ROADMAP 2.1) ---
     doc.getElementById('shareLink').dispatchEvent(new window.Event('click', { bubbles: true }));
@@ -435,6 +465,23 @@ try {
     if (doc.getElementById('cpKeyRow').style.display !== 'none')
       fail('key row should hide for keyless Ollama');
     doc.getElementById('closeCopilot').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    // --- verified PDF download (F1.5) ---
+    // verify is still ON from the sync block; the download must stamp the mark
+    // and surface the same short code shown live in the panel (same input path).
+    const panelCode = doc.getElementById('verifyCode').textContent;
+    if (!/^[0-9a-f]{10}$/.test(panelCode)) fail('panel verify code missing before download');
+    doc.getElementById('downloadPdf').dispatchEvent(new window.Event('click', { bubbles: true }));
+    let tmsg = '';
+    for (let i = 0; i < 80; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      const m = doc.querySelector('#toast .t-msg');
+      tmsg = m ? m.textContent : '';
+      if (/کدِ تأیید/.test(tmsg)) break;
+    }
+    if (!/کدِ تأیید/.test(tmsg)) fail('verified download toast missing the code: ' + tmsg);
+    if (!tmsg.includes(panelCode))
+      fail('printed code != panel code: "' + tmsg + '" vs ' + panelCode);
 
     console.log(
       'designer smoke OK — overlays:',

@@ -728,6 +728,23 @@
         direction: ltr;
         unicode-bidi: isolate;
       }
+      .verify-code {
+        flex: 1;
+        min-width: 0;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: var(--fs-sm);
+        letter-spacing: 0.04em;
+        color: var(--accent);
+        background: var(--accent-weak);
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        padding: var(--sp-2) var(--sp-4);
+        direction: ltr;
+        unicode-bidi: isolate;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       /* band strip */
       .band-bar {
         display: flex;
@@ -2398,6 +2415,27 @@
                 <option value="ltr">چپ‌به‌راست (LTR)</option>
               </select>
             </div>
+          </div>
+          <div class="sec">
+            <div class="sec-title">
+              مهرِ تأیید
+              <span class="hint">ضدِّجعل</span>
+            </div>
+            <div
+              class="row"
+              data-tip="یک QR و کدِ کوتاه روی PDF مهر می‌زند؛ هرکس با صفحهٔ «تأیید» می‌تواند بسنجد که سند از همین داده ساخته شده و دستکاری نشده"
+            >
+              <label for="verifyStamp">مهرِ QR</label>
+              <input type="checkbox" id="verifyStamp" />
+            </div>
+            <div class="row" id="verifyCodeRow" style="display: none">
+              <label>کدِ سند</label>
+              <code id="verifyCode" class="verify-code" title="کدِ کوتاهِ این سند — روی PDF چاپ می‌شود">—</code>
+            </div>
+            <p class="tinyhint" id="verifyHint" style="display: none">
+              این کد از قالب و دادهٔ فعلی ساخته می‌شود و پای PDF چاپ می‌شود. برای سنجشِ اصالت،
+              قالب و داده و همین کد را به <code>verify.html</code> بده.
+            </p>
           </div>
         </div>
 

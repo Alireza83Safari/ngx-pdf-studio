@@ -2702,6 +2702,51 @@
     if (on) btn.setAttribute('aria-busy', 'true');
     else btn.removeAttribute('aria-busy');
   }
+
+  // --- verifiable documents (F1.5) -------------------------------------------
+  // A designer-local toggle (not part of the template) that stamps a tamper-
+  // evident QR + short code onto the downloaded PDF. The hash must be
+  // reproducible by verify.html, which recomputes it from template + data
+  // alone — so the verified render deliberately omits the volatile `now`, and
+  // the code shown live in the panel is exactly what lands on the paper.
+  var VERIFY_KEY = 'pdfstudio.verify';
+  var verifyOn = false;
+  try {
+    verifyOn = window.localStorage.getItem(VERIFY_KEY) === '1';
+  } catch (e) {
+    /* private mode: default off */
+  }
+  var verifyChk = document.getElementById('verifyStamp');
+  var verifyCodeRow = document.getElementById('verifyCodeRow');
+  var verifyCodeEl = document.getElementById('verifyCode');
+  var verifyHintEl = document.getElementById('verifyHint');
+  verifyChk.checked = verifyOn;
+  /** The hashed render input for the verification stamp (no volatile clock). */
+  function verifyInput() {
+    return { data: sampleData };
+  }
+  /** Reflect the toggle: show/hide the live code and recompute it when on. */
+  function updateVerifyUi() {
+    var show = verifyOn ? '' : 'none';
+    verifyCodeRow.style.display = show;
+    verifyHintEl.style.display = show;
+    if (!verifyOn) return;
+    try {
+      verifyCodeEl.textContent = P.hashDocument(store.getState(), verifyInput()).short;
+    } catch (e) {
+      verifyCodeEl.textContent = '—';
+    }
+  }
+  verifyChk.addEventListener('change', function () {
+    verifyOn = verifyChk.checked;
+    try {
+      window.localStorage.setItem(VERIFY_KEY, verifyOn ? '1' : '0');
+    } catch (e) {
+      /* ignore persistence failure */
+    }
+    updateVerifyUi();
+  });
+
   var pdfBusy = false;
   document.getElementById('downloadPdf').addEventListener('click', async function () {
     if (pdfBusy) return;
@@ -2711,11 +2756,13 @@
       var fonts = window.VAZIRMATN_BASE64
         ? [{ family: 'Vazirmatn', bytes: base64ToBytes(window.VAZIRMATN_BASE64) }]
         : [];
-      var res = await P.renderToPdf(
-        store.getState(),
-        { data: sampleData, now: Date.now() },
-        { pdf: { fonts: fonts } },
-      );
+      // With the verification stamp on, render from the reproducible input
+      // (no volatile `now`) so the printed code matches verify.html; otherwise
+      // pin `now` to the current clock so date/now fields render as today.
+      var input = verifyOn ? verifyInput() : { data: sampleData, now: Date.now() };
+      var opts = { pdf: { fonts: fonts } };
+      if (verifyOn) opts.verify = true;
+      var res = await P.renderToPdf(store.getState(), input, opts);
       var blob = new Blob([res.bytes], { type: 'application/pdf' });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
@@ -2730,10 +2777,18 @@
             })
             .join('\n')
         : '';
+      var verifyNote = '';
+      if (verifyOn) {
+        try {
+          verifyNote = ' · کدِ تأیید ' + P.hashDocument(store.getState(), verifyInput()).short;
+        } catch (e) {
+          /* leave the code out if hashing fails */
+        }
+      }
       toast(
-        res.diagnostics.length
+        (res.diagnostics.length
           ? 'PDF با ' + res.diagnostics.length + ' هشدار ساخته شد'
-          : 'PDF ساخته شد و در حال دانلود است',
+          : 'PDF ساخته شد و در حال دانلود است') + verifyNote,
         { type: res.diagnostics.length ? 'info' : 'success' },
       );
     } catch (err) {
@@ -3905,6 +3960,7 @@
     renderLayers();
     renderStatus();
     renderPreview();
+    updateVerifyUi();
     autosave();
   }
   function bumpUid(t) {
