@@ -59,9 +59,10 @@
   - در مسیرِ `pdfContentToTemplate`: تشخیصِ ردیف‌های **تکرارشونده** (جدول)، جفتِ **label:value** (برچسبِ ثابت + مقدارِ متغیرنما)، و تاریخ/عدد/ارز با regex → پیشنهادِ binding.
   - ارزان، آفلاین، هم‌راستا با اتوسِ «provider رایگان/لوکال».
   - **انجام‌شده:** `core/src/pdf-import/classify.ts` — تابعِ خالصِ `classifyPage(page) → { texts: TextClassification[], tables: TableRegion[] }` با سه سیگنالِ ارزان‌به‌گران: (۱) `detectValueKind` با regex برای date/currency/number/percent/email/phone/IBAN (همه بعد از `toLatinDigits`، پس ارقامِ فارسی هم)، (۲) جفتِ **label:value** (متنِ مختوم به «:» + رانِ همجوار در جهتِ خواندن — RTL چپ، LTR راست؛ کلیدِ ascii از برچسب یا fallback به kind+شمارنده)، (۳) تشخیصِ **جدول** (ردیف‌های متوالیِ هم‌ستون). تقدم با فرم تا بلاکِ دوستونیِ «:» با جدول اشتباه نشود. صادرشده از core. **۱۲ تستِ جدید سبز؛ کلِ ۴۰۱ تستِ core سبز** + typecheck تمیز (خطای lintِ irregular-whitespace در `convert.ts` از قبل بوده، بی‌ربط).
-- [ ] **۲.۲ — طبقه‌بندِ AI (escalation برای مبهم‌ها)** ⬜
+- [x] **۲.۲ — طبقه‌بندِ AI (escalation برای مبهم‌ها)** ✅
   - `PdfImportOptions.classifier?: CopilotProvider`. ساختارِ استخراج‌شده (متن + مختصات + الگوی تکرار) را با یک contractِ سخت بفرست → per-segment `{ role: 'static'|'field'|'tableColumn'|…, fieldPath, format }`.
   - از `extractJson` + الگوی validate→repairِ `generate.ts` بازاستفاده کن.
+  - **انجام‌شده:** `pdf-import/classify-ai.ts` — `classifyPageWithAi(page, classifier, {onlyAmbiguous?})` رویِ نتیجهٔ هیوریستیک سوار می‌شود: رانها (متن+مختصات+`guess`ِ هیوریستیک) را با `CLASSIFY_CONTRACT`ِ سخت می‌فرستد → JSON با `{segments:[{i,role,fieldPath?,kind?}]}`؛ با `extractJson` پارس، ایندکس/نقشِ نامعتبر فیلتر می‌شود. **افت‌پذیریِ امن:** هر خطای شبکه/JSON → بازگشت به هیوریستیک (مسیرِ بی‌کلید همیشه کار می‌کند). `onlyAmbiguous` (پیش‌فرض true) فقط رانهای `static` را ارتقا می‌دهد و تصمیم‌های مطمئنِ رجکس را دست نمی‌زند. ماژولِ آفلاین وابسته به copilot نشد (فایلِ جدا). **۷ تستِ جدید** (اسکریپت‌شده: ارتقا، عدم‌بازنویسیِ فیلدِ مطمئن، بازچسبِ کامل، fallbackِ throw/JSONِ خراب/ایندکسِ خارج‌ازمحدوده، ارسالِ guess). **۴۰۷ تستِ core سبز** + typecheck/lint تمیز.
 - [ ] **۲.۳ — استنتاجِ schema + دادهٔ نمونه** ⬜
   - از فیلدهای طبقه‌بندی‌شده یک `sampleData` JSON بساز (schema + مقدارِ مثال) و در `PdfImportResult.inferredData` برگردان تا قالب بلافاصله بایند و پیش‌نمایش‌پذیر باشد.
 - [ ] **۲.۴ — auto-binding به المان‌ها** ⬜
@@ -79,7 +80,7 @@
 
 ## پیشرفت
 - F1 Verifiable: ۶/۶ ✅ (کامل)
-- F2 Format Cloner: ۱/۶ (۲.۱ ✅)
-- **کل: ۷/۱۲**
+- F2 Format Cloner: ۲/۶ (۲.۱–۲.۲ ✅)
+- **کل: ۸/۱۲**
 
 > شروع از **۱.۱** (ماژولِ هشِ کانونیک) — خودکفا و پایهٔ بقیهٔ F1.

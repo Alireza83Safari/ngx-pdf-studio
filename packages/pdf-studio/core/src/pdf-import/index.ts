@@ -21,6 +21,11 @@ export {
   type TextRole,
   type ValueKind,
 } from './classify';
+export {
+  classifyPageWithAi,
+  CLASSIFY_CONTRACT,
+  type AiClassifyOptions,
+} from './classify-ai';
 export type {
   ExtractedPage,
   ExtractedRect,
