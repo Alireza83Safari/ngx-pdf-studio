@@ -19,6 +19,7 @@ export {
   insertElement,
   removeElement,
   patchPage,
+  elementChildren,
   type ElementLocation,
 } from './template-ops';
 export { DocumentStore, type StoreListener } from './document-store';

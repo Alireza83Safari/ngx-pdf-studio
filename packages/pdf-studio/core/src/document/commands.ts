@@ -93,16 +93,19 @@ export function setElementZIndex(elementId: string, zIndex: number): Command {
   return patchElement(elementId, { zIndex });
 }
 
-/** Add an element to a band. */
-export function addElement(bandId: string, element: AnyElement, index?: number): Command {
+/**
+ * Add an element to a parent — a band id for a top-level element, or a
+ * `container`/`list` id to nest it inside that element (§5).
+ */
+export function addElement(parentId: string, element: AnyElement, index?: number): Command {
   return {
     type: 'addElement',
-    apply: (state) => insertElement(state, bandId, element, index),
+    apply: (state) => insertElement(state, parentId, element, index),
     invert: () => removeElementById(element.id),
   };
 }
 
-/** Remove an element; undo re-inserts it at its original band and position. */
+/** Remove an element; undo re-inserts it at its original parent and position. */
 export function removeElementById(elementId: string): Command {
   return {
     type: 'removeElement',
@@ -110,7 +113,7 @@ export function removeElementById(elementId: string): Command {
     invert: (state) => {
       const loc = findElement(state, elementId);
       if (!loc) return NO_OP;
-      return addElement(loc.bandId, loc.element, loc.index);
+      return addElement(loc.parentId, loc.element, loc.index);
     },
   };
 }

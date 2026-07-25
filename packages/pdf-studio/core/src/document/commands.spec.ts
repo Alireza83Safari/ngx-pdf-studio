@@ -102,3 +102,62 @@ describe('commands are reversible (§8, ADR-0004)', () => {
     expect(cmd.invert(before).type).toBe('noop');
   });
 });
+
+describe('commands reach nested elements (§5 containers)', () => {
+  /** band › outer › inner › deep */
+  const nested = (): PdfTemplate =>
+    template([
+      el('top'),
+      {
+        id: 'outer',
+        type: 'container',
+        bounds: { x: 100, y: 100, width: 200, height: 200 },
+        zIndex: 1,
+        children: [
+          el('mid'),
+          {
+            id: 'inner',
+            type: 'container',
+            bounds: { x: 10, y: 10, width: 100, height: 100 },
+            zIndex: 1,
+            children: [el('deep')],
+          },
+        ],
+      },
+    ]);
+
+  it('patchElement round-trips on a deeply nested element', () => {
+    expectReversible(nested(), patchElement('deep', { zIndex: 9, rotation: 30 }));
+  });
+
+  it('setElementBounds round-trips on a nested element', () => {
+    expectReversible(nested(), setElementBounds('mid', { x: 7, y: 8, width: 60, height: 25 }));
+  });
+
+  it('addElement nests into a container and undo removes it', () => {
+    const before = nested();
+    const cmd = addElement('inner', el('fresh'));
+    const after = cmd.apply(before);
+    expect(findElement(after, 'fresh')).toMatchObject({ parentId: 'inner' });
+    expect(cmd.invert(before).apply(after)).toEqual(before);
+  });
+
+  it('removeElementById restores a nested element to its own parent, not the band', () => {
+    const before = nested();
+    const cmd = removeElementById('deep');
+    const after = cmd.apply(before);
+    expect(findElement(after, 'deep')).toBeUndefined();
+    // The naive implementation would re-add it at band level; this must round-trip.
+    const restored = cmd.invert(before).apply(after);
+    expect(findElement(restored, 'deep')).toMatchObject({ parentId: 'inner' });
+    expect(restored).toEqual(before);
+  });
+
+  it('setStaticText round-trips on a nested element', () => {
+    const before = nested();
+    const cmd = setStaticText('deep', 'changed');
+    const after = cmd.apply(before);
+    expect(findElement(after, 'deep')).toMatchObject({ element: { text: 'changed' } });
+    expect(cmd.invert(before).apply(after)).toEqual(before);
+  });
+});
