@@ -26,6 +26,21 @@ export {
   CLASSIFY_CONTRACT,
   type AiClassifyOptions,
 } from './classify-ai';
+export {
+  inferData,
+  analyzeTable,
+  tablePath,
+  type InferredData,
+  type InferredField,
+  type InferredTable,
+  type InferredSchema,
+  type AnalyzedTable,
+} from './infer';
+export {
+  cloneFormat,
+  type CloneFormatOptions,
+  type CloneFormatResult,
+} from './clone';
 export type {
   ExtractedPage,
   ExtractedRect,
@@ -36,6 +51,7 @@ export type {
 } from './types';
 
 import { pdfContentToTemplate, type PdfImportOptions, type PdfImportResult } from './convert';
+import { cloneFormat, type CloneFormatOptions, type CloneFormatResult } from './clone';
 import { extractPdfContent } from './extract';
 import type { PdfjsDocumentLike } from './types';
 
@@ -45,4 +61,12 @@ export async function importPdfDocument(
   options: PdfImportOptions = {},
 ): Promise<PdfImportResult> {
   return pdfContentToTemplate(await extractPdfContent(doc), options);
+}
+
+/** One-call Format Cloner: extract a pdfjs document and clone it into a bound template. */
+export async function cloneFormatDocument(
+  doc: PdfjsDocumentLike,
+  options: CloneFormatOptions = {},
+): Promise<CloneFormatResult> {
+  return cloneFormat(await extractPdfContent(doc), options);
 }

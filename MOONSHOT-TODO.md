@@ -63,10 +63,12 @@
   - `PdfImportOptions.classifier?: CopilotProvider`. ساختارِ استخراج‌شده (متن + مختصات + الگوی تکرار) را با یک contractِ سخت بفرست → per-segment `{ role: 'static'|'field'|'tableColumn'|…, fieldPath, format }`.
   - از `extractJson` + الگوی validate→repairِ `generate.ts` بازاستفاده کن.
   - **انجام‌شده:** `pdf-import/classify-ai.ts` — `classifyPageWithAi(page, classifier, {onlyAmbiguous?})` رویِ نتیجهٔ هیوریستیک سوار می‌شود: رانها (متن+مختصات+`guess`ِ هیوریستیک) را با `CLASSIFY_CONTRACT`ِ سخت می‌فرستد → JSON با `{segments:[{i,role,fieldPath?,kind?}]}`؛ با `extractJson` پارس، ایندکس/نقشِ نامعتبر فیلتر می‌شود. **افت‌پذیریِ امن:** هر خطای شبکه/JSON → بازگشت به هیوریستیک (مسیرِ بی‌کلید همیشه کار می‌کند). `onlyAmbiguous` (پیش‌فرض true) فقط رانهای `static` را ارتقا می‌دهد و تصمیم‌های مطمئنِ رجکس را دست نمی‌زند. ماژولِ آفلاین وابسته به copilot نشد (فایلِ جدا). **۷ تستِ جدید** (اسکریپت‌شده: ارتقا، عدم‌بازنویسیِ فیلدِ مطمئن، بازچسبِ کامل، fallbackِ throw/JSONِ خراب/ایندکسِ خارج‌ازمحدوده، ارسالِ guess). **۴۰۷ تستِ core سبز** + typecheck/lint تمیز.
-- [ ] **۲.۳ — استنتاجِ schema + دادهٔ نمونه** ⬜
+- [x] **۲.۳ — استنتاجِ schema + دادهٔ نمونه** ✅
   - از فیلدهای طبقه‌بندی‌شده یک `sampleData` JSON بساز (schema + مقدارِ مثال) و در `PdfImportResult.inferredData` برگردان تا قالب بلافاصله بایند و پیش‌نمایش‌پذیر باشد.
-- [ ] **۲.۴ — auto-binding به المان‌ها** ⬜
+  - **انجام‌شده:** `pdf-import/infer.ts` — `inferData(pages, classes) → { data, schema }`. مقدارِ نمونهٔ هر فیلد = **متنِ واقعیِ همان ران** (پیش‌نمایشِ وفادار)؛ `schema.fields` نوعِ `kind` را برای فرمت‌دهیِ بعدی نگه می‌دارد. جدول‌ها زیرِ کلیدِ آرایه (`items`، بعد `table_2`) با کلیدِ ستون از ردیفِ سرستون (یا `col1..`). helperهای `analyzeTable`/`tablePath` برای بازاستفادهٔ F2.4 صادر شدند. **باگِ تشخیصِ سرستون** (سلول‌های جدول هیچ‌وقت field نمی‌شوند) با تصمیم بر پایهٔ **شکلِ مقدارِ سلول** حل شد.
+- [x] **۲.۴ — auto-binding به المان‌ها** ✅
   - segmentها → `dataField`/`labeledField`/`table` بایندشده به pathهای استنتاج‌شده (از ساختِ المانِ موجود در `convert.ts` استفاده کن).
+  - **انجام‌شده:** `pdf-import/clone.ts` — `cloneFormat(pages, {classifier?, aiOptions?, name?, …})` و راحتیِ یک‌فراخوانیِ `cloneFormatDocument(doc, …)`. کلِ خط را می‌بندد: extract → classify (هیوریستیک یا AI) → infer → **bind**. هندسه را از `pdfContentToTemplate` بازاستفاده می‌کند، بعد رانهای **field** را به `dataField` (بایند به path)، منطقهٔ **جدول** را به یک المانِ `table`ِ بایندشده (ستون‌ها→`detail.content`، سرستون→`header`، dataset اعلام‌شده) و بقیه را `staticText` نگه می‌دارد. `inferredData` آینهٔ سند است. **۶ تستِ F2.4 + ۴ تستِ F2.3** (شاملِ **اعتبارسنجیِ schema** با `validateTemplate` و مسیرِ **بی‌کلید**). **۴۴۳ تستِ core سبز** + typecheck/lint تمیز. *(۲.۳ و ۲.۴ چون به‌شدت جفت‌اند در یک کامیت آمدند تا تاریخچه build‌شدنی بماند.)*
 - [ ] **۲.۵ — UX دیزاینر: «کلونِ فرمت»** ⬜
   - انداختنِ PDF → import+classify → لودِ قالب + `inferredData` → یک مرحلهٔ **مرورِ bindingها** (چیپ: چه متنی فیلد شد). از الگوی مُدالِ گالری/کوپایلوت استفاده کن.
 - [ ] **۲.۶ — تستِ round-trip روی fixtureِ فاکتورِ واقعی** ⬜
@@ -80,7 +82,7 @@
 
 ## پیشرفت
 - F1 Verifiable: ۶/۶ ✅ (کامل)
-- F2 Format Cloner: ۲/۶ (۲.۱–۲.۲ ✅)
-- **کل: ۸/۱۲**
+- F2 Format Cloner: ۴/۶ (۲.۱–۲.۴ ✅)
+- **کل: ۱۰/۱۲**
 
 > شروع از **۱.۱** (ماژولِ هشِ کانونیک) — خودکفا و پایهٔ بقیهٔ F1.
