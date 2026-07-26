@@ -4500,10 +4500,77 @@
       }).observe(modal, { attributes: true, attributeFilter: ['class'] });
     });
   }
+  // --- inspector drawer on narrow layouts (design-review ۲.۱) ---------------
+  // Below the tablet breakpoint the inspector floats over the canvas instead of
+  // stealing width. CSS owns the geometry; this only tracks open/closed and
+  // keeps the toggle's aria-expanded honest.
+  var panelToggle = document.getElementById('togglePanel');
+  var panelScrim = document.getElementById('panelScrim');
+  // The drawer and the preview overlay start just below the top bar. Its height
+  // is a CSS token, but on a phone the bar wraps to two rows — so measure it
+  // instead of trusting the constant, or the overlays sit misaligned.
+  var topbarEl = document.querySelector('.topbar');
+  function syncTopbarHeight() {
+    if (!topbarEl) return;
+    var h = topbarEl.offsetHeight;
+    if (h > 0) document.documentElement.style.setProperty('--topbar-h', h + 'px');
+  }
+  if (window.ResizeObserver && topbarEl) new ResizeObserver(syncTopbarHeight).observe(topbarEl);
+  else window.addEventListener('resize', syncTopbarHeight);
+  syncTopbarHeight();
+  /** True when the layout is narrow enough that the inspector is a drawer. */
+  function isDrawerLayout() {
+    return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+  }
+  function setPanelOpen(open) {
+    if (open) document.body.dataset.panel = 'open';
+    else delete document.body.dataset.panel;
+    if (panelToggle) panelToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  if (panelToggle)
+    panelToggle.addEventListener('click', function () {
+      setPanelOpen(document.body.dataset.panel !== 'open');
+    });
+  if (panelScrim)
+    panelScrim.addEventListener('click', function () {
+      setPanelOpen(false);
+    });
+  var closePanelBtn = document.getElementById('closePanel');
+  if (closePanelBtn)
+    closePanelBtn.addEventListener('click', function () {
+      setPanelOpen(false);
+    });
+  // Escape closes the drawer before anything else would react to it
+  document.addEventListener(
+    'keydown',
+    function (e) {
+      if (e.key === 'Escape' && document.body.dataset.panel === 'open') {
+        e.stopPropagation();
+        setPanelOpen(false);
+      }
+    },
+    true,
+  );
+  // widening the window hands the panel back to the layout
+  if (window.matchMedia) {
+    var wide = window.matchMedia('(min-width: 901px)');
+    var onWide = function (e) {
+      if (e.matches) setPanelOpen(false);
+    };
+    if (wide.addEventListener) wide.addEventListener('change', onWide);
+    else if (wide.addListener) wide.addListener(onWide);
+  }
+
   installModalA11y();
   upgradeTooltips(document);
   renderFieldPicker();
   renderSnippetList(); // library-backed, so it does not ride the store's rerender
+  // On a phone an A4 page at 100% is wider than the viewport, so the first thing
+  // the user would see is a corner of it. Fit once, then leave zoom to them.
+  if (isDrawerLayout()) {
+    var fitBtn = document.getElementById('zoomFit');
+    if (fitBtn) fitBtn.click();
+  }
   if (!tryLoadFromHash() && !restoreDraft()) {
     rerender();
     renderInspector();

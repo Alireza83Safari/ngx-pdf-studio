@@ -843,6 +843,52 @@ try {
     if (!store.canRedo()) fail('jumping back should leave the steps redoable');
     doc.getElementById('closeHistory').dispatchEvent(clickEv());
 
+    // --- responsive inspector drawer (design-review ۲.۱) ---
+    // jsdom has no layout engine, so the *geometry* of the breakpoints can only
+    // be checked in a real browser. What is testable here is the mechanism the
+    // CSS hangs off: the toggle, the scrim, Escape, and aria-expanded.
+    const toggle = doc.getElementById('togglePanel');
+    const scrim = doc.getElementById('panelScrim');
+    if (!toggle) fail('panel toggle missing');
+    if (!scrim) fail('panel scrim missing');
+    if (toggle.getAttribute('aria-controls') !== 'inspectorPanel')
+      fail('panel toggle does not point at the inspector');
+    if (doc.body.dataset.panel) fail('drawer should start closed');
+
+    toggle.dispatchEvent(clickEv());
+    if (doc.body.dataset.panel !== 'open') fail('toggle did not open the drawer');
+    if (toggle.getAttribute('aria-expanded') !== 'true') fail('aria-expanded not set on open');
+    scrim.dispatchEvent(clickEv());
+    if (doc.body.dataset.panel) fail('scrim did not close the drawer');
+    if (toggle.getAttribute('aria-expanded') !== 'false') fail('aria-expanded not cleared');
+
+    toggle.dispatchEvent(clickEv());
+    doc.getElementById('closePanel').dispatchEvent(clickEv());
+    if (doc.body.dataset.panel) fail('in-drawer close button did not close the drawer');
+
+    toggle.dispatchEvent(clickEv());
+    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    if (doc.body.dataset.panel) fail('Escape did not close the drawer');
+    // …and Escape must not have cleared the selection on its way out
+    toggle.dispatchEvent(clickEv());
+    layerFor('sm-1').dispatchEvent(clickEv());
+    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    if (doc.body.dataset.panel) fail('Escape did not close the drawer (second pass)');
+    if (!doc.querySelector('.el.selected')) fail('Escape closed the drawer AND lost the selection');
+
+    // The drawer is anchored to --topbar-h, which JS refines by measurement when
+    // the bar wraps on a phone. jsdom reports offsetHeight 0, so only the static
+    // :root fallback is checkable here — the measured path needs a real browser.
+    if (!/--topbar-h:\s*\d+px/.test(html)) fail('--topbar-h has no static fallback');
+
+    // the stylesheet must actually carry the breakpoints the drawer relies on
+    const css = html;
+    for (const q of ['max-width: 1180px', 'max-width: 900px', 'max-width: 620px']) {
+      if (!css.includes('@media (' + q + ')')) fail('missing breakpoint: ' + q);
+    }
+    if (!/@media \(max-width: 900px\)[\s\S]{0,1200}position: fixed/.test(css))
+      fail('the tablet breakpoint does not float the inspector');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <title>بازبینیِ ریسپانسیو — PDF Studio Designer</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #e6e9ef;
+        --muted: #98a1b2;
+        --bg: #0d1117;
+        --surface: #161b22;
+        --border: #2a323d;
+        --accent: #5b94f6;
+        --ok: #3fb950;
+        --bad: #f85149;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        padding: 20px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p.lede {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 18px;
+        line-height: 1.7;
+      }
+      .frames {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        overflow-x: auto;
+        padding-bottom: 12px;
+      }
+      figure {
+        margin: 0;
+        flex: none;
+      }
+      figcaption {
+        font-size: 12px;
+        color: var(--muted);
+        padding: 8px 2px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      figcaption b {
+        color: var(--ink);
+        font-size: 13px;
+      }
+      iframe {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        display: block;
+      }
+      .verdict {
+        font-size: 11px;
+        padding: 1px 7px;
+        border-radius: 99px;
+        border: 1px solid currentColor;
+      }
+      .verdict.ok {
+        color: var(--ok);
+      }
+      .verdict.bad {
+        color: var(--bad);
+      }
+      ul {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.9;
+        max-width: 70ch;
+      }
+      code {
+        font-family: ui-monospace, monospace;
+        color: var(--ink);
+        background: var(--surface);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>بازبینیِ ریسپانسیو</h1>
+    <p class="lede">
+      سه پله را کنار هم نشان می‌دهد. برچسبِ سبز/سرخ به‌صورتِ خودکار بررسی می‌کند که
+      <b>بدنهٔ هر فریم اسکرولِ افقی ندارد</b> — همان معیارِ پذیرشِ آیتم ۲.۱. برای دیدن رفتارِ واقعیِ
+      لمسی، خودِ <code>designer.html</code> را در حالتِ device toolbar مرورگر هم باز کن.
+    </p>
+
+    <div class="frames">
+      <figure>
+        <iframe src="designer.html" width="1280" height="760" data-w="1280"></iframe>
+        <figcaption><b>1280px</b> دسکتاپ · پنل‌ها ثابت <span class="verdict"></span></figcaption>
+      </figure>
+      <figure>
+        <iframe src="designer.html" width="768" height="760" data-w="768"></iframe>
+        <figcaption><b>768px</b> تبلت · پنل کشویی <span class="verdict"></span></figcaption>
+      </figure>
+      <figure>
+        <iframe src="designer.html" width="375" height="760" data-w="375"></iframe>
+        <figcaption><b>375px</b> موبایل · نوارِ افقی <span class="verdict"></span></figcaption>
+      </figure>
+    </div>
+
+    <ul>
+      <li>در ۷۶۸ و ۳۷۵ باید دکمهٔ «پنل خواص» در نوارِ بالا دیده شود و اینسپکتور روی بوم بیاید.</li>
+      <li>در ۳۷۵ جعبه‌ابزار باید نوارِ افقیِ اسکرول‌شدنی بالای بوم باشد، و صفحه خودکار fit شود.</li>
+      <li>پنل با کلیک روی پس‌زمینه، دکمهٔ ✕ داخلِ پنل، یا Escape بسته می‌شود.</li>
+    </ul>
+
+    <script>
+      // A frame "passes" when its document is not wider than its viewport.
+      addEventListener('load', () => {
+        for (const frame of document.querySelectorAll('iframe')) {
+          const badge = frame.parentElement.querySelector('.verdict');
+          try {
+            const d = frame.contentDocument.documentElement;
+            const overflow = d.scrollWidth - d.clientWidth;
+            const ok = overflow <= 1; // allow a sub-pixel rounding difference
+            badge.textContent = ok ? 'بدونِ اسکرولِ افقی ✓' : 'سرریزِ ' + overflow + 'px ✕';
+            badge.className = 'verdict ' + (ok ? 'ok' : 'bad');
+          } catch (e) {
+            badge.textContent = 'قابلِ اندازه‌گیری نیست (file:// را با سرور باز کن)';
+            badge.className = 'verdict bad';
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

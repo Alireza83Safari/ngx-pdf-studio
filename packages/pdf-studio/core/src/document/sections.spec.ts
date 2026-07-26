@@ -242,7 +242,10 @@ describe('section commands', () => {
   });
 
   it('addSection creates the list on a template that has none', () => {
-    const { sections: _none, ...flat } = sectioned();
+    // build it without `sections` at all — `exactOptionalPropertyTypes` rejects
+    // an explicit `sections: undefined`, and the point is the absent-key case
+    const flat: PdfTemplate = { ...sectioned() };
+    delete flat.sections;
     const after = addSection({ id: 'first', page: page(), bands: [] }).apply(flat);
     expect(sectionIds(after)).toEqual(['first']);
   });

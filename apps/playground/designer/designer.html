@@ -64,6 +64,8 @@
         --h-sm: 28px;
         --h-md: 34px;
         --h-lg: 40px;
+        /* the top bar's height, so overlays can sit exactly below it (2.1) */
+        --topbar-h: 50px;
 
         /* ---- motion + small elevation (design-review 3.6) ---- */
         --ease: var(--ease);
@@ -194,7 +196,7 @@
         display: flex;
         align-items: center;
         gap: var(--sp-1);
-        height: 50px;
+        height: var(--topbar-h);
         padding: 0 var(--sp-5);
         background: var(--surface);
         border-bottom: 1px solid var(--border);
@@ -1955,6 +1957,175 @@
         border-top-color: transparent;
       }
 
+      /* ================= responsive ==================================== */
+      /* The desktop shell is a single row: toolrail (56) · canvas · preview
+         (400, opt-in) · inspector (300). That is ~756px of fixed chrome, so the
+         canvas suffocates below ~1024px and the body scrolls sideways below
+         ~820px. Three steps fix it, panel-first: shrink, then float the panels
+         over the canvas, then stack the toolbar.
+
+         `#togglePanel` is hidden on desktop, where the inspector is always
+         visible; the drawer state lives on <body data-panel>. */
+      #togglePanel {
+        display: none;
+      }
+      #panelScrim {
+        display: none;
+      }
+      #closePanel {
+        display: none;
+      }
+
+      /* --- 1. compact desktop / large tablet: give the canvas its room --- */
+      @media (max-width: 1180px) {
+        aside {
+          width: 264px;
+        }
+        #preview {
+          width: 320px;
+        }
+      }
+
+      /* --- 2. tablet: the side panels float over the canvas --- */
+      @media (max-width: 900px) {
+        #togglePanel {
+          display: inline-flex;
+        }
+        /* the inspector becomes a drawer on the inline-end edge (left in RTL) */
+        aside {
+          position: fixed;
+          /* below the topbar (z-index 70) so its own tabs are never covered */
+          z-index: 60;
+          inset-block: var(--topbar-h) 0;
+          inset-inline-end: 0;
+          width: min(320px, 88vw);
+          box-shadow: var(--shadow-pop);
+          transform: translateX(100%);
+          transition: transform var(--dur-base) var(--ease);
+        }
+        /* RTL: the panel sits on the left, so it slides out that way */
+        [dir='rtl'] aside {
+          transform: translateX(-100%);
+        }
+        body[data-panel='open'] aside,
+        [dir='rtl'] body[data-panel='open'] aside {
+          transform: translateX(0);
+        }
+        /* tap-anywhere-else to dismiss, and to darken the canvas behind */
+        #panelScrim {
+          display: block;
+          position: fixed;
+          inset: var(--topbar-h) 0 0 0;
+          z-index: 55;
+          background: rgba(0, 0, 0, 0.32);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity var(--dur-base) var(--ease);
+        }
+        body[data-panel='open'] #panelScrim {
+          opacity: 1;
+          pointer-events: auto;
+        }
+        /* the preview shares the same overlay treatment instead of stealing width */
+        #preview.show {
+          position: fixed;
+          z-index: 50;
+          inset-block: var(--topbar-h) 0;
+          inset-inline-start: 0;
+          width: min(420px, 92vw);
+          box-shadow: var(--shadow-pop);
+        }
+        /* the scrim covers the top bar, so the drawer needs its own dismiss */
+        #closePanel {
+          display: grid;
+          place-items: center;
+          position: absolute;
+          z-index: 1;
+          inset-block-start: var(--sp-3);
+          inset-inline-start: var(--sp-3);
+          width: var(--h-sm);
+          height: var(--h-sm);
+          border: 0;
+          border-radius: var(--r-md);
+          background: var(--field);
+          color: var(--muted);
+          cursor: pointer;
+        }
+        #closePanel:hover {
+          color: var(--ink);
+        }
+        /* keep the tab row clear of the close button */
+        .tabs {
+          padding-inline-start: calc(var(--h-sm) + var(--sp-5));
+        }
+        /* the doc-name field stops hogging the toolbar */
+        #docName {
+          width: clamp(90px, 22vw, 180px);
+        }
+      }
+
+      /* --- 3. phone: stack the toolbar, lay the tool rail on its side --- */
+      @media (max-width: 620px) {
+        .topbar {
+          flex-wrap: wrap;
+          height: auto;
+          row-gap: var(--sp-2);
+          padding-block: var(--sp-2);
+        }
+        /* separators only make sense in a single row */
+        .topbar .sep {
+          display: none;
+        }
+        #docName {
+          width: clamp(80px, 40vw, 200px);
+        }
+        .main {
+          flex-direction: column;
+        }
+        /* 40px of workspace padding is a luxury at 375px wide */
+        .canvas-wrap {
+          padding: var(--sp-4);
+        }
+        /* horizontal, scrollable strip above the canvas */
+        .toolrail {
+          width: auto;
+          flex: none;
+          flex-direction: row;
+          overflow-x: auto;
+          overflow-y: hidden;
+          border-inline-end: 0;
+          border-block-end: 1px solid var(--border);
+          padding: var(--sp-2) var(--sp-3);
+          gap: var(--sp-2);
+        }
+        .toolrail .tool {
+          flex: none;
+        }
+        .rail-sep {
+          width: 1px;
+          height: 22px;
+          margin-block: 0;
+          margin-inline: var(--sp-1);
+          flex: none;
+        }
+        /* status bar: keep the live readouts, drop the decorative padding */
+        .statusbar {
+          flex-wrap: wrap;
+          height: auto;
+          row-gap: var(--sp-1);
+          padding-block: var(--sp-2);
+          font-size: var(--fs-2xs);
+        }
+        /* modals were sized for a desktop viewport */
+        .gallery-panel {
+          width: 94vw !important;
+          max-height: 88vh;
+        }
+        .gallery-cards {
+          grid-template-columns: 1fr !important;
+        }
+      }
+
       /* ---------- respect reduced-motion ---------- */
       @media (prefers-reduced-motion: reduce) {
         *,
@@ -2210,6 +2381,28 @@
           <path d="M4 16h12" />
         </svg>
         دانلود PDF
+      </button>
+
+      <!-- narrow layouts only: opens the inspector, which becomes a drawer -->
+      <button
+        id="togglePanel"
+        class="btn icon quiet"
+        aria-expanded="false"
+        aria-controls="inspectorPanel"
+        data-tip="پنل خواص"
+      >
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+        >
+          <rect x="3" y="4" width="14" height="12" rx="2" />
+          <path d="M12.5 4v12" />
+        </svg>
       </button>
     </header>
 
@@ -2472,7 +2665,22 @@
 
       <div id="preview"></div>
 
-      <aside>
+      <aside id="inspectorPanel">
+        <!-- only rendered as a drawer on narrow layouts, where there is no
+             visible toggle to close it again (the scrim covers the top bar) -->
+        <button id="closePanel" aria-label="بستن پنل">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+          >
+            <path d="M6 6l8 8M14 6l-8 8" />
+          </svg>
+        </button>
         <div class="tabs" role="tablist">
           <button
             class="tab active"
@@ -2650,6 +2858,9 @@
       <span class="spacer"></span>
       <span>Ctrl+K = همهٔ فرمان‌ها</span>
     </footer>
+
+    <!-- dismisses the inspector drawer on narrow layouts (see the responsive block) -->
+    <div id="panelScrim" aria-hidden="true"></div>
 
     <div id="toast" role="status"></div>
 
