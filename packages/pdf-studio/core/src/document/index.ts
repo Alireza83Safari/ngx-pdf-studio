@@ -28,6 +28,11 @@ export {
   addBand,
   removeBandById,
   moveBand,
+  // section (§11A-E)
+  addSection,
+  removeSectionById,
+  patchSection,
+  moveSection,
   // document
   patchPageSetup,
   patchMetadata,
@@ -44,6 +49,8 @@ export {
 export { createSnippet, insertSnippet, type Snippet } from './snippet';
 export {
   findElement,
+  findBand,
+  replaceBand,
   updateElement,
   insertElement,
   removeElement,
@@ -54,5 +61,6 @@ export {
   resolveSiblings,
   translateElement,
   type ElementLocation,
+  type BandLocation,
 } from './template-ops';
 export { DocumentStore, type StoreListener, type HistoryStep } from './document-store';

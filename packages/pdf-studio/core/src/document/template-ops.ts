@@ -10,7 +10,13 @@
  * elements, which is what makes group/ungroup and nested editing possible. As in
  * the layout engine, a nested element's `bounds` are **relative to its parent's
  * top-left**, not to the band.
+ *
+ * They also reach **into `template.sections`** (§11A-E), whose bands the layout
+ * engine renders with their own page setup. Nothing in the model should be
+ * invisible to the command layer; top-level `bands` are searched first, so an id
+ * collision resolves the same way it always did.
  */
+import type { Band } from '../model/band';
 import type { AnyElement } from '../model/elements';
 import type { PageSetup } from '../model/page';
 import type { PdfTemplate } from '../model/template';
@@ -19,7 +25,10 @@ import type { Rect } from '../model/units';
 export interface ElementLocation {
   /** Band the element ultimately lives in, at any nesting depth. */
   bandId: string;
+  /** Index of the band **within its own list** (top-level or a section's). */
   bandIndex: number;
+  /** Section holding the band, or `undefined` for a top-level band. */
+  sectionIndex?: number;
   /** Index within the **immediate** parent's child list. */
   index: number;
   element: AnyElement;
@@ -33,6 +42,47 @@ export interface ElementLocation {
    * or the band id for a top-level element. Accepted by {@link insertElement}.
    */
   parentId: string;
+}
+
+/** Where a band lives — top-level, or inside a document section (§11A-E). */
+export interface BandLocation {
+  band: Band;
+  /** Index within its own list. */
+  index: number;
+  /** Section holding it, or `undefined` when top-level. */
+  sectionIndex?: number;
+}
+
+/**
+ * Put `band` back where `at` came from — the one place that knows whether a band
+ * lives in `template.bands` or inside a section, so callers do not repeat it.
+ */
+export function replaceBand(template: PdfTemplate, at: BandLocation, band: Band): PdfTemplate {
+  if (at.sectionIndex === undefined) {
+    const bands = template.bands.slice();
+    bands[at.index] = band;
+    return { ...template, bands };
+  }
+  const sections = (template.sections ?? []).slice();
+  const section = sections[at.sectionIndex];
+  if (!section) return template;
+  const bands = section.bands.slice();
+  bands[at.index] = band;
+  sections[at.sectionIndex] = { ...section, bands };
+  return { ...template, sections };
+}
+
+/** Locate a band by id, in `template.bands` first, then in every section. */
+export function findBand(template: PdfTemplate, bandId: string): BandLocation | undefined {
+  const top = template.bands.findIndex((b) => b.id === bandId);
+  if (top >= 0) return { band: template.bands[top] as Band, index: top };
+  const sections = template.sections ?? [];
+  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    const bands = sections[sectionIndex]?.bands ?? [];
+    const index = bands.findIndex((b) => b.id === bandId);
+    if (index >= 0) return { band: bands[index] as Band, index, sectionIndex };
+  }
+  return undefined;
 }
 
 /**
@@ -73,22 +123,34 @@ function search(elements: AnyElement[], elementId: string, path: string[]): Loca
   return undefined;
 }
 
-/** Locate an element by id, at any nesting depth. */
+/** Locate an element by id, at any nesting depth, in any band of any section. */
 export function findElement(template: PdfTemplate, elementId: string): ElementLocation | undefined {
-  for (let bandIndex = 0; bandIndex < template.bands.length; bandIndex++) {
-    const band = template.bands[bandIndex];
-    if (!band) continue;
-    const hit = search(band.elements, elementId, []);
-    if (!hit) continue;
-    const { containerPath } = hit;
-    return {
-      bandId: band.id,
-      bandIndex,
-      index: hit.index,
-      element: hit.element,
-      containerPath,
-      parentId: containerPath[containerPath.length - 1] ?? band.id,
-    };
+  const scan = (bands: Band[], sectionIndex?: number): ElementLocation | undefined => {
+    for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
+      const band = bands[bandIndex];
+      if (!band) continue;
+      const hit = search(band.elements, elementId, []);
+      if (!hit) continue;
+      const { containerPath } = hit;
+      return {
+        bandId: band.id,
+        bandIndex,
+        ...(sectionIndex === undefined ? {} : { sectionIndex }),
+        index: hit.index,
+        element: hit.element,
+        containerPath,
+        parentId: containerPath[containerPath.length - 1] ?? band.id,
+      };
+    }
+    return undefined;
+  };
+
+  const top = scan(template.bands);
+  if (top) return top;
+  const sections = template.sections ?? [];
+  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    const hit = scan(sections[sectionIndex]?.bands ?? [], sectionIndex);
+    if (hit) return hit;
   }
   return undefined;
 }
@@ -143,19 +205,39 @@ function transformChildrenOf(
   return changed ? next : elements;
 }
 
-/** Apply `transform` to every band's element list, keeping unchanged bands identical. */
+/**
+ * Apply `transform` to the element list of **every** band — top-level and inside
+ * every section — keeping unchanged bands, sections and the template itself
+ * referentially identical.
+ */
 function mapBands(
   template: PdfTemplate,
   transform: (elements: AnyElement[]) => AnyElement[],
 ): PdfTemplate {
-  let changed = false;
-  const bands = template.bands.map((band) => {
-    const next = transform(band.elements);
-    if (next === band.elements) return band;
-    changed = true;
-    return { ...band, elements: next };
+  const mapList = (bands: Band[]): Band[] => {
+    let changed = false;
+    const next = bands.map((band) => {
+      const elements = transform(band.elements);
+      if (elements === band.elements) return band;
+      changed = true;
+      return { ...band, elements };
+    });
+    return changed ? next : bands;
+  };
+
+  const bands = mapList(template.bands);
+  const sections = template.sections;
+  if (!sections) return bands === template.bands ? template : { ...template, bands };
+
+  let sectionsChanged = false;
+  const nextSections = sections.map((section) => {
+    const mapped = mapList(section.bands);
+    if (mapped === section.bands) return section;
+    sectionsChanged = true;
+    return { ...section, bands: mapped };
   });
-  return changed ? { ...template, bands } : template;
+  if (bands === template.bands && !sectionsChanged) return template;
+  return { ...template, bands, ...(sectionsChanged ? { sections: nextSections } : {}) };
 }
 
 /** Replace an element (matched by id, at any depth) via `updater`. */
@@ -188,14 +270,12 @@ export function insertElement(
       index === undefined ? siblings.length : Math.max(0, Math.min(index, siblings.length));
     return [...siblings.slice(0, at), element, ...siblings.slice(at)];
   };
-  const bandIndex = template.bands.findIndex((b) => b.id === parentId);
-  if (bandIndex >= 0) {
-    const band = template.bands[bandIndex];
-    if (!band) return template;
-    const bands = template.bands.slice();
-    bands[bandIndex] = { ...band, elements: insert(band.elements) };
-    return { ...template, bands };
-  }
+  const target = findBand(template, parentId);
+  if (target)
+    return replaceBand(template, target, {
+      ...target.band,
+      elements: insert(target.band.elements),
+    });
   return mapBands(template, (elements) => transformChildrenOf(elements, parentId, insert));
 }
 

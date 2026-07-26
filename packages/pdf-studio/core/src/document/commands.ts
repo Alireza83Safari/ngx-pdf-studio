@@ -20,16 +20,18 @@ import type { TemplateMetadata } from '../model/metadata';
 import type { PageSetup } from '../model/page';
 import type { NamedStyle } from '../model/style';
 import type { Rect } from '../model/units';
-import type { PdfTemplate } from '../model/template';
+import type { PdfTemplate, TemplateSection } from '../model/template';
 import { NO_OP, type Command } from './command';
 import {
   boundingBox,
   elementChildren,
+  findBand,
   findElement,
   insertElement,
   mapElements,
   patchPage,
   removeElement,
+  replaceBand,
   resolveSiblings,
   translateElement,
   updateElement,
@@ -305,7 +307,8 @@ function planZMove(
 /** Every element sharing `loc`'s immediate parent, including `loc` itself. */
 function siblingsOf(state: PdfTemplate, loc: ElementLocation): AnyElement[] {
   if (loc.containerPath.length === 0) {
-    return state.bands[loc.bandIndex]?.elements ?? [];
+    // resolve by id — the band may live inside a section, not at `bands[index]`
+    return findBand(state, loc.bandId)?.band.elements ?? [];
   }
   const parent = findElement(state, loc.parentId);
   return (parent && elementChildren(parent.element)) ?? [];
@@ -424,84 +427,187 @@ export function patchPageSetup(patch: Partial<PageSetup>): Command {
 }
 
 // --- band commands ---------------------------------------------------------
-// Bands are the ordered sections pagination flows across pages (§6). They are
+// Bands are the ordered strips pagination flows across pages (§6). They are
 // addressed by **id**, not index, so a command stays correct across a reorder;
-// `moveBand` is the exception, since a reorder is defined by positions.
+// `moveBand`/`addBand` take positions, since placement is what they are about.
+//
+// A band may live at the top level or inside a `TemplateSection` (§11A-E); these
+// commands work either way, and `sectionIndex` selects which list to add to.
 
-/** Replace the band list, preserving the template's other fields. */
-function withBands(state: PdfTemplate, bands: Band[]): PdfTemplate {
-  return { ...state, bands };
+/** Rewrite one band list — the top level, or a section's. */
+function withBandList(
+  state: PdfTemplate,
+  sectionIndex: number | undefined,
+  rewrite: (bands: Band[]) => Band[],
+): PdfTemplate {
+  if (sectionIndex === undefined) return { ...state, bands: rewrite(state.bands) };
+  const sections = (state.sections ?? []).slice();
+  const section = sections[sectionIndex];
+  if (!section) return state;
+  sections[sectionIndex] = { ...section, bands: rewrite(section.bands) };
+  return { ...state, sections };
 }
 
-const bandIndexOf = (state: PdfTemplate, bandId: string): number =>
-  state.bands.findIndex((b) => b.id === bandId);
+const bandListOf = (state: PdfTemplate, sectionIndex?: number): Band[] =>
+  sectionIndex === undefined ? state.bands : (state.sections?.[sectionIndex]?.bands ?? []);
 
 /** Patch a band's settings (type, height, dataset, master, pagination flags…). */
 export function patchBand(bandId: string, patch: Partial<Band>): Command {
   return {
     type: 'patchBand',
     apply: (state) => {
-      const index = bandIndexOf(state, bandId);
-      const band = state.bands[index];
-      if (!band) return state;
-      const bands = state.bands.slice();
-      bands[index] = { ...band, ...patch };
-      return withBands(state, bands);
+      const at = findBand(state, bandId);
+      return at ? replaceBand(state, at, { ...at.band, ...patch }) : state;
     },
     invert: (state) => {
-      const band = state.bands[bandIndexOf(state, bandId)];
-      if (!band) return NO_OP;
-      const previous = captureKeys(band as unknown as Record<string, unknown>, Object.keys(patch));
+      const at = findBand(state, bandId);
+      if (!at) return NO_OP;
+      const previous = captureKeys(
+        at.band as unknown as Record<string, unknown>,
+        Object.keys(patch),
+      );
       return patchBand(bandId, previous as Partial<Band>);
     },
   };
 }
 
-/** Add a band at `index` (default: end of the stack). */
-export function addBand(band: Band, index?: number): Command {
+/**
+ * Add a band at `index` (default: end of the list). `sectionIndex` places it in
+ * a document section instead of at the top level.
+ */
+export function addBand(band: Band, index?: number, sectionIndex?: number): Command {
   return {
     type: 'addBand',
-    apply: (state) => {
-      const at =
-        index === undefined ? state.bands.length : Math.max(0, Math.min(index, state.bands.length));
-      const bands = state.bands.slice();
-      bands.splice(at, 0, band);
-      return withBands(state, bands);
-    },
+    apply: (state) =>
+      withBandList(state, sectionIndex, (bands) => {
+        const at = index === undefined ? bands.length : Math.max(0, Math.min(index, bands.length));
+        const next = bands.slice();
+        next.splice(at, 0, band);
+        return next;
+      }),
     invert: () => removeBandById(band.id),
   };
 }
 
-/** Remove a band; undo restores it at its original position. */
+/** Remove a band; undo restores it at its original position, section included. */
 export function removeBandById(bandId: string): Command {
   return {
     type: 'removeBand',
-    apply: (state) =>
-      withBands(
-        state,
-        state.bands.filter((b) => b.id !== bandId),
-      ),
+    apply: (state) => {
+      const at = findBand(state, bandId);
+      if (!at) return state;
+      return withBandList(state, at.sectionIndex, (bands) => bands.filter((b) => b.id !== bandId));
+    },
     invert: (state) => {
-      const index = bandIndexOf(state, bandId);
-      const band = state.bands[index];
-      if (!band) return NO_OP;
-      return addBand(band, index);
+      const at = findBand(state, bandId);
+      if (!at) return NO_OP;
+      return addBand(at.band, at.index, at.sectionIndex);
     },
   };
 }
 
-/** Reorder the band stack by moving the band at `from` to `to`. */
-export function moveBand(from: number, to: number): Command {
+/**
+ * Reorder a band list by moving the band at `from` to `to` — within the top
+ * level, or within one section.
+ */
+export function moveBand(from: number, to: number, sectionIndex?: number): Command {
   return {
     type: 'moveBand',
     apply: (state) => {
-      const bands = state.bands.slice();
-      const [band] = bands.splice(from, 1);
-      if (!band) return state;
-      bands.splice(Math.max(0, Math.min(to, bands.length)), 0, band);
-      return withBands(state, bands);
+      if (from < 0 || from >= bandListOf(state, sectionIndex).length) return state;
+      return withBandList(state, sectionIndex, (bands) => {
+        const next = bands.slice();
+        const [band] = next.splice(from, 1);
+        if (!band) return bands;
+        next.splice(Math.max(0, Math.min(to, next.length)), 0, band);
+        return next;
+      });
     },
-    invert: () => moveBand(to, from),
+    invert: () => moveBand(to, from, sectionIndex),
+  };
+}
+
+// --- section commands (§11A-E) ---------------------------------------------
+// Sections give parts of one document their own page setup (size, orientation,
+// margins, direction). When any exist, the layout engine renders them in order
+// and ignores top-level `bands` — so the two are alternatives, not a mix.
+
+/** Add a document section at `index` (default: end). */
+export function addSection(section: TemplateSection, index?: number): Command {
+  return {
+    type: 'addSection',
+    apply: (state) => {
+      const sections = (state.sections ?? []).slice();
+      const at =
+        index === undefined ? sections.length : Math.max(0, Math.min(index, sections.length));
+      sections.splice(at, 0, section);
+      return { ...state, sections };
+    },
+    invert: () => removeSectionById(section.id),
+  };
+}
+
+/** Remove a section (and its bands); undo restores it at its position. */
+export function removeSectionById(sectionId: string): Command {
+  return {
+    type: 'removeSection',
+    apply: (state) => {
+      const sections = state.sections ?? [];
+      if (!sections.some((s) => s.id === sectionId)) return state;
+      return { ...state, sections: sections.filter((s) => s.id !== sectionId) };
+    },
+    invert: (state) => {
+      const index = (state.sections ?? []).findIndex((s) => s.id === sectionId);
+      const section = state.sections?.[index];
+      if (!section) return NO_OP;
+      return addSection(section, index);
+    },
+  };
+}
+
+/**
+ * Patch a section's own settings — its `page` setup and `restartPageNumbers`.
+ * Its bands are edited with the band commands above, which already find them.
+ */
+export function patchSection(
+  sectionId: string,
+  patch: Partial<Omit<TemplateSection, 'bands'>>,
+): Command {
+  return {
+    type: 'patchSection',
+    apply: (state) => {
+      const sections = (state.sections ?? []).slice();
+      const index = sections.findIndex((s) => s.id === sectionId);
+      const section = sections[index];
+      if (!section) return state;
+      sections[index] = { ...section, ...patch };
+      return { ...state, sections };
+    },
+    invert: (state) => {
+      const section = (state.sections ?? []).find((s) => s.id === sectionId);
+      if (!section) return NO_OP;
+      const previous = captureKeys(
+        section as unknown as Record<string, unknown>,
+        Object.keys(patch),
+      );
+      return patchSection(sectionId, previous as Partial<Omit<TemplateSection, 'bands'>>);
+    },
+  };
+}
+
+/** Reorder the sections — which is also the page order of the document. */
+export function moveSection(from: number, to: number): Command {
+  return {
+    type: 'moveSection',
+    apply: (state) => {
+      const sections = (state.sections ?? []).slice();
+      if (from < 0 || from >= sections.length) return state;
+      const [section] = sections.splice(from, 1);
+      if (!section) return state;
+      sections.splice(Math.max(0, Math.min(to, sections.length)), 0, section);
+      return { ...state, sections };
+    },
+    invert: () => moveSection(to, from),
   };
 }
 

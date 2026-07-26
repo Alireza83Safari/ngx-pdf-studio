@@ -32,6 +32,12 @@ export interface PdfTemplate {
    * orientation, margins, direction) — for mixed page sizes within one document
    * (§11A-E). When present, sections render in order with continuous page
    * numbers; `bands` above is used only when no sections are declared.
+   *
+   * The editing layer (`document/`) reaches into sections: elements and bands
+   * inside them are found, patched and moved like any other, and there are
+   * section-level commands (`addSection`, `patchSection`, …). The *visual
+   * designer* still edits one flat band stack, so composing a sectioned document
+   * is an API-level task for now.
    */
   sections?: TemplateSection[];
   /** Report variables (running accumulators) exposed as `$vars.<name>` (§11A-D). */
