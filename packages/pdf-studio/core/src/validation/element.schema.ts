@@ -24,6 +24,9 @@ import {
 
 const baseElement = z.object({
   id: z.string(),
+  /** Editor-only affordances (§8A); neither affects layout or paint. */
+  name: z.string().optional(),
+  locked: z.boolean().optional(),
   bounds: rectSchema,
   rotation: z.number().optional(),
   zIndex: z.number(),

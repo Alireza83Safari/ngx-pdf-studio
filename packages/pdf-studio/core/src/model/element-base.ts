@@ -92,6 +92,18 @@ export interface ElementBookmark {
 export interface ElementBase {
   id: string;
   type: ElementType;
+  /**
+   * Author-facing label shown in the designer's layer list (§8A). Purely an
+   * editing aid — it never affects rendering. Defaults to the element's type
+   * and content when absent.
+   */
+  name?: string;
+  /**
+   * Editor-only lock (§8A): the designer will not let the author move, resize,
+   * or delete this element, though it stays selectable and fully visible. Has
+   * no effect on layout or paint.
+   */
+  locked?: boolean;
   /** Band-relative bounds, in points. */
   bounds: Rect;
   /** Clockwise rotation in degrees. */

@@ -637,6 +637,74 @@ try {
     store.undo();
     if (xOf('sm-1') !== 10) fail('moveElementsBy undo failed: ' + xOf('sm-1'));
 
+    // --- lock + rename + relative z-order (§8A) ---
+    const clickEv = () => new window.MouseEvent('click', { bubbles: true });
+    const layerFor = (id) => doc.querySelector('#layers [data-id="' + id + '"]');
+    if (!layerFor('sm-1')) fail('layers panel missing the test elements');
+    layerFor('sm-1').dispatchEvent(clickEv());
+
+    // the shortcut handler ignores keys while a text field is focused, and
+    // earlier steps leave one focused — blur first or these checks are vacuous
+    const key = (k) => {
+      if (doc.activeElement && doc.activeElement.blur) doc.activeElement.blur();
+      doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: k, bubbles: true }));
+    };
+    const el1 = () => P.findElement(store.getState(), 'sm-1').element;
+
+    // baseline: while unlocked, the arrow key really does nudge (proves wiring)
+    const yStart = el1().bounds.y;
+    key('ArrowDown');
+    if (el1().bounds.y !== yStart + 1) fail('arrow nudge is not wired: ' + el1().bounds.y);
+    store.undo();
+
+    // lock from the layers panel: the row's toggle must not also re-select
+    const lockBtn = doc.querySelector('#layers [data-lock="sm-1"]');
+    if (!lockBtn) fail('layer lock button missing');
+    lockBtn.dispatchEvent(clickEv());
+    if (el1().locked !== true) fail('lock toggle did not lock the element');
+    if (doc.querySelector('#layers [data-lock="sm-1"]').getAttribute('aria-pressed') !== 'true')
+      fail('lock button aria-pressed not updated');
+    // a locked element offers no resize handle, and refuses arrows and Delete
+    if (doc.querySelector('.el.selected .handle'))
+      fail('locked element still shows a resize handle');
+    key('ArrowDown');
+    if (el1().bounds.y !== yStart) fail('arrow key moved a locked element');
+    key('Delete');
+    if (!P.findElement(store.getState(), 'sm-1')) fail('Delete removed a locked element');
+
+    // unlock → the nudge works again
+    doc.querySelector('#layers [data-lock="sm-1"]').dispatchEvent(clickEv());
+    if (el1().locked !== false) fail('lock toggle did not unlock');
+    layerFor('sm-1').dispatchEvent(clickEv());
+    key('ArrowDown');
+    if (el1().bounds.y !== yStart + 1) fail('unlocked element still refuses to move');
+    store.undo();
+
+    // rename from the inspector; the layers row picks the name up
+    const nameInp = doc.querySelector('#inspector [data-prop="name"]');
+    if (!nameInp) fail('inspector name field missing');
+    nameInp.value = 'لوگوی شرکت';
+    nameInp.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (el1().name !== 'لوگوی شرکت') fail('rename did not apply: ' + el1().name);
+    if (!/لوگوی شرکت/.test(layerFor('sm-1').textContent))
+      fail('layers row did not pick up the element name');
+    store.undo();
+    if (el1().name) fail('rename undo failed');
+
+    // relative z-order: one step up swaps with the neighbour above. Park both
+    // test elements above every template element so they neighbour each other.
+    store.dispatch(P.setElementZIndex('sm-1', 900));
+    store.dispatch(P.setElementZIndex('sm-2', 901));
+    layerFor('sm-1').dispatchEvent(clickEv());
+    const zStep = doc.querySelector('#inspector [data-zstep="forward"]');
+    if (!zStep) fail('relative z-order buttons missing');
+    zStep.dispatchEvent(clickEv());
+    const zOf2 = (id) => P.findElement(store.getState(), id).element.zIndex;
+    if (zOf2('sm-1') !== 901 || zOf2('sm-2') !== 900)
+      fail('forward did not swap z with the neighbour: ' + zOf2('sm-1') + '/' + zOf2('sm-2'));
+    store.undo();
+    if (zOf2('sm-1') !== 900 || zOf2('sm-2') !== 901) fail('z-order swap undo failed');
+
     // --- group / ungroup (§8A) ---
     // select both via the layers panel, then group through the inspector button
     const layerRow = (id) => doc.querySelector('#layers [data-id="' + id + '"]');

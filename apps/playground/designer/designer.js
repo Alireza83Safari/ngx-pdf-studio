@@ -392,6 +392,24 @@
     if (cmds.length) store.dispatch(P.composite(cmds));
   }
 
+  /** A locked element can be selected and inspected, but not moved or deleted. */
+  function isLocked(id) {
+    var loc = P.findElement(store.getState(), id);
+    return !!(loc && loc.element.locked);
+  }
+  function unlockedSelection() {
+    return selected.filter(function (id) {
+      return !isLocked(id);
+    });
+  }
+  var lockToastAt = 0;
+  /** Explain why nothing moved — but only once per few seconds, not per frame. */
+  function lockedNudge() {
+    if (Date.now() - lockToastAt < 3000) return;
+    lockToastAt = Date.now();
+    toast('این الِمان قفل است — از پنل لایه‌ها یا اینسپکتور بازش کن');
+  }
+
   /** The single selected element, when it is a group (container). */
   function selectedContainer() {
     if (selected.length !== 1) return null;
@@ -962,7 +980,8 @@
     });
     ordered.forEach(function (el) {
       var node = document.createElement('div');
-      node.className = 'el' + (isSelected(el.id) ? ' selected' : '');
+      node.className =
+        'el' + (isSelected(el.id) ? ' selected' : '') + (el.locked ? ' is-locked' : '');
       node.dataset.id = el.id;
       // keyboard access (design-review 1.3): Tab reaches elements, Enter/Space selects.
       // aria-label carries the type for AT; no native `title` so the styled
@@ -997,7 +1016,8 @@
         }
       }
       pageEl.appendChild(node);
-      if (selected.length === 1 && isSelected(el.id)) {
+      // a locked element offers no resize handle — the affordance would lie
+      if (selected.length === 1 && isSelected(el.id) && !el.locked) {
         var handle = document.createElement('div');
         handle.className = 'handle';
         handle.dataset.resize = el.id;
@@ -1067,12 +1087,19 @@
   /** Layers panel: top-most first, click to select, shift-click to toggle. */
   var layersEl = document.getElementById('layers');
   function layerLabel(el) {
+    if (el.name) return el.name; // author-given name always wins (§8A)
     if (el.type === 'staticText' && el.text) return el.text;
     if (el.value && el.value.source) return el.value.source;
     if (el.type === 'chart') return faName(el.type) + ' · ' + (el.chartKind || '');
     if (el.type === 'container') return faName(el.type) + ' · ' + el.children.length + ' الِمان';
     return faName(el.type);
   }
+  var LOCK_ICON =
+    '<svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
+    '<rect x="4.5" y="9" width="11" height="7.5" rx="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg>';
+  var UNLOCK_ICON =
+    '<svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
+    '<rect x="4.5" y="9" width="11" height="7.5" rx="1.5"/><path d="M7 9V6.5a3 3 0 0 1 5.8-1"/></svg>';
   function renderLayers() {
     var t = store.getState();
     var els = getActiveBand(t).elements.slice().reverse();
@@ -1088,15 +1115,26 @@
           (isSelected(el.id) ? ' selected' : '') +
           '" role="button" tabindex="0" aria-pressed="' +
           (isSelected(el.id) ? 'true' : 'false') +
-          '" title="کلیک: انتخاب · Shift+کلیک: افزودن به انتخاب" data-id="' +
+          '" title="کلیک: انتخاب · Shift+کلیک: افزودن به انتخاب · دابل‌کلیک روی نام: تغییر نام" data-id="' +
           esc(el.id) +
           '"><span class="l-ico">' +
           typeIcon(el.type, 13) +
-          '</span><span class="l-name">' +
+          '</span><span class="l-name" data-rename="' +
+          esc(el.id) +
+          '">' +
           esc(layerLabel(el)) +
           '</span><span class="l-type">' +
           esc(el.type) +
-          '</span></div>'
+          '</span>' +
+          '<button class="l-lock" data-lock="' +
+          esc(el.id) +
+          '" aria-pressed="' +
+          (el.locked ? 'true' : 'false') +
+          '" title="' +
+          (el.locked ? 'باز کردنِ قفل' : 'قفل کردن — جلوگیری از جابه‌جایی/حذفِ ناخواسته') +
+          '">' +
+          (el.locked ? LOCK_ICON : UNLOCK_ICON) +
+          '</button></div>'
         );
       })
       .join('');
@@ -1125,9 +1163,46 @@
     return e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar';
   }
   layersEl.addEventListener('click', function (e) {
+    var lockBtn = e.target.closest ? e.target.closest('[data-lock]') : null;
+    if (lockBtn) {
+      e.stopPropagation(); // toggling the lock must not also re-select the row
+      var lockId = lockBtn.dataset.lock;
+      store.dispatch(P.setElementLocked(lockId, !isLocked(lockId)));
+      return;
+    }
     var row = e.target.closest ? e.target.closest('.layer') : null;
     if (!row) return;
     selectById(row.dataset.id, e.shiftKey);
+  });
+  // double-click a layer name to rename it (Figma-style), Enter/blur commits
+  layersEl.addEventListener('dblclick', function (e) {
+    var nameEl = e.target.closest ? e.target.closest('[data-rename]') : null;
+    if (!nameEl) return;
+    var id = nameEl.dataset.rename;
+    var loc = P.findElement(store.getState(), id);
+    if (!loc) return;
+    var input = document.createElement('input');
+    input.className = 'l-rename';
+    input.value = loc.element.name || layerLabel(loc.element);
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    var done = false;
+    function commit(save) {
+      if (done) return;
+      done = true;
+      var v = input.value.trim();
+      if (save && v && v !== (loc.element.name || '')) store.dispatch(P.renameElement(id, v));
+      else renderLayers();
+    }
+    input.addEventListener('keydown', function (ev) {
+      ev.stopPropagation(); // don't let Delete/arrows reach the canvas shortcuts
+      if (ev.key === 'Enter') commit(true);
+      if (ev.key === 'Escape') commit(false);
+    });
+    input.addEventListener('blur', function () {
+      commit(true);
+    });
   });
   layersEl.addEventListener('keydown', function (e) {
     if (!isActivateKey(e)) return;
@@ -1206,6 +1281,7 @@
     var elNode = e.target.closest ? e.target.closest('.el') : null;
     if (resizeId) {
       var loc = P.findElement(store.getState(), resizeId);
+      if (isLocked(resizeId)) return lockedNudge();
       drag = {
         mode: 'resize',
         id: resizeId,
@@ -1226,14 +1302,27 @@
       } else if (!isSelected(id)) {
         selected = [id];
       }
+      // a locked element still selects (so it can be inspected/unlocked) but
+      // never joins a drag — and a selection of only locked elements cannot move
+      var movable = selected.filter(function (sid) {
+        return !isLocked(sid);
+      });
+      if (!movable.length) {
+        setTab('design');
+        renderInspector();
+        renderCanvas();
+        lockedNudge();
+        e.preventDefault();
+        return;
+      }
       var starts = {};
-      selected.forEach(function (sid) {
+      movable.forEach(function (sid) {
         var l = P.findElement(store.getState(), sid);
         if (l) starts[sid] = Object.assign({}, l.element.bounds);
       });
       drag = {
         mode: 'move',
-        ids: selected.slice(),
+        ids: movable,
         sx: e.clientX,
         sy: e.clientY,
         starts: starts,
@@ -1793,6 +1882,31 @@
       '<button data-z="front" title="نمایش روی الِمان‌های دیگر">⬆ بیار جلو</button>' +
       '<button data-z="back" title="نمایش زیر الِمان‌های دیگر">⬇ بفرست عقب</button>' +
       '</div>';
+    // one step at a time, relative to the siblings in this band/group
+    html +=
+      '<div class="btnrow">' +
+      '<button data-zstep="forward" title="یک پله بالاتر از الِمانِ بعدی">↑ یک پله بالا</button>' +
+      '<button data-zstep="backward" title="یک پله پایین‌تر از الِمانِ قبلی">↓ یک پله پایین</button>' +
+      '</div>';
+    html += '</div>';
+
+    // --- editor affordances (§8A): name + lock -------------------------------
+    html += '<div class="sec"><div class="sec-title">شناسه و قفل</div>';
+    html += field(
+      'نام',
+      '<input data-prop="name" title="نامِ نمایشی در پنل لایه‌ها — روی خروجی اثری ندارد" ' +
+        'placeholder="' +
+        esc(layerLabel(el)) +
+        '" value="' +
+        esc(el.name || '') +
+        '">',
+    );
+    html += field(
+      'قفل',
+      '<label class="chk"><input type="checkbox" data-prop="locked"' +
+        (el.locked ? ' checked' : '') +
+        '> جابه‌جایی، تغییر اندازه و حذف را قفل کن</label>',
+    );
     html += '</div>';
 
     // --- alignment (multi) ----------------------------------------------------
@@ -2435,6 +2549,29 @@
         reorderSelected(btn.dataset.z === 'front');
       });
     });
+    inspectorEl.querySelectorAll('[data-zstep]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var cmds = selected.map(function (sid) {
+          return P.moveElementZ(sid, btn.dataset.zstep);
+        });
+        if (cmds.length) store.dispatch(P.composite(cmds));
+      });
+    });
+    var nameInp = inspectorEl.querySelector('[data-prop="name"]');
+    if (nameInp)
+      nameInp.addEventListener('change', function () {
+        var v = nameInp.value.trim();
+        // clearing the field drops back to the auto-generated label
+        store.dispatch(P.renameElement(lastSelected(), v || undefined));
+      });
+    var lockInp = inspectorEl.querySelector('[data-prop="locked"]');
+    if (lockInp)
+      lockInp.addEventListener('change', function () {
+        var cmds = selected.map(function (sid) {
+          return P.setElementLocked(sid, lockInp.checked);
+        });
+        if (cmds.length) store.dispatch(P.composite(cmds));
+      });
     var grpBtn = inspectorEl.querySelector('[data-group]');
     if (grpBtn) grpBtn.addEventListener('click', groupSelected);
     var ungrpBtn = inspectorEl.querySelector('[data-ungroup]');
@@ -3030,13 +3167,16 @@
   });
 
   function deleteSelected() {
-    var n = selected.length;
+    var deletable = unlockedSelection();
+    if (deletable.length < selected.length) lockedNudge();
+    var n = deletable.length;
     // one composite → deleting a whole selection is a single undo step
-    var cmds = selected.map(function (sid) {
+    var cmds = deletable.map(function (sid) {
       return P.removeElementById(sid);
     });
     if (cmds.length) store.dispatch(P.composite(cmds));
-    selected = [];
+    // whatever survived (locked) stays selected, so the user can go unlock it
+    selected = selected.filter(isLocked);
     if (n) {
       toast(n === 1 ? 'الِمان حذف شد' : n + ' الِمان حذف شد', {
         action: {
@@ -3914,7 +4054,9 @@
       var step = e.shiftKey ? 10 : 1;
       var dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
       var dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
-      store.dispatch(P.moveElementsBy(selected.slice(), dx, dy));
+      var nudgeable = unlockedSelection();
+      if (nudgeable.length) store.dispatch(P.moveElementsBy(nudgeable, dx, dy));
+      else lockedNudge();
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.length && !editing) {
       e.preventDefault();
       deleteSelected();

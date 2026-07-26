@@ -502,6 +502,13 @@
         border-color: var(--accent);
         box-shadow: 0 0 0 1px var(--accent);
       }
+      /* locked: still selectable and visible, but the cursor promises nothing */
+      .el.is-locked {
+        cursor: default;
+      }
+      .el.is-locked.selected {
+        border-style: dashed;
+      }
       /* an element that paints nothing: make it findable + explain itself */
       .el.is-empty {
         border-color: color-mix(in srgb, var(--accent) 32%, transparent);
@@ -1114,6 +1121,64 @@
         font-size: var(--fs-2xs);
         color: var(--faint);
         direction: ltr;
+      }
+      /* lock toggle: quiet until hovered or engaged, so rows stay calm */
+      .layer .l-lock {
+        flex: none;
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        padding: 0;
+        border: 0;
+        border-radius: var(--r-sm);
+        background: transparent;
+        color: var(--faint);
+        cursor: pointer;
+        opacity: 0;
+        transition:
+          opacity var(--dur-fast),
+          background var(--dur-fast),
+          color var(--dur-fast);
+      }
+      .layer:hover .l-lock,
+      .layer .l-lock:focus-visible,
+      .layer .l-lock[aria-pressed='true'] {
+        opacity: 1;
+      }
+      .layer .l-lock[aria-pressed='true'] {
+        color: var(--accent);
+      }
+      .layer .l-lock:hover {
+        background: var(--field);
+        color: var(--ink);
+      }
+      /* inline rename input replaces .l-name in place */
+      .layer .l-rename {
+        flex: 1;
+        min-width: 0;
+        font-size: var(--fs-xs);
+        font-family: inherit;
+        padding: 1px var(--sp-2);
+        border: 1px solid var(--accent);
+        border-radius: var(--r-sm);
+        background: var(--surface);
+        color: var(--ink);
+      }
+      /* checkbox + label on one line, for boolean inspector fields */
+      .chk {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        font-size: var(--fs-xs);
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .chk input {
+        width: auto;
+        margin: 0;
+        flex: none;
+        accent-color: var(--accent);
       }
       .layers-empty {
         color: var(--faint);
@@ -2033,7 +2098,11 @@
         <div id="fileMenu" class="menu">
           <button id="newDoc" class="btn quiet">سند نو</button>
           <button id="importJson" class="btn quiet">بارگذاری طرح (JSON)</button>
-          <button id="cloneFormat" class="btn quiet" data-tip="یک PDF موجود را بینداز؛ سیستم فیلدها و جدول را تشخیص می‌دهد و یک قالبِ بایندشده می‌سازد">
+          <button
+            id="cloneFormat"
+            class="btn quiet"
+            data-tip="یک PDF موجود را بینداز؛ سیستم فیلدها و جدول را تشخیص می‌دهد و یک قالبِ بایندشده می‌سازد"
+          >
             کلونِ فرمت (از PDF)
           </button>
           <button id="exportJson" class="btn quiet">ذخیرهٔ طرح (JSON)</button>
@@ -2433,11 +2502,16 @@
             </div>
             <div class="row" id="verifyCodeRow" style="display: none">
               <label>کدِ سند</label>
-              <code id="verifyCode" class="verify-code" title="کدِ کوتاهِ این سند — روی PDF چاپ می‌شود">—</code>
+              <code
+                id="verifyCode"
+                class="verify-code"
+                title="کدِ کوتاهِ این سند — روی PDF چاپ می‌شود"
+                >—</code
+              >
             </div>
             <p class="tinyhint" id="verifyHint" style="display: none">
-              این کد از قالب و دادهٔ فعلی ساخته می‌شود و پای PDF چاپ می‌شود. برای سنجشِ اصالت،
-              قالب و داده و همین کد را به <code>verify.html</code> بده.
+              این کد از قالب و دادهٔ فعلی ساخته می‌شود و پای PDF چاپ می‌شود. برای سنجشِ اصالت، قالب
+              و داده و همین کد را به <code>verify.html</code> بده.
             </p>
           </div>
         </div>
@@ -2561,7 +2635,14 @@
           </div>
           <button id="closeCopilot" aria-label="بستن">✕</button>
         </div>
-        <div style="padding: var(--sp-7) var(--sp-7) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-5)">
+        <div
+          style="
+            padding: var(--sp-7) var(--sp-7) var(--sp-8);
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-5);
+          "
+        >
           <div class="row" data-tip="حالت کار کوپایلوت">
             <label>حالت</label>
             <select id="cpMode">
@@ -2615,7 +2696,10 @@
             <label>کلید API</label>
             <input id="cpKey" type="password" dir="ltr" placeholder="sk-ant-…" />
           </div>
-          <div id="cpStatus" style="font-size: var(--fs-xs); color: var(--muted); min-height: 16px"></div>
+          <div
+            id="cpStatus"
+            style="font-size: var(--fs-xs); color: var(--muted); min-height: 16px"
+          ></div>
           <div class="btnrow" style="margin: 0">
             <button id="cpRun" class="btn primary" style="flex: 1; height: var(--h-md)">
               <svg
@@ -2681,7 +2765,10 @@
           </div>
           <button id="closeCloneReview" aria-label="بستن">✕</button>
         </div>
-        <div id="cloneReviewBody" style="padding: var(--sp-7); display: flex; flex-direction: column; gap: var(--sp-5)"></div>
+        <div
+          id="cloneReviewBody"
+          style="padding: var(--sp-7); display: flex; flex-direction: column; gap: var(--sp-5)"
+        ></div>
       </div>
     </div>
 

@@ -23,6 +23,7 @@ import type { Rect } from '../model/units';
 import type { PdfTemplate } from '../model/template';
 import { NO_OP, type Command } from './command';
 import {
+  elementChildren,
   findElement,
   insertElement,
   patchPage,
@@ -192,9 +193,102 @@ export function moveElementsBy(ids: string[], dx: number, dy: number): Command {
   };
 }
 
-/** Set an element's z-order (bring-forward / send-to-back, etc.). */
+/** Set an element's z-order to an absolute value. */
 export function setElementZIndex(elementId: string, zIndex: number): Command {
   return patchElement(elementId, { zIndex });
+}
+
+/**
+ * Rename an element for the designer's layer list; does not affect rendering.
+ * Pass `undefined` to clear the name and fall back to the generated label.
+ */
+export function renameElement(elementId: string, name: string | undefined): Command {
+  return patchElement(elementId, { name });
+}
+
+/** Lock or unlock an element against editing (§8A); does not affect rendering. */
+export function setElementLocked(elementId: string, locked: boolean): Command {
+  return patchElement(elementId, { locked });
+}
+
+/** Where to move an element within its siblings' stacking order. */
+export type ZOrderMove = 'front' | 'back' | 'forward' | 'backward';
+
+/**
+ * Restack an element **relative to its siblings** — the elements sharing its
+ * immediate parent, since z-order is local to each band or container. Saves
+ * every caller from recomputing sibling min/max, and stays correct inside a
+ * group, where the surrounding band's z values are irrelevant.
+ *
+ * `front`/`back` jump past every sibling. `forward`/`backward` **swap** with the
+ * neighbour one step up/down, so repeated presses walk the stack without
+ * inflating z values or creating ties (a tie would leave paint order decided by
+ * document order, i.e. arbitrary from the author's point of view). Already being
+ * at the end of the stack is a no-op.
+ */
+export function moveElementZ(elementId: string, move: ZOrderMove): Command {
+  return {
+    type: 'moveElementZ',
+    apply: (state) => {
+      const plan = planZMove(state, elementId, move);
+      if (!plan) return state;
+      return Object.entries(plan).reduce(
+        (s, [id, zIndex]) => updateElement(s, id, (el) => asElement({ ...el, zIndex })),
+        state,
+      );
+    },
+    invert: (state) => {
+      const plan = planZMove(state, elementId, move);
+      if (!plan) return NO_OP;
+      return composite(
+        Object.keys(plan).map((id) =>
+          setElementZIndex(id, findElement(state, id)?.element.zIndex ?? 0),
+        ),
+      );
+    },
+  };
+}
+
+/**
+ * The `id → new zIndex` assignments `move` implies, or `undefined` when nothing
+ * should change. `forward`/`backward` touch two elements (the swap).
+ */
+function planZMove(
+  state: PdfTemplate,
+  elementId: string,
+  move: ZOrderMove,
+): Record<string, number> | undefined {
+  const loc = findElement(state, elementId);
+  if (!loc) return undefined;
+  const siblings = siblingsOf(state, loc).filter((el) => el.id !== elementId);
+  if (siblings.length === 0) return undefined;
+  const z = loc.element.zIndex;
+
+  if (move === 'front') {
+    const max = Math.max(...siblings.map((el) => el.zIndex));
+    return z > max ? undefined : { [elementId]: max + 1 };
+  }
+  if (move === 'back') {
+    const min = Math.min(...siblings.map((el) => el.zIndex));
+    return z < min ? undefined : { [elementId]: min - 1 };
+  }
+
+  const up = move === 'forward';
+  const beyond = siblings.filter((el) => (up ? el.zIndex > z : el.zIndex < z));
+  if (beyond.length === 0) return undefined;
+  const neighbour = beyond.reduce((closest, el) =>
+    (up ? el.zIndex < closest.zIndex : el.zIndex > closest.zIndex) ? el : closest,
+  );
+  return { [elementId]: neighbour.zIndex, [neighbour.id]: z };
+}
+
+/** Every element sharing `loc`'s immediate parent, including `loc` itself. */
+function siblingsOf(state: PdfTemplate, loc: ElementLocation): AnyElement[] {
+  if (loc.containerPath.length === 0) {
+    return state.bands[loc.bandIndex]?.elements ?? [];
+  }
+  const parent = findElement(state, loc.parentId);
+  return (parent && elementChildren(parent.element)) ?? [];
 }
 
 /**
