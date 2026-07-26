@@ -28,10 +28,7 @@ function dslString(value: string): string {
 }
 
 /** Return a copy of `template` with a verification stamp (QR + short code). */
-export function stampVerification(
-  template: PdfTemplate,
-  options: StampOptions = {},
-): PdfTemplate {
+export function stampVerification(template: PdfTemplate, options: StampOptions = {}): PdfTemplate {
   // StampOptions extends VerifyInput, so it carries data/parameters/now directly
   const { hash, short } = hashDocument(template, options);
   const payload = options.verifyUrl ? `${options.verifyUrl}?h=${hash}` : hash;

@@ -3,11 +3,7 @@
  * from *your* pdfjs (`getDocument(bytes).promise`) — core talks to it purely
  * structurally, so pdfjs stays out of the library's dependency tree.
  */
-export {
-  pdfContentToTemplate,
-  type PdfImportOptions,
-  type PdfImportResult,
-} from './convert';
+export { pdfContentToTemplate, type PdfImportOptions, type PdfImportResult } from './convert';
 export { extractPdfContent } from './extract';
 export {
   classifyPage,
@@ -21,11 +17,7 @@ export {
   type TextRole,
   type ValueKind,
 } from './classify';
-export {
-  classifyPageWithAi,
-  CLASSIFY_CONTRACT,
-  type AiClassifyOptions,
-} from './classify-ai';
+export { classifyPageWithAi, CLASSIFY_CONTRACT, type AiClassifyOptions } from './classify-ai';
 export {
   inferData,
   analyzeTable,
@@ -36,11 +28,7 @@ export {
   type InferredSchema,
   type AnalyzedTable,
 } from './infer';
-export {
-  cloneFormat,
-  type CloneFormatOptions,
-  type CloneFormatResult,
-} from './clone';
+export { cloneFormat, type CloneFormatOptions, type CloneFormatResult } from './clone';
 export type {
   ExtractedPage,
   ExtractedRect,

@@ -128,8 +128,14 @@ describe('F1.6 tamper-evidence', () => {
   // Every bound value that appears on the page must move the hash when changed.
   const mutations: Array<[string, typeof DATA]> = [
     ['header field', { ...DATA, invoice: { ...DATA.invoice, number: 'INV-1025' } }],
-    ['first row price', { ...DATA, items: [{ ...DATA.items[0]!, price: 42000001 }, DATA.items[1]!] }],
-    ['first row name', { ...DATA, items: [{ ...DATA.items[0]!, name: 'لپ‌تاپِ گیمینگ' }, DATA.items[1]!] }],
+    [
+      'first row price',
+      { ...DATA, items: [{ ...DATA.items[0]!, price: 42000001 }, DATA.items[1]!] },
+    ],
+    [
+      'first row name',
+      { ...DATA, items: [{ ...DATA.items[0]!, name: 'لپ‌تاپِ گیمینگ' }, DATA.items[1]!] },
+    ],
     ['row count', { ...DATA, items: [...DATA.items, { name: 'کیبورد', price: 1200000 }] }],
     ['row order', { ...DATA, items: [DATA.items[1]!, DATA.items[0]!] }],
   ];

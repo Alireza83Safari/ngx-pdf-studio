@@ -20,6 +20,7 @@
 **چرا تو:** determinism + serialization کانونیک + QR (ماژولِ barcode) را **همین‌الان** داری.
 
 ### MVP
+
 - [x] **۱.۱ — ماژولِ هش کانونیک** `core/src/verify/` ✅
   - `canonicalize(template, resolvedData, engineVersion) → string` (کلیدهای مرتب، نرمال‌سازیِ عدد/تاریخ). اگر `serialization/` کانونیکال‌سازی دارد، همان را بازاستفاده کن.
   - `hashDocument(...) → sha256 hex`. **مهم:** پیاده‌سازیِ هشِ **یکسان روی Node و مرورگر** (sha256 خالصِ JS یا لایهٔ نازک روی `crypto.subtle` با fallback) — چون تعیّن، کلِ داستان است.
@@ -55,6 +56,7 @@
 **چرا تو:** `pdf-import` (extract متن با transform/dir/font + rect + convert) و `copilot` (`CopilotProvider` + validate→repair) را داری.
 
 ### MVP
+
 - [x] **۲.۱ — هیوریستیکِ static-vs-dynamic (بدونِ AI، اول این)** ✅
   - در مسیرِ `pdfContentToTemplate`: تشخیصِ ردیف‌های **تکرارشونده** (جدول)، جفتِ **label:value** (برچسبِ ثابت + مقدارِ متغیرنما)، و تاریخ/عدد/ارز با regex → پیشنهادِ binding.
   - ارزان، آفلاین، هم‌راستا با اتوسِ «provider رایگان/لوکال».
@@ -68,7 +70,7 @@
   - **انجام‌شده:** `pdf-import/infer.ts` — `inferData(pages, classes) → { data, schema }`. مقدارِ نمونهٔ هر فیلد = **متنِ واقعیِ همان ران** (پیش‌نمایشِ وفادار)؛ `schema.fields` نوعِ `kind` را برای فرمت‌دهیِ بعدی نگه می‌دارد. جدول‌ها زیرِ کلیدِ آرایه (`items`، بعد `table_2`) با کلیدِ ستون از ردیفِ سرستون (یا `col1..`). helperهای `analyzeTable`/`tablePath` برای بازاستفادهٔ F2.4 صادر شدند. **باگِ تشخیصِ سرستون** (سلول‌های جدول هیچ‌وقت field نمی‌شوند) با تصمیم بر پایهٔ **شکلِ مقدارِ سلول** حل شد.
 - [x] **۲.۴ — auto-binding به المان‌ها** ✅
   - segmentها → `dataField`/`labeledField`/`table` بایندشده به pathهای استنتاج‌شده (از ساختِ المانِ موجود در `convert.ts` استفاده کن).
-  - **انجام‌شده:** `pdf-import/clone.ts` — `cloneFormat(pages, {classifier?, aiOptions?, name?, …})` و راحتیِ یک‌فراخوانیِ `cloneFormatDocument(doc, …)`. کلِ خط را می‌بندد: extract → classify (هیوریستیک یا AI) → infer → **bind**. هندسه را از `pdfContentToTemplate` بازاستفاده می‌کند، بعد رانهای **field** را به `dataField` (بایند به path)، منطقهٔ **جدول** را به یک المانِ `table`ِ بایندشده (ستون‌ها→`detail.content`، سرستون→`header`، dataset اعلام‌شده) و بقیه را `staticText` نگه می‌دارد. `inferredData` آینهٔ سند است. **۶ تستِ F2.4 + ۴ تستِ F2.3** (شاملِ **اعتبارسنجیِ schema** با `validateTemplate` و مسیرِ **بی‌کلید**). **۴۴۳ تستِ core سبز** + typecheck/lint تمیز. *(۲.۳ و ۲.۴ چون به‌شدت جفت‌اند در یک کامیت آمدند تا تاریخچه build‌شدنی بماند.)*
+  - **انجام‌شده:** `pdf-import/clone.ts` — `cloneFormat(pages, {classifier?, aiOptions?, name?, …})` و راحتیِ یک‌فراخوانیِ `cloneFormatDocument(doc, …)`. کلِ خط را می‌بندد: extract → classify (هیوریستیک یا AI) → infer → **bind**. هندسه را از `pdfContentToTemplate` بازاستفاده می‌کند، بعد رانهای **field** را به `dataField` (بایند به path)، منطقهٔ **جدول** را به یک المانِ `table`ِ بایندشده (ستون‌ها→`detail.content`، سرستون→`header`، dataset اعلام‌شده) و بقیه را `staticText` نگه می‌دارد. `inferredData` آینهٔ سند است. **۶ تستِ F2.4 + ۴ تستِ F2.3** (شاملِ **اعتبارسنجیِ schema** با `validateTemplate` و مسیرِ **بی‌کلید**). **۴۴۳ تستِ core سبز** + typecheck/lint تمیز. _(۲.۳ و ۲.۴ چون به‌شدت جفت‌اند در یک کامیت آمدند تا تاریخچه build‌شدنی بماند.)_
 - [x] **۲.۵ — UX دیزاینر: «کلونِ فرمت»** ✅
   - انداختنِ PDF → import+classify → لودِ قالب + `inferredData` → یک مرحلهٔ **مرورِ bindingها** (چیپ: چه متنی فیلد شد). از الگوی مُدالِ گالری/کوپایلوت استفاده کن.
   - **انجام‌شده:** دکمهٔ «کلونِ فرمت (از PDF)» در منویِ فایل + inputِ PDF. pdfjs (نسخهٔ ۳.۱۱، UMD → `window.pdfjsLib`) و workerش در `designer:build` از node_modules کنارِ صفحه کپی می‌شوند (گیت‌ایگنور، مثل engine). فلو: فایل → `pdfjsLib.getDocument` → `P.cloneFormatDocument` → ست‌کردنِ `sampleData` + `renderFieldPicker` + `loadTemplate` (آینهٔ لودِ گالری) → **مُدالِ مرور** با چیپِ فیلدها (path/kind/نمونه) و جدول‌ها (ستون‌ها·تعداد ردیف). مُدال از کلاسِ `gallery-backdrop` استفاده می‌کند پس a11y/focus-trapِ موجود خودکار پوششش می‌دهد. **smoke توسعه یافت** با pdfjsِ ساختگی → کلونِ یک فاکتور: مُدال باز شد، چیپِ `invoice_no`/`items`، نامِ سند، دادهٔ نمونه، و رندرِ مقدارِ بایندشده روی بوم — **سبز**.
@@ -83,6 +85,7 @@
 ---
 
 ## پیشرفت
+
 - F1 Verifiable: ۶/۶ ✅ (کامل)
 - F2 Format Cloner: ۶/۶ ✅ (کامل)
 - **کل: ۱۲/۱۲ 🎉 — هر دو فیچرِ پرچم‌دار کامل**

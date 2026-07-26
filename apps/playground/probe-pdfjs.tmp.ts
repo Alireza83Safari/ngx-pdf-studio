@@ -1,5 +1,8 @@
 /** Probe: what does pdfjs give us for a PDF rendered by our own engine? */
-import { renderToPdf, loadBundledVazirmatn } from '/home/alireza/workspace/my-project/ngx-pdf-studio/packages/pdf-studio/core/src/node';
+import {
+  renderToPdf,
+  loadBundledVazirmatn,
+} from '/home/alireza/workspace/my-project/ngx-pdf-studio/packages/pdf-studio/core/src/node';
 import type { PdfTemplate } from '/home/alireza/workspace/my-project/ngx-pdf-studio/packages/pdf-studio/core/src';
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.js';
 
@@ -29,7 +32,11 @@ const template: PdfTemplate = {
           bounds: { x: 50, y: 100, width: 200, height: 24 },
           zIndex: 1,
           text: 'فاکتور فروش',
-          typography: { fontFamily: 'Vazirmatn', fontSize: 20, color: { space: 'rgb', r: 37, g: 99, b: 235 } },
+          typography: {
+            fontFamily: 'Vazirmatn',
+            fontSize: 20,
+            color: { space: 'rgb', r: 37, g: 99, b: 235 },
+          },
         },
         {
           id: 'e2',
@@ -67,7 +74,12 @@ async function main() {
   const res = await renderToPdf(template, { data: {} }, { pdf: { fonts: font } });
   console.log('diagnostics:', res.diagnostics);
 
-  const doc = await getDocument({ data: res.bytes, useSystemFonts: false, isEvalSupported: false, useWorkerFetch: false }).promise;
+  const doc = await getDocument({
+    data: res.bytes,
+    useSystemFonts: false,
+    isEvalSupported: false,
+    useWorkerFetch: false,
+  }).promise;
   const page = await doc.getPage(1);
   const vp = page.getViewport({ scale: 1 });
   console.log('viewport:', vp.width, vp.height);
@@ -75,15 +87,17 @@ async function main() {
   const tc = await page.getTextContent();
   for (const item of tc.items as any[]) {
     if (!('str' in item)) continue;
-    console.log(JSON.stringify({
-      str: item.str,
-      dir: item.dir,
-      transform: item.transform,
-      width: item.width,
-      height: item.height,
-      fontName: item.fontName,
-      hasEOL: item.hasEOL,
-    }));
+    console.log(
+      JSON.stringify({
+        str: item.str,
+        dir: item.dir,
+        transform: item.transform,
+        width: item.width,
+        height: item.height,
+        fontName: item.fontName,
+        hasEOL: item.hasEOL,
+      }),
+    );
   }
   console.log('styles:', JSON.stringify(tc.styles));
 
@@ -91,13 +105,23 @@ async function main() {
   const opNames = Object.fromEntries(Object.entries(OPS).map(([k, v]) => [v, k]));
   for (let i = 0; i < opList.fnArray.length; i++) {
     const name = opNames[opList.fnArray[i]];
-    if (['beginText', 'endText', 'setFont', 'showText', 'setTextMatrix', 'dependency'].includes(name)) continue;
+    if (
+      ['beginText', 'endText', 'setFont', 'showText', 'setTextMatrix', 'dependency'].includes(name)
+    )
+      continue;
     let args = opList.argsArray[i];
     try {
-      args = JSON.parse(JSON.stringify(args, (_, v) => (ArrayBuffer.isView(v) ? Array.from(v as any) : v)));
-    } catch { /* keep raw */ }
+      args = JSON.parse(
+        JSON.stringify(args, (_, v) => (ArrayBuffer.isView(v) ? Array.from(v as any) : v)),
+      );
+    } catch {
+      /* keep raw */
+    }
     console.log(name, JSON.stringify(args)?.slice(0, 200));
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

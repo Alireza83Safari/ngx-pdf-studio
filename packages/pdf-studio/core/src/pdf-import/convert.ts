@@ -48,8 +48,7 @@ const LINE_HEIGHT = 1.2;
 const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
 const round = (v: number): number => Math.round(v * 100) / 100;
-const isBlack = (c: RgbColor | undefined): boolean =>
-  !c || (c.r === 0 && c.g === 0 && c.b === 0);
+const isBlack = (c: RgbColor | undefined): boolean => !c || (c.r === 0 && c.g === 0 && c.b === 0);
 
 /** Convert extracted pages into an editable template (one band per page). */
 export function pdfContentToTemplate(
@@ -89,7 +88,9 @@ export function pdfContentToTemplate(
         zIndex: 1,
         box: {
           ...(rect.fill ? { fill: { color: rect.fill } } : {}),
-          ...(rect.stroke ? { border: { all: { width: rect.lineWidth, color: rect.stroke } } } : {}),
+          ...(rect.stroke
+            ? { border: { all: { width: rect.lineWidth, color: rect.stroke } } }
+            : {}),
         },
       });
     }

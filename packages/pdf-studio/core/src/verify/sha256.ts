@@ -130,5 +130,7 @@ export function sha256Hex(message: string): string {
     h7 = (h7 + h) >>> 0;
   }
 
-  return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4) + toHex(h5) + toHex(h6) + toHex(h7);
+  return (
+    toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4) + toHex(h5) + toHex(h6) + toHex(h7)
+  );
 }

@@ -39,8 +39,7 @@ function withVerification(
   options: RenderOptions,
 ): PdfTemplate {
   if (!options.verify) return template;
-  const stampInput: StampOptions =
-    options.verify === true ? {} : { ...options.verify };
+  const stampInput: StampOptions = options.verify === true ? {} : { ...options.verify };
   // pull the hashed inputs from the render input (avoid assigning `undefined`
   // under exactOptionalPropertyTypes)
   if (input.data !== undefined) stampInput.data = input.data;

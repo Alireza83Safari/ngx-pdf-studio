@@ -79,7 +79,8 @@ function parseSegments(reply: string, count: number): AiSegment[] | null {
     if (typeof role !== 'string' || !ROLES.has(role)) continue;
     const item: AiSegment = { i, role: role as TextRole };
     if (typeof seg['fieldPath'] === 'string' && seg['fieldPath']) item.fieldPath = seg['fieldPath'];
-    if (typeof seg['kind'] === 'string' && KINDS.has(seg['kind'])) item.kind = seg['kind'] as ValueKind;
+    if (typeof seg['kind'] === 'string' && KINDS.has(seg['kind']))
+      item.kind = seg['kind'] as ValueKind;
     out.push(item);
   }
   return out;
