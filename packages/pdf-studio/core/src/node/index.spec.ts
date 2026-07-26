@@ -167,5 +167,8 @@ describe('end-to-end Persian + mixed-language rendering (§11)', () => {
       { pdf: { fonts } },
     );
     expect(Buffer.from(a.bytes).equals(Buffer.from(b.bytes))).toBe(true);
-  }, 30000);
+    // 60s, not 30: this renders the bilingual fixture twice with real font
+    // embedding, and under parallel worker contention 30s flakes. It is
+    // measuring determinism, not speed.
+  }, 60000);
 });

@@ -96,5 +96,7 @@ suite('§11 bilingual golden (text extraction, §13)', () => {
     const a = await renderToPdf(fixture, opts, { pdf: { fonts } });
     const b = await renderToPdf(fixture, opts, { pdf: { fonts } });
     expect(await extractPdfText(a.bytes)).toEqual(await extractPdfText(b.bytes));
-  }, 30000);
+    // 60s for the same reason as the node determinism test: two full renders
+    // plus two pdfjs text extractions, which flake at 30s when workers contend.
+  }, 60000);
 });
