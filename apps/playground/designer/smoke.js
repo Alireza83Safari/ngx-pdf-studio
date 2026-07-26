@@ -822,6 +822,27 @@ try {
     if (store.getState().bands[0].elements.length !== countBefore)
       fail('component insert is not one undo step each');
 
+    // --- visible undo history (§8A) ---
+    doc.getElementById('openHistory').dispatchEvent(clickEv());
+    const stepRows = () => Array.from(doc.querySelectorAll('#stepList .st-row'));
+    if (stepRows().length !== store.getHistory().length)
+      fail('step list does not match the store history: ' + stepRows().length);
+    // the type is mapped to Persian wording in the designer, not in core
+    if (/^[a-z]/i.test(stepRows()[0].querySelector('.st-name').textContent.trim()))
+      fail('step label was not translated: ' + stepRows()[0].textContent);
+    // newest first: the top row is labelled "الان"
+    if (!/الان/.test(stepRows()[0].textContent)) fail('newest step is not marked as current');
+
+    // jumping back to a step rewinds the document and shortens the list
+    const stepsBefore = store.getHistory().length;
+    const targetBtn = doc.querySelector('#stepList [data-step="' + (stepsBefore - 3) + '"]');
+    if (!targetBtn) fail('no step button to jump to');
+    targetBtn.dispatchEvent(clickEv());
+    if (store.getHistory().length !== stepsBefore - 2)
+      fail('undoTo did not rewind to the chosen step: ' + store.getHistory().length);
+    if (!store.canRedo()) fail('jumping back should leave the steps redoable');
+    doc.getElementById('closeHistory').dispatchEvent(clickEv());
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

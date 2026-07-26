@@ -143,14 +143,14 @@ at?, index?})` که idهای تازه می‌دهد تا یک جزء چندبا�
 
 ## 🟢 دستهٔ ۳ — آماده‌سازیِ آینده (نه بلاکر، ولی رویِ روادمپ سوار است)
 
-- [ ] **۳.۱ — متادیتای کامند برای Collaboration (Phase 5.2، Yjs روی command stream)**
+- [x] **۳.۱ — متادیتای کامند برای Collaboration (Phase 5.2، Yjs روی command stream)** ✅
       `Command` (`command.ts`) الان فقط `type`/`apply`/`invert`/`coalesceKey` دارد — هیچ `id`،
       `actor`، یا `timestamp` ندارد. برای همکاریِ چندنفره روی command stream (roadmap 5.2) لازم
       است کامندها قابلِ سریالایز/ارسال باشند و روی state ریموت هم apply شوند بدونِ آلوده‌کردنِ
       استکِ undo محلی. پیشنهاد: یک `dispatchRemote(command)` روی `DocumentStore` که state را
       آپدیت می‌کند ولی undo/redo محلی را دست نمی‌زند؛ فقط طراحیِ اینترفیس، نه پیاده‌سازیِ کاملِ Yjs.
 
-- [ ] **۳.۲ — تاریخچهٔ undo/redو با نمایشِ دیداری**
+- [x] **۳.۲ — تاریخچهٔ undo/redو با نمایشِ دیداری** ✅
       از TODO.md ریشه: «🟡 Undo/redo … ⬜ history دیداری». `DocumentStore` الان فقط دو استکِ
       فلت (`undoStack`/`redoStack`) دارد، بدونِ لیبل/timestamp قابلِ‌نمایش. یک
       `getHistory(): { label: string; timestamp: number }[]` (بر پایهِ `command.type` + زمانِ

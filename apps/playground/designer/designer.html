@@ -2801,12 +2801,20 @@
       >
         <div class="gallery-head">
           <div>
-            <strong id="historyTitle">تاریخچهٔ نسخه‌ها</strong>
-            <p>ذخیره‌های خودکار اخیر — روی «بازگردانی» بزن تا برگردی</p>
+            <strong id="historyTitle">تاریخچه</strong>
+            <p>گام‌های این نشست، و ذخیره‌های خودکارِ اخیر</p>
           </div>
           <button id="closeHistory" aria-label="بستن">✕</button>
         </div>
-        <div id="historyList" class="gallery-cards" style="grid-template-columns: 1fr"></div>
+        <div class="sec">
+          <div class="sec-title">گام‌های این نشست</div>
+          <div id="stepList"></div>
+          <div class="hint">روی هر گام بزن تا سند به همان لحظه برگردد (با Ctrl+Y جلو می‌رود).</div>
+        </div>
+        <div class="sec">
+          <div class="sec-title">نسخه‌های ذخیره‌شده</div>
+          <div id="historyList" class="gallery-cards" style="grid-template-columns: 1fr"></div>
+        </div>
       </div>
     </div>
 

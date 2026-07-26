@@ -3913,8 +3913,69 @@
       })
       .join('');
   }
+  // Undo steps of the current session (distinct from the saved snapshots above).
+  // The engine reports each step's command `type`; the Persian wording lives here
+  // because `core` stays language-neutral.
+  var STEP_LABELS = {
+    addElement: 'افزودن الِمان',
+    removeElement: 'حذف الِمان',
+    patchElement: 'تغییر خواص',
+    replaceElement: 'جایگزینی الِمان',
+    modifyElement: 'ویرایش الِمان',
+    setElementBounds: 'جابه‌جایی/اندازه',
+    setElementsBounds: 'جابه‌جایی گروهی',
+    moveElementsBy: 'جابه‌جایی با کیبورد',
+    moveElementZ: 'تغییر ترتیب',
+    renameElement: 'تغییر نامِ الِمان',
+    setStaticText: 'ویرایش متن',
+    groupElements: 'گروه‌بندی',
+    ungroupContainer: 'باز کردنِ گروه',
+    patchBand: 'تنظیمات باند',
+    addBand: 'افزودن باند',
+    removeBand: 'حذف باند',
+    moveBand: 'جابه‌جایی باند',
+    patchPage: 'تنظیمات صفحه',
+    patchMetadata: 'تغییر نامِ سند',
+    ensureStyles: 'افزودن سبک',
+    ensureDataset: 'اعلانِ دیتاست',
+    addStyle: 'افزودن سبک',
+    updateStyle: 'ویرایش سبک',
+    duplicateStyle: 'تکثیر سبک',
+    removeStyle: 'حذف سبک',
+    replaceTemplate: 'جایگزینی سند',
+    composite: 'چند تغییر با هم',
+  };
+  function renderStepList() {
+    var listEl = document.getElementById('stepList');
+    if (!listEl) return;
+    var steps = store.getHistory();
+    if (!steps.length) {
+      listEl.innerHTML = '<div class="layers-empty">هنوز تغییری در این نشست ندادی.</div>';
+      return;
+    }
+    // newest first reads better, but the engine indexes oldest-first
+    listEl.innerHTML = steps
+      .slice()
+      .reverse()
+      .map(function (step, revIndex) {
+        var index = steps.length - 1 - revIndex;
+        return (
+          '<div class="st-row"><span class="st-name">' +
+          esc(STEP_LABELS[step.type] || step.type) +
+          '</span><span class="st-meta">' +
+          (revIndex === 0 ? 'الان' : index + 1) +
+          '</span>' +
+          '<button class="st-act" data-step="' +
+          index +
+          '" title="برگرد به وضعیتِ بعد از این گام">برگرد</button></div>'
+        );
+      })
+      .join('');
+    upgradeTooltips(listEl);
+  }
   document.getElementById('openHistory').addEventListener('click', function () {
     renderHistory();
+    renderStepList();
     historyEl.classList.add('show');
   });
   document.getElementById('closeHistory').addEventListener('click', function () {
@@ -3922,6 +3983,14 @@
   });
   historyEl.addEventListener('click', function (e) {
     if (e.target === historyEl) return historyEl.classList.remove('show');
+    var stepBtn = e.target.closest ? e.target.closest('[data-step]') : null;
+    if (stepBtn) {
+      store.undoTo(Number(stepBtn.dataset.step));
+      selected = [];
+      renderInspector();
+      renderStepList();
+      return;
+    }
     var btn = e.target.closest ? e.target.closest('[data-hist]') : null;
     if (!btn) return;
     var entry = readHistory()[Number(btn.dataset.hist)];
