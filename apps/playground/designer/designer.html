@@ -1165,6 +1165,59 @@
         background: var(--surface);
         color: var(--ink);
       }
+      /* style-library + saved-component rows: name · meta · quiet actions */
+      .st-row {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        padding: var(--sp-2) var(--sp-3);
+        border-radius: var(--r-md);
+        border: 1px solid transparent;
+      }
+      .st-row:hover {
+        background: var(--field);
+      }
+      .st-row .st-name {
+        flex: 1;
+        min-width: 0;
+        font-size: var(--fs-xs);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .st-row .st-meta {
+        font-size: var(--fs-2xs);
+        color: var(--faint);
+        flex: none;
+      }
+      .st-row .st-act {
+        flex: none;
+        padding: 1px var(--sp-2);
+        font-size: var(--fs-2xs);
+        font-family: inherit;
+        border: 1px solid var(--border);
+        border-radius: var(--r-sm);
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        opacity: 0;
+        transition:
+          opacity var(--dur-fast),
+          color var(--dur-fast),
+          border-color var(--dur-fast);
+      }
+      .st-row:hover .st-act,
+      .st-row .st-act:focus-visible {
+        opacity: 1;
+      }
+      .st-row .st-act:hover {
+        color: var(--ink);
+        border-color: var(--border-strong);
+      }
+      .st-row .st-act.danger:hover {
+        color: var(--danger);
+        border-color: currentColor;
+      }
       /* checkbox + label on one line, for boolean inspector fields */
       .chk {
         display: flex;
@@ -2518,6 +2571,23 @@
 
         <div class="tabpane" data-pane="layers">
           <div id="layers"></div>
+          <div class="sec">
+            <div class="sec-title">سبک‌های نامدار</div>
+            <div id="styleList"></div>
+            <div class="hint">
+              سبک را یک‌جا ویرایش کن، همهٔ الِمان‌هایی که به آن وصل‌اند به‌روز می‌شوند. حذفِ سبک،
+              ارجاع‌های آن را هم پاک می‌کند (یک واگرد).
+            </div>
+          </div>
+          <div class="sec">
+            <div class="sec-title">اجزای ذخیره‌شده</div>
+            <div id="snippetList"></div>
+            <button id="saveSnippet" class="btn" type="button">ذخیرهٔ انتخاب به‌عنوان جزء</button>
+            <div class="hint">
+              انتخاب را به‌عنوان یک جزءِ قابل‌استفادهٔ مجدد ذخیره کن — با سبک‌های خودش — و در هر
+              سندی دوباره درجش کن.
+            </div>
+          </div>
         </div>
 
         <div class="tabpane" data-pane="data">

@@ -14,7 +14,7 @@
  */
 import type { Band } from '../model/band';
 import type { ElementBase } from '../model/element-base';
-import type { AnyElement, ContainerElement } from '../model/elements';
+import type { AnyElement, ContainerElement, TableCell } from '../model/elements';
 import type { DatasetDef } from '../model/dataset';
 import type { TemplateMetadata } from '../model/metadata';
 import type { PageSetup } from '../model/page';
@@ -23,11 +23,15 @@ import type { Rect } from '../model/units';
 import type { PdfTemplate } from '../model/template';
 import { NO_OP, type Command } from './command';
 import {
+  boundingBox,
   elementChildren,
   findElement,
   insertElement,
+  mapElements,
   patchPage,
   removeElement,
+  resolveSiblings,
+  translateElement,
   updateElement,
   type ElementLocation,
 } from './template-ops';
@@ -200,10 +204,26 @@ export function setElementZIndex(elementId: string, zIndex: number): Command {
 
 /**
  * Rename an element for the designer's layer list; does not affect rendering.
- * Pass `undefined` to clear the name and fall back to the generated label.
+ * Pass `undefined` to clear the name and fall back to the generated label —
+ * which **removes** the property rather than setting it to `undefined`, so the
+ * serialized template stays clean.
  */
 export function renameElement(elementId: string, name: string | undefined): Command {
-  return patchElement(elementId, { name });
+  return {
+    type: 'renameElement',
+    apply: (state) =>
+      updateElement(state, elementId, (el) => {
+        if (name !== undefined) return asElement({ ...el, name });
+        const cleared: Record<string, unknown> = { ...el };
+        delete cleared['name'];
+        return cleared as unknown as AnyElement;
+      }),
+    invert: (state) => {
+      const loc = findElement(state, elementId);
+      if (!loc) return NO_OP;
+      return renameElement(elementId, loc.element.name);
+    },
+  };
 }
 
 /** Lock or unlock an element against editing (§8A); does not affect rendering. */
@@ -344,7 +364,7 @@ export function groupElements(elementIds: string[], containerId: string): Comman
         type: 'container',
         bounds: box,
         zIndex: Math.max(...members.map((m) => m.element.zIndex)),
-        children: members.map((m) => rebase(m.element, -box.x, -box.y)),
+        children: members.map((m) => translateElement(m.element, -box.x, -box.y)),
       };
       const without = members.reduce((s, m) => removeElement(s, m.element.id), state);
       return insertElement(without, parentId, container, index);
@@ -368,7 +388,12 @@ export function ungroupContainer(containerId: string): Command {
       const without = removeElement(state, containerId);
       return children.reduce(
         (s, child, offset) =>
-          insertElement(s, loc.parentId, rebase(child, bounds.x, bounds.y), loc.index + offset),
+          insertElement(
+            s,
+            loc.parentId,
+            translateElement(child, bounds.x, bounds.y),
+            loc.index + offset,
+          ),
         without,
       );
     },
@@ -381,37 +406,6 @@ export function ungroupContainer(containerId: string): Command {
       );
     },
   };
-}
-
-/** Shift an element (and any subtree it owns rides along) by a delta. */
-function rebase(element: AnyElement, dx: number, dy: number): AnyElement {
-  return asElement({
-    ...element,
-    bounds: { ...element.bounds, x: element.bounds.x + dx, y: element.bounds.y + dy },
-  });
-}
-
-/** The smallest rect covering every input rect. */
-function boundingBox(rects: Rect[]): Rect {
-  const x = Math.min(...rects.map((r) => r.x));
-  const y = Math.min(...rects.map((r) => r.y));
-  const right = Math.max(...rects.map((r) => r.x + r.width));
-  const bottom = Math.max(...rects.map((r) => r.y + r.height));
-  return { x, y, width: right - x, height: bottom - y };
-}
-
-/**
- * Locate the requested elements, keep only those sharing the **first** one's
- * parent, and return them in document order — grouping across two different
- * parents has no meaning, since bounds are relative to different origins.
- */
-function resolveSiblings(state: PdfTemplate, elementIds: string[]): ElementLocation[] {
-  const found = elementIds
-    .map((id) => findElement(state, id))
-    .filter((loc): loc is ElementLocation => loc !== undefined);
-  const first = found[0];
-  if (!first) return [];
-  return found.filter((loc) => loc.parentId === first.parentId).sort((a, b) => a.index - b.index);
 }
 
 /** Patch the page setup (size, margins, orientation, direction, …). */
@@ -588,6 +582,132 @@ export function ensureDataset(name: string, source?: DatasetDef['source']): Comm
       };
     },
   };
+}
+
+/** Add a named style to the library. */
+export function addStyle(style: NamedStyle): Command {
+  return {
+    type: 'addStyle',
+    apply: (state) =>
+      state.styles.some((s) => s.id === style.id)
+        ? state
+        : { ...state, styles: [...state.styles, style] },
+    invert: (state) =>
+      state.styles.some((s) => s.id === style.id) ? NO_OP : removeStyle(style.id),
+  };
+}
+
+/**
+ * Patch a named style. Every element referencing it re-renders with the new
+ * values — that is the point of a style library (§8A-B): edit once, update
+ * everywhere.
+ */
+export function updateStyle(styleId: string, patch: Partial<NamedStyle>): Command {
+  return {
+    type: 'updateStyle',
+    apply: (state) => {
+      const index = state.styles.findIndex((s) => s.id === styleId);
+      const style = state.styles[index];
+      if (!style) return state;
+      const styles = state.styles.slice();
+      styles[index] = { ...style, ...patch };
+      return { ...state, styles };
+    },
+    invert: (state) => {
+      const style = state.styles.find((s) => s.id === styleId);
+      if (!style) return NO_OP;
+      const previous = captureKeys(style as unknown as Record<string, unknown>, Object.keys(patch));
+      return updateStyle(styleId, previous as Partial<NamedStyle>);
+    },
+  };
+}
+
+/**
+ * Copy a style under a new id — the usual way to start a variant without
+ * disturbing the elements already using the original.
+ */
+export function duplicateStyle(styleId: string, newId: string, name?: string): Command {
+  return {
+    type: 'duplicateStyle',
+    apply: (state) => {
+      const style = state.styles.find((s) => s.id === styleId);
+      if (!style || state.styles.some((s) => s.id === newId)) return state;
+      return {
+        ...state,
+        styles: [...state.styles, { ...style, id: newId, ...(name ? { name } : {}) }],
+      };
+    },
+    invert: (state) => {
+      const exists = state.styles.some((s) => s.id === styleId);
+      return exists && !state.styles.some((s) => s.id === newId) ? removeStyle(newId) : NO_OP;
+    },
+  };
+}
+
+/**
+ * Delete a named style **and drop every reference to it** — element `styleId`s,
+ * table cell styles, and a table's row-stripe style. Leaving them dangling would
+ * silently restyle those elements (style lookup just misses, with no
+ * diagnostic), so the cleanup is part of the same step.
+ *
+ * The inverse restores the previous template wholesale rather than replaying N
+ * per-element patches: one reference is cheaper than reconstructing the sweep,
+ * and it is exactly correct.
+ */
+export function removeStyle(styleId: string): Command {
+  return {
+    type: 'removeStyle',
+    apply: (state) => {
+      if (!state.styles.some((s) => s.id === styleId)) return state;
+      const withoutRefs = mapElements(state, (el) => dropStyleRef(el, styleId));
+      return { ...withoutRefs, styles: withoutRefs.styles.filter((s) => s.id !== styleId) };
+    },
+    invert: (state) =>
+      state.styles.some((s) => s.id === styleId) ? replaceTemplate(state) : NO_OP,
+  };
+}
+
+/**
+ * Strip references to `styleId` from an element (including table cells).
+ *
+ * Built on a plain record copy: `Omit` over the `AnyElement` union collapses the
+ * discriminant, and properties are **deleted** rather than set to `undefined` so
+ * the serialized template stays clean. Returns the input untouched when it holds
+ * no reference, which keeps `mapElements`' structural sharing intact.
+ */
+function dropStyleRef(element: AnyElement, styleId: string): AnyElement {
+  const table = element.type === 'table' ? element : undefined;
+  const next: Record<string, unknown> = { ...element };
+  let changed = false;
+
+  if (element.styleId === styleId) {
+    delete next['styleId'];
+    changed = true;
+  }
+  if (table) {
+    if (table.rowStripeStyleId === styleId) {
+      delete next['rowStripeStyleId'];
+      changed = true;
+    }
+    const columns = table.columns.map((column) => {
+      const stale = (['header', 'footer', 'detail'] as const).filter(
+        (slot) => column[slot]?.styleId === styleId,
+      );
+      if (stale.length === 0) return column;
+      const patched = { ...column };
+      for (const slot of stale) {
+        const cell: Record<string, unknown> = { ...(patched[slot] as TableCell) };
+        delete cell['styleId'];
+        patched[slot] = cell as TableCell;
+      }
+      return patched;
+    });
+    if (columns.some((column, i) => column !== table.columns[i])) {
+      next['columns'] = columns;
+      changed = true;
+    }
+  }
+  return changed ? (next as unknown as AnyElement) : element;
 }
 
 /**

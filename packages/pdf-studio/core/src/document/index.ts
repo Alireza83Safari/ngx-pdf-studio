@@ -35,14 +35,24 @@ export {
   ensureStyles,
   ensureDataset,
   replaceTemplate,
+  // style library
+  addStyle,
+  updateStyle,
+  duplicateStyle,
+  removeStyle,
 } from './commands';
+export { createSnippet, insertSnippet, type Snippet } from './snippet';
 export {
   findElement,
   updateElement,
   insertElement,
   removeElement,
+  mapElements,
   patchPage,
   elementChildren,
+  boundingBox,
+  resolveSiblings,
+  translateElement,
   type ElementLocation,
 } from './template-ops';
 export { DocumentStore, type StoreListener } from './document-store';

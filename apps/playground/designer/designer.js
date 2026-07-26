@@ -1140,6 +1140,250 @@
       .join('');
     upgradeTooltips(layersEl);
   }
+
+  // --- style library (§8A-B) -------------------------------------------------
+  // Named styles are the "edit once, update everywhere" mechanism. The engine
+  // owns the commands; this panel just lists them and dispatches.
+  var styleListEl = document.getElementById('styleList');
+  /** How many elements (incl. table cells) point at a style — the "usage" count. */
+  function styleUsage(t, styleId) {
+    var n = 0;
+    var visit = function (el) {
+      if (el.styleId === styleId) n++;
+      if (el.type === 'table') {
+        if (el.rowStripeStyleId === styleId) n++;
+        (el.columns || []).forEach(function (col) {
+          ['header', 'footer', 'detail'].forEach(function (slot) {
+            if (col[slot] && col[slot].styleId === styleId) n++;
+          });
+        });
+      }
+      (P.elementChildren(el) || []).forEach(visit);
+    };
+    t.bands.forEach(function (band) {
+      band.elements.forEach(visit);
+    });
+    return n;
+  }
+  function renderStyleList() {
+    if (!styleListEl) return;
+    var t = store.getState();
+    var styles = t.styles || [];
+    if (!styles.length) {
+      styleListEl.innerHTML =
+        '<div class="layers-empty">هنوز سبکِ نامداری نداری.<br>' +
+        'یک جدول اضافه کن یا از الِمان انتخاب‌شده سبک بساز.</div>';
+      return;
+    }
+    styleListEl.innerHTML = styles
+      .map(function (s) {
+        var used = styleUsage(t, s.id);
+        var size = (s.typography && s.typography.fontSize) || '';
+        return (
+          '<div class="st-row" data-style="' +
+          esc(s.id) +
+          '"><span class="st-name" data-style-rename="' +
+          esc(s.id) +
+          '" title="دابل‌کلیک برای تغییر نام">' +
+          esc(s.name || s.id) +
+          '</span>' +
+          '<span class="st-meta">' +
+          (size ? size + 'pt · ' : '') +
+          used +
+          ' کاربرد</span>' +
+          '<button class="st-act" data-style-apply="' +
+          esc(s.id) +
+          '" title="اعمال بر انتخاب">اعمال</button>' +
+          '<button class="st-act" data-style-dup="' +
+          esc(s.id) +
+          '" title="ساختن یک نسخهٔ جدید از این سبک">تکثیر</button>' +
+          '<button class="st-act danger" data-style-del="' +
+          esc(s.id) +
+          '" title="حذفِ سبک و پاک کردنِ ارجاع‌هایش">حذف</button></div>'
+        );
+      })
+      .join('');
+    upgradeTooltips(styleListEl);
+  }
+  if (styleListEl)
+    styleListEl.addEventListener('click', function (e) {
+      var target = e.target.closest ? e.target : null;
+      if (!target) return;
+      var applyId = target.dataset.styleApply;
+      if (applyId) {
+        var ids = selected.slice();
+        if (!ids.length) return toast('اول یک الِمان انتخاب کن');
+        store.dispatch(
+          P.composite(
+            ids.map(function (id) {
+              return P.patchElement(id, { styleId: applyId });
+            }),
+          ),
+        );
+        return toast('سبک اعمال شد', { type: 'success' });
+      }
+      var dupId = target.dataset.styleDup;
+      if (dupId) {
+        var src = (store.getState().styles || []).filter(function (s) {
+          return s.id === dupId;
+        })[0];
+        var newId = dupId + '-' + uid++;
+        store.dispatch(
+          P.duplicateStyle(dupId, newId, (src && src.name ? src.name : dupId) + ' (کپی)'),
+        );
+        return;
+      }
+      var delId = target.dataset.styleDel;
+      if (delId) {
+        var n = styleUsage(store.getState(), delId);
+        store.dispatch(P.removeStyle(delId));
+        toast(n ? 'سبک حذف شد — ' + n + ' ارجاع پاک شد' : 'سبک حذف شد', {
+          action: {
+            label: 'واگرد',
+            onClick: function () {
+              store.undo();
+            },
+          },
+        });
+      }
+    });
+  if (styleListEl)
+    styleListEl.addEventListener('dblclick', function (e) {
+      var nameEl = e.target.closest ? e.target.closest('[data-style-rename]') : null;
+      if (!nameEl) return;
+      var id = nameEl.dataset.styleRename;
+      var current = (store.getState().styles || []).filter(function (s) {
+        return s.id === id;
+      })[0];
+      if (!current) return;
+      var input = document.createElement('input');
+      input.className = 'l-rename';
+      input.value = current.name || id;
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+      var done = false;
+      var commit = function (save) {
+        if (done) return;
+        done = true;
+        var v = input.value.trim();
+        if (save && v && v !== current.name) store.dispatch(P.updateStyle(id, { name: v }));
+        else renderStyleList();
+      };
+      input.addEventListener('keydown', function (ev) {
+        ev.stopPropagation();
+        if (ev.key === 'Enter') commit(true);
+        if (ev.key === 'Escape') commit(false);
+      });
+      input.addEventListener('blur', function () {
+        commit(true);
+      });
+    });
+
+  // --- saved components / snippets (§8A-B) -----------------------------------
+  // Snippets are a *library* artifact, not part of the template, so they live in
+  // localStorage; the engine only captures and inserts them.
+  var SNIPPET_KEY = 'pdfstudio.snippets.v1';
+  var snippetListEl = document.getElementById('snippetList');
+  function loadSnippets() {
+    try {
+      var raw = localStorage.getItem(SNIPPET_KEY);
+      var parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function saveSnippets(list) {
+    try {
+      localStorage.setItem(SNIPPET_KEY, JSON.stringify(list));
+    } catch (e) {
+      toast('ذخیرهٔ جزء ممکن نشد (فضای مرورگر پر است)', { type: 'error' });
+    }
+  }
+  function renderSnippetList() {
+    if (!snippetListEl) return;
+    var list = loadSnippets();
+    if (!list.length) {
+      snippetListEl.innerHTML =
+        '<div class="layers-empty">هنوز جزئی ذخیره نکردی.<br>' +
+        'چند الِمان را انتخاب کن و «ذخیرهٔ انتخاب» را بزن.</div>';
+      return;
+    }
+    snippetListEl.innerHTML = list
+      .map(function (s) {
+        return (
+          '<div class="st-row"><span class="st-name">' +
+          esc(s.name || s.id) +
+          '</span><span class="st-meta">' +
+          Math.round(s.width) +
+          '×' +
+          Math.round(s.height) +
+          'pt</span>' +
+          '<button class="st-act" data-snip-insert="' +
+          esc(s.id) +
+          '" title="درج در باندِ فعال">درج</button>' +
+          '<button class="st-act danger" data-snip-del="' +
+          esc(s.id) +
+          '" title="حذف از کتابخانه">حذف</button></div>'
+        );
+      })
+      .join('');
+    upgradeTooltips(snippetListEl);
+  }
+  var saveSnippetBtn = document.getElementById('saveSnippet');
+  if (saveSnippetBtn)
+    saveSnippetBtn.addEventListener('click', function () {
+      if (!selected.length) return toast('اول الِمان‌هایی را انتخاب کن');
+      var name = prompt('نامِ این جزء؟', 'جزء ' + (loadSnippets().length + 1));
+      if (name === null) return;
+      var snippet = P.createSnippet(store.getState(), selected.slice(), {
+        id: 'snip-' + Date.now(),
+        name: (name || '').trim() || 'جزء بی‌نام',
+      });
+      if (!snippet) return toast('چیزی برای ذخیره پیدا نشد', { type: 'error' });
+      saveSnippets(loadSnippets().concat([snippet]));
+      renderSnippetList();
+      toast('جزء ذخیره شد', { type: 'success' });
+    });
+  if (snippetListEl)
+    snippetListEl.addEventListener('click', function (e) {
+      var target = e.target;
+      var insertId = target.dataset && target.dataset.snipInsert;
+      if (insertId) {
+        var snippet = loadSnippets().filter(function (s) {
+          return s.id === insertId;
+        })[0];
+        if (!snippet) return;
+        // drop it into the first free spot so it never lands on existing content
+        var spot = nextSpot(snippet.width, snippet.height);
+        var prefix = 'el-' + uid;
+        uid += countSnippetElements(snippet) + 1;
+        store.dispatch(P.insertSnippet(curBandId(), snippet, { idPrefix: prefix, at: spot }));
+        toast('جزء درج شد', { type: 'success' });
+        return;
+      }
+      var delId = target.dataset && target.dataset.snipDel;
+      if (delId) {
+        saveSnippets(
+          loadSnippets().filter(function (s) {
+            return s.id !== delId;
+          }),
+        );
+        renderSnippetList();
+      }
+    });
+  /** Total elements in a snippet, subtree included — reserves that many ids. */
+  function countSnippetElements(snippet) {
+    var n = 0;
+    var visit = function (el) {
+      n++;
+      (P.elementChildren(el) || []).forEach(visit);
+    };
+    (snippet.elements || []).forEach(visit);
+    return n;
+  }
+
   // shared selection used by layer rows + canvas elements (mouse and keyboard)
   function selectById(id, additive) {
     if (additive) {
@@ -4096,6 +4340,7 @@
     }
     renderCanvas();
     renderLayers();
+    renderStyleList();
     renderStatus();
     renderPreview();
     updateVerifyUi();
@@ -4189,6 +4434,7 @@
   installModalA11y();
   upgradeTooltips(document);
   renderFieldPicker();
+  renderSnippetList(); // library-backed, so it does not ride the store's rerender
   if (!tryLoadFromHash() && !restoreDraft()) {
     rerender();
     renderInspector();

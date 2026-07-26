@@ -754,6 +754,74 @@ try {
     if (P.findElement(store.getState(), 'sm-1').element.bounds.y !== 10)
       fail('undo left the child in container-local coordinates');
 
+    // --- style library + saved components (§8A-B) ---
+    // The cloned document carries no named styles, so make some the way a user
+    // would: adding a table atomically declares its cell/header styles.
+    const styleRows = () => Array.from(doc.querySelectorAll('#styleList .st-row'));
+    if (styleRows().length) fail('expected no named styles before adding a table');
+    doc.querySelector('[data-add="table"]').dispatchEvent(clickEv());
+    if (styleRows().length < 2)
+      fail('adding a table did not surface its styles: ' + styleRows().length);
+    const firstStyleId = styleRows()[0].dataset.style;
+    const styleById = (id) => (store.getState().styles || []).filter((s) => s.id === id)[0];
+
+    // apply a style to the selection
+    layerFor('sm-1').dispatchEvent(clickEv());
+    doc.querySelector('[data-style-apply="' + firstStyleId + '"]').dispatchEvent(clickEv());
+    if (P.findElement(store.getState(), 'sm-1').element.styleId !== firstStyleId)
+      fail('apply-style did not set styleId');
+
+    // rename a style inline; the row and the model both follow
+    const nameSpan = doc.querySelector('[data-style-rename="' + firstStyleId + '"]');
+    nameSpan.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+    const styleInput = doc.querySelector('#styleList .l-rename');
+    if (!styleInput) fail('style rename input did not appear');
+    styleInput.value = 'سبکِ تازه';
+    styleInput.dispatchEvent(new window.Event('blur', { bubbles: true }));
+    if (styleById(firstStyleId).name !== 'سبکِ تازه')
+      fail('style rename did not apply: ' + styleById(firstStyleId).name);
+
+    // duplicate → one more style, same typography
+    const beforeDup = (store.getState().styles || []).length;
+    doc.querySelector('[data-style-dup="' + firstStyleId + '"]').dispatchEvent(clickEv());
+    if ((store.getState().styles || []).length !== beforeDup + 1)
+      fail('duplicate-style did not add a style');
+    store.undo();
+
+    // delete → the style goes and the reference we just applied is cleared
+    doc.querySelector('[data-style-del="' + firstStyleId + '"]').dispatchEvent(clickEv());
+    if (styleById(firstStyleId)) fail('delete-style left the style behind');
+    if (P.findElement(store.getState(), 'sm-1').element.styleId)
+      fail('delete-style left a dangling styleId reference');
+    store.undo();
+    if (!styleById(firstStyleId)) fail('undo did not restore the deleted style');
+    if (P.findElement(store.getState(), 'sm-1').element.styleId !== firstStyleId)
+      fail('undo did not restore the cleared style reference');
+
+    // save the selection as a component, then insert it back
+    layerFor('sm-1').dispatchEvent(clickEv());
+    layerFor('sm-2').dispatchEvent(
+      new window.MouseEvent('click', { bubbles: true, shiftKey: true }),
+    );
+    window.prompt = () => 'سربرگِ من';
+    doc.getElementById('saveSnippet').dispatchEvent(clickEv());
+    const snipRows = () => Array.from(doc.querySelectorAll('#snippetList .st-row'));
+    if (snipRows().length !== 1) fail('saved component was not listed: ' + snipRows().length);
+    if (!/سربرگِ من/.test(snipRows()[0].textContent)) fail('component row missing its name');
+
+    const countBefore = store.getState().bands[0].elements.length;
+    doc.querySelector('[data-snip-insert]').dispatchEvent(clickEv());
+    if (store.getState().bands[0].elements.length !== countBefore + 2)
+      fail('inserting the component did not add its 2 elements');
+    // inserting twice must not collide on ids
+    doc.querySelector('[data-snip-insert]').dispatchEvent(clickEv());
+    const allIds = store.getState().bands[0].elements.map((e) => e.id);
+    if (new Set(allIds).size !== allIds.length) fail('component insert produced duplicate ids');
+    store.undo();
+    store.undo();
+    if (store.getState().bands[0].elements.length !== countBefore)
+      fail('component insert is not one undo step each');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

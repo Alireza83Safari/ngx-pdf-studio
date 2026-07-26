@@ -110,7 +110,7 @@ command model» نه — نصفِ واژگان واقعی بیرون از core �
     ترتیبِ آرایه = دلخواه از دیدِ کاربر) و عدد را متورم می‌کرد. دکمه‌های «یک پله بالا/پایین»
     در اینسپکتور.
 
-- [ ] **۲.۴ — سیستمِ استایل/تمِ قابلِ‌استفادهٔ مجدد در core**
+- [x] **۲.۴ — سیستمِ استایل/تمِ قابلِ‌استفادهٔ مجدد در core** ✅
       `ensureStylesCmd` فعلی (بعد از کوچ در ۱.۲) فقط «اضافه‌کن اگر نیست» است. برای پاریتی با
       Canva/Figma style-library لازم است:
   - `updateStyle(styleId, patch)` / `removeStyle(styleId)` / `duplicateStyle(styleId, newId)`
@@ -119,6 +119,17 @@ command model» نه — نصفِ واژگان واقعی بیرون از core �
     document theme presets») — یک ساختارِ داده برای «این زیرشاخه از عناصر را به‌عنوانِ کامپوننتِ
     قابلِ‌استفادهٔ مجدد ذخیره کن» + کامندِ `insertSnippet(bandId, snippet, at?)`. می‌تواند روی
     `groupElements` (۱.۳) سوار شود: هر گروه = کاندیدِ snippet.
+  - **انجام‌شده:** `addStyle`/`updateStyle`/`duplicateStyle`/`removeStyle`. نکتهٔ مهم:
+    `removeStyle` علاوه بر خودِ سبک، **همهٔ ارجاع‌ها** را هم پاک می‌کند (`styleId` عناصر در هر
+    عمق، سبکِ سلول‌های جدول، و `rowStripeStyleId`) چون lookupِ سبکِ گمشده بی‌صدا به پیش‌فرض
+    برمی‌گردد و هیچ diagnostic نمی‌دهد؛ inverse آن کلِ قالبِ قبلی را برمی‌گرداند (یک ارجاع،
+    دقیقاً درست). `mapElements` به template-ops اضافه شد برای همین جاروی کلِ درخت.
+  - **Snippets:** `document/snippet.ts` — `Snippet` (عناصرِ نسبی + کپیِ سبک‌های ارجاع‌شده +
+    ابعاد)، `createSnippet(template, ids, meta)` و `insertSnippet(parentId, snippet, {idPrefix,
+at?, index?})` که idهای تازه می‌دهد تا یک جزء چندبار در یک سند درج شود. snippet عمداً
+    **جزئی از قالب نیست** (آرتیفکتِ کتابخانه‌ای است) و در دیزاینر در localStorage می‌نشیند.
+  - UI: پنلِ «سبک‌های نامدار» (شمارشِ کاربرد، اعمال بر انتخاب، تکثیر، حذف، تغییرِ نام با
+    دابل‌کلیک) و «اجزای ذخیره‌شده» در تبِ لایه‌ها. ۲۶ تستِ core + پوششِ smoke.
 
 - [ ] **۲.۵ — پشتیبانیِ `TemplateSection` (چندصفحه با اندازهٔ متفاوت) در کامندها**
       `model/template.ts` یک فیلدِ `sections?: TemplateSection[]` دارد (§11A-E، هر سکشن

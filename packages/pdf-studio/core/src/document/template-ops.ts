@@ -14,6 +14,7 @@
 import type { AnyElement } from '../model/elements';
 import type { PageSetup } from '../model/page';
 import type { PdfTemplate } from '../model/template';
+import type { Rect } from '../model/units';
 
 export interface ElementLocation {
   /** Band the element ultimately lives in, at any nesting depth. */
@@ -205,7 +206,65 @@ export function removeElement(template: PdfTemplate, elementId: string): PdfTemp
   );
 }
 
+/**
+ * Apply `fn` to **every** element in the template, at any depth. Used for
+ * sweeps that are not about one element — e.g. dropping every reference to a
+ * style being deleted. Bands whose elements all come back identical keep their
+ * reference.
+ */
+export function mapElements(
+  template: PdfTemplate,
+  fn: (element: AnyElement) => AnyElement,
+): PdfTemplate {
+  const walk = (elements: AnyElement[]): AnyElement[] => {
+    let changed = false;
+    const next = elements.map((el) => {
+      const children = elementChildren(el);
+      const nextChildren = children ? walk(children) : undefined;
+      const withKids =
+        nextChildren && nextChildren !== children ? withChildren(el, nextChildren) : el;
+      const mapped = fn(withKids);
+      if (mapped !== el) changed = true;
+      return mapped;
+    });
+    return changed ? next : elements;
+  };
+  return mapBands(template, walk);
+}
+
 /** Shallow-merge a patch into the page setup. */
 export function patchPage(template: PdfTemplate, patch: Partial<PageSetup>): PdfTemplate {
   return { ...template, page: { ...template.page, ...patch } };
+}
+
+/** The smallest rect covering every input rect. */
+export function boundingBox(rects: Rect[]): Rect {
+  const x = Math.min(...rects.map((r) => r.x));
+  const y = Math.min(...rects.map((r) => r.y));
+  const right = Math.max(...rects.map((r) => r.x + r.width));
+  const bottom = Math.max(...rects.map((r) => r.y + r.height));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+/**
+ * Locate the requested elements, keep only those sharing the **first** one's
+ * parent, and return them in document order. Operations that treat a selection
+ * as one shape (grouping, capturing a snippet) need a single coordinate space —
+ * bounds are relative to the parent, so mixing parents would move things.
+ */
+export function resolveSiblings(template: PdfTemplate, elementIds: string[]): ElementLocation[] {
+  const found = elementIds
+    .map((id) => findElement(template, id))
+    .filter((loc): loc is ElementLocation => loc !== undefined);
+  const first = found[0];
+  if (!first) return [];
+  return found.filter((loc) => loc.parentId === first.parentId).sort((a, b) => a.index - b.index);
+}
+
+/** Shift an element (its whole subtree rides along) by a delta. */
+export function translateElement(element: AnyElement, dx: number, dy: number): AnyElement {
+  return {
+    ...element,
+    bounds: { ...element.bounds, x: element.bounds.x + dx, y: element.bounds.y + dy },
+  } as AnyElement;
 }

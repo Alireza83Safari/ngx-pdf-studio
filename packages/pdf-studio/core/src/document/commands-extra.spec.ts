@@ -253,7 +253,7 @@ describe('document commands', () => {
   });
 
   it('ensureStyles adds only what is missing', () => {
-    const style = (id: string): NamedStyle => ({ id, typography: { fontSize: 10 } });
+    const style = (id: string): NamedStyle => ({ id, name: id, typography: { fontSize: 10 } });
     const before = template({ styles: [style('existing')] });
     const cmd = ensureStyles([style('existing'), style('fresh')]);
     const after = cmd.apply(before);
@@ -261,7 +261,7 @@ describe('document commands', () => {
   });
 
   it('ensureStyles undo removes only the styles it added, never a pre-existing one', () => {
-    const style = (id: string): NamedStyle => ({ id, typography: { fontSize: 10 } });
+    const style = (id: string): NamedStyle => ({ id, name: id, typography: { fontSize: 10 } });
     const store = new DocumentStore(template({ styles: [style('existing')] }));
     store.dispatch(ensureStyles([style('existing'), style('fresh')]));
     store.undo();
@@ -269,7 +269,7 @@ describe('document commands', () => {
   });
 
   it('ensureStyles is a no-op when every style is already present', () => {
-    const style = (id: string): NamedStyle => ({ id, typography: { fontSize: 10 } });
+    const style = (id: string): NamedStyle => ({ id, name: id, typography: { fontSize: 10 } });
     const before = template({ styles: [style('existing')] });
     const cmd = ensureStyles([style('existing')]);
     expect(cmd.apply(before)).toBe(before);
@@ -285,11 +285,12 @@ describe('document commands', () => {
   });
 
   it('ensureDataset accepts an explicit source and trims the name', () => {
-    const after = ensureDataset('  rows  ', { kind: 'expression', expr: '$data.rows' }).apply(
-      template(),
-    );
+    const after = ensureDataset('  rows  ', {
+      kind: 'expression',
+      expr: { source: '$data.rows' },
+    }).apply(template());
     expect(after.datasets).toEqual([
-      { name: 'rows', source: { kind: 'expression', expr: '$data.rows' } },
+      { name: 'rows', source: { kind: 'expression', expr: { source: '$data.rows' } } },
     ]);
   });
 
@@ -317,7 +318,11 @@ describe('document commands', () => {
 
 describe('the composites the designer builds from these commands', () => {
   it('adding a table wires its styles and dataset in a single undo step', () => {
-    const cellStyle: NamedStyle = { id: 'tblCell', typography: { fontFamily: 'Vazirmatn' } };
+    const cellStyle: NamedStyle = {
+      id: 'tblCell',
+      name: 'Table cell',
+      typography: { fontFamily: 'Vazirmatn' },
+    };
     const store = new DocumentStore(template());
     const before = store.getState();
     const table: TableElement = {
