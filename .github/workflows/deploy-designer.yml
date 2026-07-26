@@ -1,0 +1,55 @@
+# Publishes the standalone visual designer to GitHub Pages.
+#
+# The designer is a no-dev-server static app: `npm run designer:build` emits the
+# four gitignored bundles (engine.global.js, vazirmatn.js, pdfjs.global.js,
+# pdf.worker.min.js) next to designer.html, and every <script src> is relative —
+# so the folder is served as-is, subpath and all.
+name: Deploy designer
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Allow the deploy job to publish to Pages via OIDC.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; queue instead of cancelling a live one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      # Gate the deploy on the designer's own smoke test (it runs
+      # designer:build first), so a broken editor never reaches the site.
+      - run: npm run designer:smoke
+
+      # Serve designer.html at the site root as well, so the bare URL works.
+      - run: cp apps/playground/designer/designer.html apps/playground/designer/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/playground/designer
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

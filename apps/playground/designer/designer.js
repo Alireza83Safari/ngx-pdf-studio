@@ -26,7 +26,9 @@
   var clipboard = [];
   var pasteSeq = 0;
   var activeBand = 0; // which band the canvas edits (index into template.bands)
+  var enteredGroup = null; // id of the container we "entered" (see renderCanvas)
   var selected = []; // ids, last item drives the inspector
+  var enteredGroup = null; // container id whose children the canvas exposes, or null
   var sampleData = {
     company: { name: 'شرکت نمونه' },
     customer: { name: 'علی رضایی' },
@@ -429,6 +431,30 @@
     toast('گروه ساخته شد', { type: 'success' });
   }
 
+  /**
+   * Step inside a group so its children are directly editable on the canvas.
+   * Leaving is Escape, a click on empty canvas, or the breadcrumb.
+   */
+  function enterGroup(containerId) {
+    var loc = P.findElement(store.getState(), containerId);
+    if (!loc || loc.element.type !== 'container') return;
+    enteredGroup = containerId;
+    selected = [];
+    renderCanvas();
+    renderInspector();
+    renderLayers();
+  }
+  function exitGroup() {
+    if (!enteredGroup) return false;
+    var id = enteredGroup;
+    enteredGroup = null;
+    selected = P.findElement(store.getState(), id) ? [id] : [];
+    renderCanvas();
+    renderInspector();
+    renderLayers();
+    return true;
+  }
+
   /** Dissolve the selected group; its children become the selection. */
   function ungroupSelected() {
     var group = selectedContainer();
@@ -707,7 +733,9 @@
    * content. Falls back to the current active band's elements for collision.
    */
   function nextSpot(w, h) {
-    var els = getActiveBand(store.getState()).elements;
+    var t0 = store.getState();
+    var host = enteredGroup ? P.findElement(t0, enteredGroup) : null;
+    var els = host ? host.element.children : getActiveBand(t0).elements;
     var W = w || 200,
       H = h || 24,
       x = 0,
@@ -794,7 +822,7 @@
 
   function duplicateSelected() {
     var t = store.getState();
-    var bandId = getActiveBand(t).id;
+    var bandId = curBandId();
     var adds = [];
     var fresh = [];
     selected.forEach(function (id) {
@@ -873,7 +901,12 @@
   function getActiveBand(t) {
     return t.bands[clampActiveBand(t)];
   }
+  /**
+   * Where new elements land: the group we have stepped into, if any, otherwise
+   * the active band. Both are valid `parentId`s for the engine's addElement.
+   */
   function curBandId() {
+    if (enteredGroup && P.findElement(store.getState(), enteredGroup)) return enteredGroup;
     return getActiveBand(store.getState()).id;
   }
   function isRowBand(band) {
@@ -972,10 +1005,24 @@
     } catch (e) {
       /* ignore */
     }
+    // Which elements get overlays: normally the band's own, but after
+    // double-clicking a group we "enter" it and expose its children instead, so
+    // they can be selected and dragged directly on the canvas (Figma-style).
+    // Their bounds are parent-relative, so the overlay carries the group offset;
+    // the drag/resize commands need no adjustment, since they write back
+    // parent-relative bounds too.
+    var entered = enteredGroup ? P.findElement(t, enteredGroup) : null;
+    if (enteredGroup && (!entered || entered.element.type !== 'container')) {
+      enteredGroup = null; // the group was deleted or ungrouped under us
+      entered = null;
+    }
+    var overlaySource = entered ? entered.element.children : band.elements;
+    var offX = entered ? entered.element.bounds.x : 0;
+    var offY = entered ? entered.element.bounds.y : 0;
     // Append overlays in paint order (zIndex ascending, array order as the
     // tiebreak) so the visually top-most element is last in the DOM and wins
     // the click on overlapping elements — matching what the SVG shows.
-    var ordered = band.elements.slice().sort(function (a, b) {
+    var ordered = overlaySource.slice().sort(function (a, b) {
       return (a.zIndex || 1) - (b.zIndex || 1);
     });
     ordered.forEach(function (el) {
@@ -991,8 +1038,8 @@
       node.setAttribute('aria-label', faName(el.type));
       node.setAttribute('aria-pressed', isSelected(el.id) ? 'true' : 'false');
       var b = el.bounds;
-      node.style.left = (m.left + b.x) * zoom + 'px';
-      node.style.top = (m.top + b.y) * zoom + 'px';
+      node.style.left = (m.left + offX + b.x) * zoom + 'px';
+      node.style.top = (m.top + offY + b.y) * zoom + 'px';
       node.style.width = Math.max(4, b.width * zoom) + 'px';
       node.style.height = Math.max(4, b.height * zoom) + 'px';
       // an element that paints nothing is invisible on the canvas — give it a
@@ -1577,6 +1624,10 @@
       renderInspector();
       renderCanvas();
       e.preventDefault();
+    } else if (enteredGroup) {
+      // inside a group, empty canvas means "I am done in here"
+      exitGroup();
+      e.preventDefault();
     } else {
       // empty page: start a marquee selection
       var rect = pageEl.getBoundingClientRect();
@@ -1697,6 +1748,8 @@
     var loc = P.findElement(store.getState(), id);
     if (!loc) return;
     var el = loc.element;
+    // a group opens instead of editing text — that is how you reach its children
+    if (el.type === 'container') return enterGroup(el.id);
     var isText = el.type === 'staticText';
     var isField = el.type === 'dataField' || el.type === 'barcode' || el.type === 'qrcode';
     if (!isText && !isField) return;
@@ -1830,7 +1883,7 @@
     var id = 'el-' + uid++;
     selected = [id];
     store.dispatch(
-      P.addElement(getActiveBand(t).id, {
+      P.addElement(curBandId(), {
         id: id,
         type: 'dataField',
         bounds: { x: Math.max(0, x), y: Math.max(0, y), width: 180, height: 18 },
@@ -4359,6 +4412,7 @@
       if (helpEl.classList.contains('show')) return helpEl.classList.remove('show');
       if (historyEl.classList.contains('show')) return historyEl.classList.remove('show');
       if (copilotEl.classList.contains('show')) return copilotEl.classList.remove('show');
+      if (exitGroup()) return; // step out of a group before dropping the selection
       selected = [];
       renderInspector();
       renderCanvas();
