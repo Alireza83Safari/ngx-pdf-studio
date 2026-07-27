@@ -218,7 +218,11 @@ function opsMarkup(ops: readonly VectorOp[], x: number, y: number): string {
       }
       if (c.op === 'text') {
         const anchor = c.align === 'middle' ? 'middle' : c.align === 'end' ? 'end' : 'start';
-        return `<text x="${r2(x + c.x)}" y="${r2(y + c.y)}" font-size="${r2(c.size)}" font-family="Vazirmatn, sans-serif" text-anchor="${anchor}" fill="${rgb01ToCss(c.color)}">${escapeXml(c.text)}</text>`;
+        // Vector ops carry *physical* positions (the PDF painter offsets by the
+        // measured width). Inline SVG inherits `direction` from the host page, so
+        // on an RTL page `text-anchor="start"` would mean the right edge and every
+        // chart legend/axis label would render mirrored onto its own swatch.
+        return `<text x="${r2(x + c.x)}" y="${r2(y + c.y)}" font-size="${r2(c.size)}" font-family="Vazirmatn, sans-serif" direction="ltr" text-anchor="${anchor}" fill="${rgb01ToCss(c.color)}">${escapeXml(c.text)}</text>`;
       }
       return `<line x1="${r2(x + c.x1)}" y1="${r2(y + c.y1)}" x2="${r2(x + c.x2)}" y2="${r2(y + c.y2)}" stroke="${rgb01ToCss(c.color)}" stroke-width="${r2(c.width)}" />`;
     })
@@ -331,7 +335,23 @@ function textMarkup(el: LaidOutElement): string {
   const lines = el.lines ?? [el.text];
   const { x, y, width } = el.bounds;
 
-  const anchor = style.align === 'center' ? 'middle' : style.align === 'right' ? 'end' : 'start';
+  // `style.align` is already *physical* (paint-style resolves start/end against
+  // the direction), but SVG's `text-anchor` is *logical* — under
+  // `direction="rtl"` "start" is the right edge. Emitting the logical name that
+  // matches the physical edge keeps the preview on the same geometry as the PDF
+  // painter's `lineStartX`; without this every non-centered line on an RTL page
+  // is displaced by its own width.
+  const rtl = el.direction === 'rtl';
+  const anchor =
+    style.align === 'center'
+      ? 'middle'
+      : style.align === 'right'
+        ? rtl
+          ? 'start'
+          : 'end'
+        : rtl
+          ? 'end'
+          : 'start';
   const tx = style.align === 'center' ? x + width / 2 : style.align === 'right' ? x + width : x;
 
   const fontStyle = [

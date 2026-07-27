@@ -153,7 +153,49 @@
     if (footer) c.footer = { aggregate: footer, styleId: 'cellHead' };
     return c;
   }
+  /** Named page sizes, mirroring the engine's `resolvePageSize`. */
+  var NAMED_SIZES = {
+    A3: [841.89, 1190.55],
+    A4: [595.28, 841.89],
+    A5: [419.53, 595.28],
+    Letter: [612, 792],
+    Legal: [612, 1008],
+  };
+  function contentWidth(pageSetup) {
+    var s = pageSetup.size;
+    var base = typeof s === 'string' ? NAMED_SIZES[s] || NAMED_SIZES.A4 : [s.width, s.height];
+    var long = Math.max(base[0], base[1]);
+    var short = Math.min(base[0], base[1]);
+    var w = pageSetup.orientation === 'landscape' ? long : short;
+    return w - pageSetup.margins.left - pageSetup.margins.right;
+  }
+  /**
+   * Element `bounds.x` is *physical* (x=0 is the left paper edge) no matter the
+   * page direction, but these templates are all right-to-left documents and are
+   * authored the way they read: x=0 is where the eye starts, i.e. the RIGHT
+   * edge, labels come before their values, the title precedes the meta block.
+   * Mirroring once here turns that logical authoring into physical coordinates,
+   * instead of every template hand-computing `width - x` and reading backwards.
+   *
+   * Children of containers/list items are relative to their own box, so they
+   * mirror against that box's width.
+   */
+  function mirrorElements(elements, width) {
+    (elements || []).forEach(function (el) {
+      if (el.itemTemplate) mirrorElements(el.itemTemplate, el.bounds.width);
+      if (el.children) mirrorElements(el.children, el.bounds.width);
+      el.bounds.x = width - el.bounds.x - el.bounds.width;
+    });
+    return elements;
+  }
+
   function baseTemplate(name, pageSetup, bands, extra) {
+    if (pageSetup.direction === 'rtl') {
+      var cw = contentWidth(pageSetup);
+      bands.forEach(function (band) {
+        mirrorElements(band.elements, cw);
+      });
+    }
     return Object.assign(
       {
         schemaVersion: '1.0.0',
@@ -2082,17 +2124,19 @@
             fontWeight: 'bold',
           }),
           panel('db-c1-bg', 0, 174, 380, 160, { fill: rgb(248, 250, 252), radius: 10 }),
+          // grouped columns: `combo` is in the model but `chartOps` has no branch
+          // for it, so it would silently paint these two series as columns anyway
           {
             id: 'db-c1',
             type: 'chart',
-            chartKind: 'combo',
+            chartKind: 'column',
             dataset: 'months',
             bounds: { x: 10, y: 184, width: 360, height: 140 },
             zIndex: 1,
             categories: { source: 'month' },
             series: [
-              { name: 'درآمد', values: { source: 'revenue' }, kind: 'column' },
-              { name: 'هدف', values: { source: 'target' }, kind: 'line' },
+              { name: 'درآمد', values: { source: 'revenue' } },
+              { name: 'هدف', values: { source: 'target' } },
             ],
             showLegend: true,
           },
