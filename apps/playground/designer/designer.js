@@ -3843,8 +3843,9 @@
   var tplZoomEl = document.getElementById('tplZoom');
   var tplZoomStageEl = document.getElementById('tplZoomStage');
   var TPL_THEME_KEY = 'pdfstudio.tplTheme';
-  var THUMB_W = 208;
-  var THUMB_H = 162;
+  var THUMB_INSET = 12; // breathing room between the paper and the card edge
+  var THUMB_W = 172; // fallback box when there is no layout engine (jsdom)
+  var THUMB_H = 184;
 
   var tplQuery = '';
   var tplCat = 'all';
@@ -3890,14 +3891,24 @@
     var fn = window.PDFSTUDIO_THEME_TEMPLATE;
     return fn ? fn(template, tplTheme) : JSON.parse(JSON.stringify(template));
   }
+  /**
+   * Badge the page format — but stay quiet for the plain A4 portrait everyone
+   * already assumes, so the chip marks the exceptions instead of repeating
+   * itself on almost every card. Custom sizes are reported the way the engine
+   * will actually resolve them (short side first unless landscape).
+   */
   function tplSizeLabel(template) {
     var pg = (template && template.page) || {};
     var landscape = pg.orientation === 'landscape';
-    if (typeof pg.size === 'string') return pg.size + (landscape ? ' افقی' : ' عمودی');
-    if (pg.size && pg.size.width)
-      return (
-        faDigits(Math.round(pg.size.width)) + '×' + faDigits(Math.round(pg.size.height)) + ' pt'
-      );
+    if (typeof pg.size === 'string')
+      return pg.size === 'A4' && !landscape ? '' : pg.size + (landscape ? ' افقی' : ' عمودی');
+    if (pg.size && pg.size.width) {
+      var long = Math.round(Math.max(pg.size.width, pg.size.height));
+      var short = Math.round(Math.min(pg.size.width, pg.size.height));
+      return landscape
+        ? faDigits(long) + '×' + faDigits(short) + ' pt'
+        : faDigits(short) + '×' + faDigits(long) + ' pt';
+    }
     return landscape ? 'افقی' : 'عمودی';
   }
   function tplThumb(entry) {
@@ -3924,19 +3935,36 @@
     });
   }
 
-  /** Scale the engine SVG so the whole page fits the card, never cropped. */
+  /**
+   * Scale the engine SVG so the whole page fits its card, never cropped. The box
+   * is measured from the live card rather than assumed, so the fit stays right
+   * at every grid width; jsdom (no layout) falls back to the nominal box.
+   */
   function fitThumb(card) {
+    var thumb = card.querySelector('.tpl-thumb');
     var svg = card.querySelector('.tpl-thumb svg');
     var paper = card.querySelector('.tpl-paper');
-    if (!svg || !paper) return;
+    if (!thumb || !svg || !paper) return;
+    var boxW = (thumb.clientWidth || 0) - THUMB_INSET * 2;
+    var boxH = (thumb.clientHeight || 0) - THUMB_INSET * 2;
+    if (boxW <= 0 || boxH <= 0) {
+      boxW = THUMB_W;
+      boxH = THUMB_H;
+    }
     var w = Number(svg.getAttribute('width')) || 595;
     var h = Number(svg.getAttribute('height')) || 842;
-    var k = Math.min(THUMB_W / w, THUMB_H / h);
+    var k = Math.min(boxW / w, boxH / h);
     paper.style.width = Math.round(w * k) + 'px';
     paper.style.height = Math.round(h * k) + 'px';
     svg.style.transform = 'scale(' + k + ')';
   }
+  function fitAllThumbs() {
+    Array.prototype.forEach.call(galleryCardsEl.querySelectorAll('.tpl-card'), fitThumb);
+  }
 
+  function tplChip(cls, textValue) {
+    return textValue ? '<span class="' + cls + '">' + esc(textValue) + '</span>' : '';
+  }
   function buildTplCard(entry, index) {
     var card = document.createElement('div');
     card.className = 'tpl-card';
@@ -3948,10 +3976,9 @@
       '<div class="tpl-thumb"><div class="tpl-paper">' +
       tplThumb(entry) +
       '</div>' +
-      (entry.badge ? '<span class="tpl-badge">' + esc(entry.badge) + '</span>' : '') +
-      '<span class="tpl-size">' +
-      esc(tplSizeLabel(entry.template)) +
-      '</span><div class="tpl-actions">' +
+      tplChip('tpl-badge', entry.badge) +
+      tplChip('tpl-size', tplSizeLabel(entry.template)) +
+      '<div class="tpl-actions">' +
       '<button class="tpl-use" data-act="use" tabindex="-1">استفاده از این قالب</button>' +
       '<button class="tpl-peek" data-act="peek" tabindex="-1" aria-label="پیش‌نمایش بزرگ" ' +
       'title="پیش‌نمایش بزرگ در اندازهٔ واقعی">⤢</button>' +
@@ -3960,7 +3987,6 @@
       '</strong><span>' +
       esc(entry.desc || '') +
       '</span></div>';
-    fitThumb(card);
     card.title = 'لود قالب «' + entry.name + '» همراه دادهٔ نمونه‌اش';
     return card;
   }
@@ -3974,6 +4000,8 @@
     tplVisible.forEach(function (entry, i) {
       galleryCardsEl.appendChild(buildTplCard(entry, i));
     });
+    // the cards are in the DOM now, so the thumbs can be fitted to real widths
+    fitAllThumbs();
     tplEmptyEl.classList.toggle('show', tplVisible.length === 0);
     tplCountEl.textContent = tplVisible.length
       ? faDigits(tplVisible.length) + ' قالب آماده'
@@ -3981,6 +4009,13 @@
     if (tplFocus >= tplVisible.length) tplFocus = 0;
     upgradeTooltips(galleryCardsEl);
   }
+  // the grid reflows on resize, so the papers have to be re-fitted with it
+  var tplRefitTimer = null;
+  window.addEventListener('resize', function () {
+    if (!galleryEl.classList.contains('show')) return;
+    clearTimeout(tplRefitTimer);
+    tplRefitTimer = setTimeout(fitAllThumbs, 120);
+  });
 
   /** Category chips + palette swatches — built once, then only their state moves. */
   function renderTplChrome() {
