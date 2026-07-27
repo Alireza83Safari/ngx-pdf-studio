@@ -75,11 +75,40 @@ preview matches the PDF exactly.
 under RTL), `left`/`right`/`center` are physical. Prefer logical alignment in
 templates that must serve both directions.
 
+### 6. Coordinates
+
+`bounds.x` is **physical**: x=0 is the left paper edge whatever the direction.
+That makes an RTL document awkward to author — the title of a Persian invoice
+belongs at the right, so it has to be placed at `contentWidth - width`, and each
+label/value pair reads backwards in the source. Templates written the natural
+way come out mirrored.
+
+Set `page.coordinates: 'logical'` and x=0 becomes the **start** edge instead, so
+the page is authored the way it reads:
+
+```ts
+page: { /* … */ direction: 'rtl', coordinates: 'logical' },
+// x=0 is the right edge; the label comes before the value it belongs to
+elements: [label('نام:', { x: 0, width: 60 }), field('customer.name', { x: 60, width: 200 })],
+```
+
+The engine mirrors it to physical once, before layout, so both painters agree.
+Children of containers and list item templates mirror against their own box, and
+multi-column pages mirror against the column width. On an LTR page logical and
+physical are identical, so the flag is safe to set unconditionally. It is a
+per-page convention: a band's own `direction` override affects text, not
+coordinates.
+
+Omit it (or set `'physical'`) and nothing changes — every template written
+before the flag existed keeps its geometry.
+
 ## Checklist for a correct Persian document
 
 1. `page.direction: 'rtl'`.
 2. `locale: { language: 'fa', digits: 'persian', calendar: 'jalali' }`.
 3. Embed Vazirmatn (or your brand font) and set `fontFamily` on text styles.
 4. Use logical `start`/`end` alignment.
-5. Check `result.diagnostics` — encoding problems surface there as warnings,
+5. Author positions with `page.coordinates: 'logical'` so the source reads in
+   the same order as the page.
+6. Check `result.diagnostics` — encoding problems surface there as warnings,
    never as crashes.

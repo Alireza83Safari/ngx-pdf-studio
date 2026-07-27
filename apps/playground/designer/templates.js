@@ -37,6 +37,8 @@
         direction: 'rtl',
         locale: { language: 'fa', digits: 'persian', calendar: 'jalali' },
         unit: 'pt',
+        // authored in reading order; `bakeLogical` flips it to physical below
+        coordinates: 'logical',
       },
       overrides || {},
     );
@@ -153,73 +155,54 @@
     if (footer) c.footer = { aggregate: footer, styleId: 'cellHead' };
     return c;
   }
-  /** Named page sizes, mirroring the engine's `resolvePageSize`. */
-  var NAMED_SIZES = {
-    A3: [841.89, 1190.55],
-    A4: [595.28, 841.89],
-    A5: [419.53, 595.28],
-    Letter: [612, 792],
-    Legal: [612, 1008],
-  };
-  function contentWidth(pageSetup) {
-    var s = pageSetup.size;
-    var base = typeof s === 'string' ? NAMED_SIZES[s] || NAMED_SIZES.A4 : [s.width, s.height];
-    var long = Math.max(base[0], base[1]);
-    var short = Math.min(base[0], base[1]);
-    var w = pageSetup.orientation === 'landscape' ? long : short;
-    return w - pageSetup.margins.left - pageSetup.margins.right;
-  }
   /**
-   * Element `bounds.x` is *physical* (x=0 is the left paper edge) no matter the
-   * page direction, but these templates are all right-to-left documents and are
-   * authored the way they read: x=0 is where the eye starts, i.e. the RIGHT
-   * edge, labels come before their values, the title precedes the meta block.
-   * Mirroring once here turns that logical authoring into physical coordinates,
-   * instead of every template hand-computing `width - x` and reading backwards.
+   * These templates are right-to-left documents authored the way they read —
+   * x=0 is where the eye starts (the right edge), the title precedes the meta
+   * block, a label precedes its value. That is the engine's
+   * `page.coordinates: 'logical'` convention.
    *
-   * Children of containers/list items are relative to their own box, so they
-   * mirror against that box's width.
+   * The *visual designer*, though, drags physical boxes: its overlays come
+   * straight from `bounds`, so they would land on the mirrored side of whatever
+   * the painters drew. So rather than shipping the flag, bake it — run the
+   * engine's own `withLogicalBounds` once here and hand the designer physical
+   * geometry. `withLogicalBounds` is its own inverse, so the flag has to come
+   * back off afterwards or `layoutDocument` would mirror a second time.
    */
-  function mirrorElements(elements, width) {
-    (elements || []).forEach(function (el) {
-      if (el.itemTemplate) mirrorElements(el.itemTemplate, el.bounds.width);
-      if (el.children) mirrorElements(el.children, el.bounds.width);
-      el.bounds.x = width - el.bounds.x - el.bounds.width;
-    });
-    return elements;
+  function bakeLogical(template) {
+    var P = window.PdfStudio;
+    if (!P || typeof P.withLogicalBounds !== 'function') return template;
+    var baked = P.withLogicalBounds(template);
+    baked.page = Object.assign({}, baked.page, { coordinates: 'physical' });
+    return baked;
   }
 
   function baseTemplate(name, pageSetup, bands, extra) {
-    if (pageSetup.direction === 'rtl') {
-      var cw = contentWidth(pageSetup);
-      bands.forEach(function (band) {
-        mirrorElements(band.elements, cw);
-      });
-    }
-    return Object.assign(
-      {
-        schemaVersion: '1.0.0',
-        metadata: { name: name },
-        page: pageSetup,
-        styles: [
-          {
-            id: 'cell',
-            name: 'سلول جدول',
-            typography: { fontFamily: V, fontSize: 10, color: INK },
-          },
-          {
-            id: 'cellHead',
-            name: 'سرستون جدول',
-            typography: { fontFamily: V, fontSize: 10, fontWeight: 'bold', color: INK },
-            box: { fill: { color: TINT } },
-          },
-        ],
-        datasets: [{ name: 'items', source: { kind: 'path', path: 'items' } }],
-        parameters: [],
-        bands: bands,
-        resources: { fonts: [], images: [] },
-      },
-      extra || {},
+    return bakeLogical(
+      Object.assign(
+        {
+          schemaVersion: '1.0.0',
+          metadata: { name: name },
+          page: pageSetup,
+          styles: [
+            {
+              id: 'cell',
+              name: 'سلول جدول',
+              typography: { fontFamily: V, fontSize: 10, color: INK },
+            },
+            {
+              id: 'cellHead',
+              name: 'سرستون جدول',
+              typography: { fontFamily: V, fontSize: 10, fontWeight: 'bold', color: INK },
+              box: { fill: { color: TINT } },
+            },
+          ],
+          datasets: [{ name: 'items', source: { kind: 'path', path: 'items' } }],
+          parameters: [],
+          bands: bands,
+          resources: { fonts: [], images: [] },
+        },
+        extra || {},
+      ),
     );
   }
 

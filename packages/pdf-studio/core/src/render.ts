@@ -7,6 +7,7 @@
  */
 import { createRenderContext, type RenderContextInput } from './binding/render-context';
 import type { ExpressionDiagnostic } from './expression/errors';
+import { withLogicalBounds } from './layout/logical-bounds';
 import { paginate, type PaginateOptions } from './layout/paginate';
 import type { PaginatedDocument } from './layout/page';
 import { paintToPdf, type PdfPaintOptions } from './paint/pdf-painter';
@@ -67,8 +68,12 @@ export function layoutDocument(
   input: RenderContextInput = {},
   options: RenderOptions = {},
 ): PaginatedDocument {
-  const finalTemplate = withVerification(template, input, options);
-  return paginate(finalTemplate, createRenderContext(input), options.paginate);
+  // Order matters: the verification hash must cover the template *as authored*,
+  // so that the code the designer shows live, the code printed on the paper and
+  // the code `verify.html` recomputes are all the same (F1.5). Mirroring runs
+  // after, and carries the stamp band along to the mirrored side of the page.
+  const stamped = withVerification(template, input, options);
+  return paginate(withLogicalBounds(stamped), createRenderContext(input), options.paginate);
 }
 
 /** Render to a real PDF (`Uint8Array`). */

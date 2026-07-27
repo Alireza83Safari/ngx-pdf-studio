@@ -28,4 +28,18 @@ export interface PageSetup {
   locale: LocaleSetup;
   /** UI display unit; internal storage is always points. */
   unit: LengthUnit;
+  /**
+   * How `bounds.x` on this page's elements is authored (§7).
+   *
+   * - `physical` (default) — x=0 is the left paper edge, whatever `direction`
+   *   is. Back-compatible: every template written before this flag existed.
+   * - `logical` — x=0 is the **start** edge, so a right-to-left page is
+   *   authored the way it reads (title first, label before value) and is
+   *   mirrored to physical before layout.
+   *
+   * On an LTR page the two are identical, so the flag is safe to set
+   * unconditionally. The convention is per page, not per band: a band's own
+   * `direction` override affects text, not the coordinate system.
+   */
+  coordinates?: 'physical' | 'logical';
 }

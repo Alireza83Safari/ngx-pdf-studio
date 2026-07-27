@@ -26,6 +26,7 @@ const pageSetupSchema = z
     direction: directionSchema,
     locale: localeSetupSchema,
     unit: z.enum(['pt', 'mm']),
+    coordinates: z.enum(['physical', 'logical']).optional(),
   })
   .passthrough();
 

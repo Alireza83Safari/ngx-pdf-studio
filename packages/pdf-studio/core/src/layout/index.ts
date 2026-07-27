@@ -7,6 +7,7 @@ export {
 } from './measure';
 export { FontkitTextMeasurer, type FontkitFontInput } from './fontkit-measurer';
 export { resolvePageSize } from './page-size';
+export { withLogicalBounds } from './logical-bounds';
 export type { LaidOutElement, LayoutPage, PaginatedDocument, VecColor, VectorOp } from './page';
 export {
   ElementRegistry,
