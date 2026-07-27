@@ -82,6 +82,8 @@ export interface LaidImage {
 export interface LaidChartSeries {
   name?: string;
   values: number[];
+  /** Per-series override, honoured when the chart itself is a `combo` (§5). */
+  kind?: ChartKind;
 }
 export interface LaidChart {
   kind: ChartKind;

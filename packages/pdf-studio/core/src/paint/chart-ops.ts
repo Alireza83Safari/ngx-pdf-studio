@@ -37,8 +37,116 @@ function legendOps(names: string[], x: number, y: number): ChartOp[] {
   return ops;
 }
 
+/** Geometry shared by every cartesian series renderer. */
+interface Plot {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Category-slot centre, the anchor line/area/scatter series hang off. */
+const centreOf = (plot: Plot, step: number, i: number): number => plot.x + step * (i + 0.5);
+
+function lineSeriesOps(
+  values: number[],
+  color: Rgb01,
+  plot: Plot,
+  step: number,
+  yOf: (v: number) => number,
+): ChartOp[] {
+  const ops: ChartOp[] = [];
+  for (let i = 0; i + 1 < values.length; i++) {
+    ops.push({
+      op: 'line',
+      x1: centreOf(plot, step, i),
+      y1: yOf(values[i] as number),
+      x2: centreOf(plot, step, i + 1),
+      y2: yOf(values[i + 1] as number),
+      color,
+      width: 1.5,
+    });
+  }
+  return ops;
+}
+
+function areaSeriesOps(
+  values: number[],
+  color: Rgb01,
+  plot: Plot,
+  step: number,
+  yOf: (v: number) => number,
+  baselineY: number,
+): ChartOp[] {
+  if (values.length === 0) return [];
+  const pts = values.map((v, i) => ({ x: centreOf(plot, step, i), y: yOf(v) }));
+  const first = pts[0] as { x: number; y: number };
+  const lastPt = pts[pts.length - 1] as { x: number; y: number };
+  const d =
+    `M ${f(first.x)} ${f(baselineY)} ` +
+    pts.map((p) => `L ${f(p.x)} ${f(p.y)}`).join(' ') +
+    ` L ${f(lastPt.x)} ${f(baselineY)} Z`;
+  return [{ op: 'path', d, fill: color }];
+}
+
+/** Scatter marks: a small square per point (rect keeps both painters identical). */
+function scatterSeriesOps(
+  values: number[],
+  color: Rgb01,
+  plot: Plot,
+  step: number,
+  yOf: (v: number) => number,
+): ChartOp[] {
+  const s = 3.5;
+  return values.map((v, i) => ({
+    op: 'rect' as const,
+    x: centreOf(plot, step, i) - s / 2,
+    y: yOf(v) - s / 2,
+    w: s,
+    h: s,
+    fill: color,
+  }));
+}
+
+/** One series of a grouped column chart, in slot `slot` of `slots`. */
+function columnSeriesOps(
+  values: number[],
+  color: Rgb01,
+  plot: Plot,
+  groupW: number,
+  slot: number,
+  slots: number,
+  baselineY: number,
+  yOf: (v: number) => number,
+): ChartOp[] {
+  const barW = (groupW * 0.8) / Math.max(1, slots);
+  return values.map((v, gi) => {
+    const top = yOf(v);
+    return {
+      op: 'rect' as const,
+      x: plot.x + groupW * gi + groupW * 0.1 + barW * slot,
+      y: top,
+      w: barW,
+      h: baselineY - top,
+      fill: color,
+    };
+  });
+}
+
+/** Bare trend line: no axes, no labels, no legend — it fills its whole box (§5). */
+function sparklineOps(chart: LaidChart, width: number, height: number): ChartOp[] {
+  const plot: Plot = { x: 1, y: 1, w: Math.max(1, width - 2), h: Math.max(1, height - 2) };
+  const values = chart.series[0]?.values ?? [];
+  if (values.length === 0) return [];
+  const max = Math.max(1, ...values.map((v) => (v > 0 ? v : 0)));
+  const step = plot.w / Math.max(1, values.length);
+  const yOf = (v: number): number => plot.y + plot.h - (Math.max(0, v) / max) * plot.h;
+  return lineSeriesOps(values, PALETTE[0] as Rgb01, plot, step, yOf);
+}
+
 export function chartOps(chart: LaidChart, width: number, height: number): ChartOp[] {
   if (chart.kind === 'pie' || chart.kind === 'donut') return pieOps(chart, width, height);
+  if (chart.kind === 'sparkline') return sparklineOps(chart, width, height);
 
   const seriesNames = chart.series.map((s) => s.name ?? '').filter(Boolean);
   const legendH = chart.showLegend && seriesNames.length > 0 ? LEGEND_H : 0;
@@ -117,35 +225,61 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
 
   if (chart.kind === 'line') {
     series.forEach((s, si) => {
-      const color = PALETTE[si % PALETTE.length] as Rgb01;
-      for (let i = 0; i + 1 < s.values.length; i++) {
-        const x1 = plot.x + step * (i + 0.5);
-        const x2 = plot.x + step * (i + 1.5);
-        ops.push({
-          op: 'line',
-          x1,
-          y1: yOf(s.values[i] as number),
-          x2,
-          y2: yOf(s.values[i + 1] as number),
-          color,
-          width: 1.5,
-        });
-      }
+      ops.push(...lineSeriesOps(s.values, PALETTE[si % PALETTE.length] as Rgb01, plot, step, yOf));
     });
     return ops;
   }
 
   if (chart.kind === 'area') {
     series.forEach((s, si) => {
-      if (s.values.length === 0) return;
-      const pts = s.values.map((v, i) => ({ x: plot.x + step * (i + 0.5), y: yOf(v) }));
-      const first = pts[0] as { x: number; y: number };
-      const lastPt = pts[pts.length - 1] as { x: number; y: number };
-      const d =
-        `M ${f(first.x)} ${f(baselineY)} ` +
-        pts.map((p) => `L ${f(p.x)} ${f(p.y)}`).join(' ') +
-        ` L ${f(lastPt.x)} ${f(baselineY)} Z`;
-      ops.push({ op: 'path', d, fill: PALETTE[si % PALETTE.length] as Rgb01 });
+      ops.push(
+        ...areaSeriesOps(
+          s.values,
+          PALETTE[si % PALETTE.length] as Rgb01,
+          plot,
+          step,
+          yOf,
+          baselineY,
+        ),
+      );
+    });
+    return ops;
+  }
+
+  if (chart.kind === 'scatter') {
+    series.forEach((s, si) => {
+      ops.push(
+        ...scatterSeriesOps(s.values, PALETTE[si % PALETTE.length] as Rgb01, plot, step, yOf),
+      );
+    });
+    return ops;
+  }
+
+  // Combo: each series picks its own shape on the shared scale. Only the column
+  // series compete for slots within a category, so lines/areas overlay them.
+  if (chart.kind === 'combo') {
+    const kindOf = (s: (typeof series)[number]): string => s.kind ?? 'column';
+    const columnSlots = series.filter((s) => kindOf(s) === 'column').length;
+    const groupW = plot.w / categories;
+    let slot = 0;
+    series.forEach((s, si) => {
+      const color = PALETTE[si % PALETTE.length] as Rgb01;
+      switch (kindOf(s)) {
+        case 'line':
+          ops.push(...lineSeriesOps(s.values, color, plot, step, yOf));
+          break;
+        case 'area':
+          ops.push(...areaSeriesOps(s.values, color, plot, step, yOf, baselineY));
+          break;
+        case 'scatter':
+          ops.push(...scatterSeriesOps(s.values, color, plot, step, yOf));
+          break;
+        default:
+          ops.push(
+            ...columnSeriesOps(s.values, color, plot, groupW, slot, columnSlots, baselineY, yOf),
+          );
+          slot++;
+      }
     });
     return ops;
   }
@@ -194,14 +328,19 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
     });
   } else {
     const groupW = plot.w / groupCount;
-    const barW = (groupW * 0.8) / seriesCount;
     series.forEach((s, si) => {
-      const color = PALETTE[si % PALETTE.length] as Rgb01;
-      s.values.forEach((v, gi) => {
-        const h = (Math.max(0, v) / maxValue) * plot.h;
-        const x = plot.x + groupW * gi + groupW * 0.1 + barW * si;
-        ops.push({ op: 'rect', x, y: baselineY - h, w: barW, h, fill: color });
-      });
+      ops.push(
+        ...columnSeriesOps(
+          s.values,
+          PALETTE[si % PALETTE.length] as Rgb01,
+          plot,
+          groupW,
+          si,
+          seriesCount,
+          baselineY,
+          yOf,
+        ),
+      );
     });
   }
 

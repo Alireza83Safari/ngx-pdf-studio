@@ -37,6 +37,7 @@ export function resolveChart(
 
   const series = el.series.map((s) => ({
     ...(s.name !== undefined ? { name: s.name } : {}),
+    ...(s.kind !== undefined ? { kind: s.kind } : {}),
     values: rows.map((row, index) => {
       const value = evaluateExpr(
         s.values.source,

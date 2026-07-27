@@ -2124,19 +2124,18 @@
             fontWeight: 'bold',
           }),
           panel('db-c1-bg', 0, 174, 380, 160, { fill: rgb(248, 250, 252), radius: 10 }),
-          // grouped columns: `combo` is in the model but `chartOps` has no branch
-          // for it, so it would silently paint these two series as columns anyway
+          // combo: درآمد as columns with the هدف line overlaid on the same scale
           {
             id: 'db-c1',
             type: 'chart',
-            chartKind: 'column',
+            chartKind: 'combo',
             dataset: 'months',
             bounds: { x: 10, y: 184, width: 360, height: 140 },
             zIndex: 1,
             categories: { source: 'month' },
             series: [
-              { name: 'درآمد', values: { source: 'revenue' } },
-              { name: 'هدف', values: { source: 'target' } },
+              { name: 'درآمد', values: { source: 'revenue' }, kind: 'column' },
+              { name: 'هدف', values: { source: 'target' }, kind: 'line' },
             ],
             showLegend: true,
           },
