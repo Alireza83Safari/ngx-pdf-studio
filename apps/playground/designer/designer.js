@@ -3722,7 +3722,7 @@
     {
       sel: '#openGallery',
       title: 'قالب‌های آماده',
-      body: '۱۲ طرح حرفه‌ای با پیش‌نمایش زنده — از «سند خالی» تا فاکتور و گزارش. بهترین نقطهٔ شروع.',
+      body: '۲۲ طرح حرفه‌ای با پیش‌نمایش زنده، جست‌وجو، دسته‌بندی و شش پالت رنگی. بهترین نقطهٔ شروع.',
     },
     {
       sel: '.statusbar',
@@ -3828,65 +3828,323 @@
   }, 700);
 
   // --- template gallery (§8A-B) ----------------------------------------------
+  // The gallery is a small search app: a category filter, a full-text box over
+  // name/description/tags, and a palette picker that re-skins every template by
+  // swapping its two brand tokens (see templates.js `themeTemplate`). Thumbnails
+  // are real engine renders, scaled to *fit* their card so a portrait A4 and a
+  // landscape ticket read as the same kind of object.
   var galleryEl = document.getElementById('gallery');
   var galleryCardsEl = document.getElementById('galleryCards');
-  var galleryRendered = false;
-  function renderGallery() {
-    if (galleryRendered) return;
-    galleryRendered = true;
-    var templates = window.PDFSTUDIO_TEMPLATES || [];
-    galleryCardsEl.innerHTML = '';
-    templates.forEach(function (entry) {
-      var card = document.createElement('button');
-      card.className = 'tpl-card';
-      card.dataset.template = entry.id;
-      var thumbHtml = '';
+  var tplSearchEl = document.getElementById('tplSearch');
+  var tplCatsEl = document.getElementById('tplCats');
+  var tplThemesEl = document.getElementById('tplThemes');
+  var tplEmptyEl = document.getElementById('tplEmpty');
+  var tplCountEl = document.getElementById('tplCount');
+  var tplZoomEl = document.getElementById('tplZoom');
+  var tplZoomStageEl = document.getElementById('tplZoomStage');
+  var TPL_THEME_KEY = 'pdfstudio.tplTheme';
+  var THUMB_W = 208;
+  var THUMB_H = 162;
+
+  var tplQuery = '';
+  var tplCat = 'all';
+  var tplTheme = 'indigo';
+  try {
+    tplTheme = window.localStorage.getItem(TPL_THEME_KEY) || 'indigo';
+  } catch (e) {
+    /* private mode: stay on the default palette */
+  }
+  var tplVisible = []; // the currently filtered entries, in card order
+  var tplFocus = 0; // keyboard cursor into `tplVisible`
+  var tplChromeReady = false;
+  var thumbCache = {}; // 'templateId|themeId' → rendered SVG string
+  var tplZoomEntry = null;
+
+  function faDigits(n) {
+    return String(n).replace(/[0-9]/g, function (d) {
+      return '۰۱۲۳۴۵۶۷۸۹'.charAt(Number(d));
+    });
+  }
+  /** Fold the Arabic/Persian letter variants and ZWNJ so search is forgiving. */
+  function tplNorm(s) {
+    return String(s == null ? '' : s)
+      .toLowerCase()
+      .replace(/[يى]/g, 'ی')
+      .replace(/ك/g, 'ک')
+      .replace(/‌/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function tplEntries() {
+    return window.PDFSTUDIO_TEMPLATES || [];
+  }
+  function tplEntryById(id) {
+    var found = null;
+    tplEntries().forEach(function (e) {
+      if (e.id === id) found = e;
+    });
+    return found;
+  }
+  /** A themed deep copy — the gallery never hands out a shared template object. */
+  function tplThemed(template) {
+    var fn = window.PDFSTUDIO_THEME_TEMPLATE;
+    return fn ? fn(template, tplTheme) : JSON.parse(JSON.stringify(template));
+  }
+  function tplSizeLabel(template) {
+    var pg = (template && template.page) || {};
+    var landscape = pg.orientation === 'landscape';
+    if (typeof pg.size === 'string') return pg.size + (landscape ? ' افقی' : ' عمودی');
+    if (pg.size && pg.size.width)
+      return (
+        faDigits(Math.round(pg.size.width)) + '×' + faDigits(Math.round(pg.size.height)) + ' pt'
+      );
+    return landscape ? 'افقی' : 'عمودی';
+  }
+  function tplThumb(entry) {
+    var key = entry.id + '|' + tplTheme;
+    if (thumbCache[key] === undefined) {
+      var svg = '';
       try {
         // live WYSIWYG thumbnail: the engine renders page 1 of the template
-        var res = P.renderToSvg(entry.template, { data: entry.data });
-        thumbHtml = res.pages[0] || '';
+        svg = P.renderToSvg(tplThemed(entry.template), { data: entry.data }).pages[0] || '';
       } catch (err) {
-        thumbHtml = '';
+        svg = '';
       }
-      card.innerHTML =
-        '<div class="tpl-thumb">' +
-        thumbHtml +
-        '</div><div class="tpl-meta"><strong>' +
-        esc(entry.name) +
-        '</strong><span>' +
-        esc(entry.desc || '') +
-        '</span></div>';
-      var svg = card.querySelector('.tpl-thumb svg');
-      if (svg) {
-        var w = Number(svg.getAttribute('width')) || 595;
-        svg.style.transform = 'scale(' + 220 / w + ')';
-      }
-      card.title = 'لود قالب «' + entry.name + '» همراه دادهٔ نمونه‌اش';
-      card.addEventListener('click', function () {
-        loadGalleryTemplate(entry);
-      });
-      galleryCardsEl.appendChild(card);
+      thumbCache[key] = svg;
+    }
+    return thumbCache[key];
+  }
+  function tplMatches(entry, terms) {
+    // `cat: 'all'` entries (the blank canvas) stay reachable from every filter
+    if (tplCat !== 'all' && entry.cat !== 'all' && entry.cat !== tplCat) return false;
+    if (!terms.length) return true;
+    var hay = tplNorm([entry.name, entry.desc, entry.id].concat(entry.tags || []).join(' '));
+    return terms.every(function (t) {
+      return hay.indexOf(t) >= 0;
     });
+  }
+
+  /** Scale the engine SVG so the whole page fits the card, never cropped. */
+  function fitThumb(card) {
+    var svg = card.querySelector('.tpl-thumb svg');
+    var paper = card.querySelector('.tpl-paper');
+    if (!svg || !paper) return;
+    var w = Number(svg.getAttribute('width')) || 595;
+    var h = Number(svg.getAttribute('height')) || 842;
+    var k = Math.min(THUMB_W / w, THUMB_H / h);
+    paper.style.width = Math.round(w * k) + 'px';
+    paper.style.height = Math.round(h * k) + 'px';
+    svg.style.transform = 'scale(' + k + ')';
+  }
+
+  function buildTplCard(entry, index) {
+    var card = document.createElement('div');
+    card.className = 'tpl-card';
+    card.setAttribute('role', 'button');
+    card.tabIndex = 0;
+    card.dataset.template = entry.id;
+    card.dataset.i = String(index);
+    card.innerHTML =
+      '<div class="tpl-thumb"><div class="tpl-paper">' +
+      tplThumb(entry) +
+      '</div>' +
+      (entry.badge ? '<span class="tpl-badge">' + esc(entry.badge) + '</span>' : '') +
+      '<span class="tpl-size">' +
+      esc(tplSizeLabel(entry.template)) +
+      '</span><div class="tpl-actions">' +
+      '<button class="tpl-use" data-act="use" tabindex="-1">استفاده از این قالب</button>' +
+      '<button class="tpl-peek" data-act="peek" tabindex="-1" aria-label="پیش‌نمایش بزرگ" ' +
+      'title="پیش‌نمایش بزرگ در اندازهٔ واقعی">⤢</button>' +
+      '</div></div><div class="tpl-meta"><strong>' +
+      esc(entry.name) +
+      '</strong><span>' +
+      esc(entry.desc || '') +
+      '</span></div>';
+    fitThumb(card);
+    card.title = 'لود قالب «' + entry.name + '» همراه دادهٔ نمونه‌اش';
+    return card;
+  }
+
+  function renderGallery() {
+    var terms = tplNorm(tplQuery).split(' ').filter(Boolean);
+    tplVisible = tplEntries().filter(function (entry) {
+      return tplMatches(entry, terms);
+    });
+    galleryCardsEl.innerHTML = '';
+    tplVisible.forEach(function (entry, i) {
+      galleryCardsEl.appendChild(buildTplCard(entry, i));
+    });
+    tplEmptyEl.classList.toggle('show', tplVisible.length === 0);
+    tplCountEl.textContent = tplVisible.length
+      ? faDigits(tplVisible.length) + ' قالب آماده'
+      : 'بدون نتیجه';
+    if (tplFocus >= tplVisible.length) tplFocus = 0;
     upgradeTooltips(galleryCardsEl);
   }
+
+  /** Category chips + palette swatches — built once, then only their state moves. */
+  function renderTplChrome() {
+    if (tplChromeReady) return;
+    tplChromeReady = true;
+    (window.PDFSTUDIO_TEMPLATE_CATEGORIES || []).forEach(function (cat) {
+      var b = document.createElement('button');
+      b.className = 'tpl-chip';
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.dataset.cat = cat.id;
+      b.textContent = cat.name;
+      tplCatsEl.appendChild(b);
+    });
+    (window.PDFSTUDIO_THEMES || []).forEach(function (theme) {
+      var b = document.createElement('button');
+      b.className = 'tpl-sw';
+      b.type = 'button';
+      b.setAttribute('role', 'radio');
+      b.dataset.theme = theme.id;
+      b.style.background = theme.css;
+      b.title = 'پالت ' + theme.name;
+      tplThemesEl.appendChild(b);
+    });
+    upgradeTooltips(tplThemesEl);
+    syncTplChrome();
+  }
+  function syncTplChrome() {
+    Array.prototype.forEach.call(tplCatsEl.querySelectorAll('.tpl-chip'), function (b) {
+      b.setAttribute('aria-selected', b.dataset.cat === tplCat ? 'true' : 'false');
+    });
+    Array.prototype.forEach.call(tplThemesEl.querySelectorAll('.tpl-sw'), function (b) {
+      b.setAttribute('aria-checked', b.dataset.theme === tplTheme ? 'true' : 'false');
+    });
+  }
+
+  function setTplTheme(id) {
+    tplTheme = id;
+    try {
+      window.localStorage.setItem(TPL_THEME_KEY, id);
+    } catch (e) {
+      /* private mode: the palette just won't persist */
+    }
+    syncTplChrome();
+    renderGallery();
+  }
+
   function loadGalleryTemplate(entry) {
     sampleData = JSON.parse(JSON.stringify(entry.data || {}));
     sampleEl.value = JSON.stringify(sampleData, null, 2);
     renderFieldPicker();
-    loadTemplate(JSON.parse(JSON.stringify(entry.template)));
+    loadTemplate(tplThemed(entry.template));
     galleryEl.classList.remove('show');
+    tplZoomEl.classList.remove('show');
     setTab('design');
     toast('قالب «' + entry.name + '» لود شد', { type: 'success' });
   }
+
+  function openTplZoom(entry) {
+    tplZoomEntry = entry;
+    document.getElementById('tplZoomTitle').textContent = entry.name;
+    document.getElementById('tplZoomDesc').textContent = entry.desc || '';
+    tplZoomStageEl.innerHTML = tplThumb(entry);
+    tplZoomEl.classList.add('show');
+  }
+
+  function focusTplCard(i) {
+    var cards = galleryCardsEl.querySelectorAll('.tpl-card');
+    if (!cards.length) return;
+    tplFocus = Math.max(0, Math.min(cards.length - 1, i));
+    cards[tplFocus].focus();
+  }
+
+  galleryCardsEl.addEventListener('click', function (e) {
+    var card = e.target.closest ? e.target.closest('.tpl-card') : null;
+    if (!card) return;
+    var entry = tplEntryById(card.dataset.template);
+    if (!entry) return;
+    var act = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (act && act.dataset.act === 'peek') {
+      e.stopPropagation();
+      openTplZoom(entry);
+      return;
+    }
+    loadGalleryTemplate(entry);
+  });
+  galleryCardsEl.addEventListener('keydown', function (e) {
+    var card = e.target.closest ? e.target.closest('.tpl-card') : null;
+    if (!card) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      var entry = tplEntryById(card.dataset.template);
+      if (entry) loadGalleryTemplate(entry);
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusTplCard(Number(card.dataset.i) + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusTplCard(Number(card.dataset.i) - 1);
+    }
+  });
+
+  tplCatsEl.addEventListener('click', function (e) {
+    var chip = e.target.closest ? e.target.closest('.tpl-chip') : null;
+    if (!chip) return;
+    tplCat = chip.dataset.cat;
+    syncTplChrome();
+    renderGallery();
+  });
+  tplThemesEl.addEventListener('click', function (e) {
+    var sw = e.target.closest ? e.target.closest('.tpl-sw') : null;
+    if (sw) setTplTheme(sw.dataset.theme);
+  });
+  tplSearchEl.addEventListener('input', function () {
+    tplQuery = tplSearchEl.value;
+    renderGallery();
+  });
+  tplSearchEl.addEventListener('keydown', function (e) {
+    e.stopPropagation(); // never let Delete/arrows reach the canvas shortcuts
+    if (e.key === 'ArrowDown' || e.key === 'Enter') {
+      e.preventDefault();
+      focusTplCard(0);
+    } else if (e.key === 'Escape') {
+      if (tplSearchEl.value) {
+        tplSearchEl.value = '';
+        tplQuery = '';
+        renderGallery();
+      } else galleryEl.classList.remove('show');
+    }
+  });
+  document.getElementById('tplLucky').addEventListener('click', function () {
+    var all = tplEntries().filter(function (t) {
+      return t.id !== 'blank';
+    });
+    var themes = window.PDFSTUDIO_THEMES || [];
+    if (!all.length) return;
+    var pick = all[Math.floor(Math.random() * all.length)];
+    if (themes.length) {
+      tplTheme = themes[Math.floor(Math.random() * themes.length)].id;
+      syncTplChrome();
+    }
+    loadGalleryTemplate(pick);
+  });
+
   document.getElementById('openGallery').addEventListener('click', function () {
+    renderTplChrome();
     renderGallery();
     galleryEl.classList.add('show');
+    if (tplSearchEl.focus) tplSearchEl.focus();
   });
   document.getElementById('closeGallery').addEventListener('click', function () {
     galleryEl.classList.remove('show');
   });
   galleryEl.addEventListener('click', function (e) {
     if (e.target === galleryEl) galleryEl.classList.remove('show');
+  });
+  document.getElementById('closeTplZoom').addEventListener('click', function () {
+    tplZoomEl.classList.remove('show');
+  });
+  document.getElementById('tplZoomUse').addEventListener('click', function () {
+    if (tplZoomEntry) loadGalleryTemplate(tplZoomEntry);
+  });
+  tplZoomEl.addEventListener('click', function (e) {
+    if (e.target === tplZoomEl) tplZoomEl.classList.remove('show');
   });
 
   // --- autosave / new document ----------------------------------------------
@@ -4412,6 +4670,9 @@
       if (helpEl.classList.contains('show')) return helpEl.classList.remove('show');
       if (historyEl.classList.contains('show')) return historyEl.classList.remove('show');
       if (copilotEl.classList.contains('show')) return copilotEl.classList.remove('show');
+      // the big preview sits on top of the gallery, so it closes first
+      if (tplZoomEl.classList.contains('show')) return tplZoomEl.classList.remove('show');
+      if (galleryEl.classList.contains('show')) return galleryEl.classList.remove('show');
       if (exitGroup()) return; // step out of a group before dropping the selection
       selected = [];
       renderInspector();

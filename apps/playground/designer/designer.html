@@ -1487,12 +1487,136 @@
         background: var(--accent-weak);
         color: var(--ink);
       }
+      .tpl-panel {
+        width: min(1180px, 95vw);
+        max-height: 90vh;
+      }
+      /* ---- toolbar: search + category chips + palette ---- */
+      .tpl-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--sp-5);
+        padding: var(--sp-5) var(--sp-8);
+        border-bottom: 1px solid var(--border);
+        background: var(--raised);
+      }
+      .tpl-searchbox {
+        position: relative;
+        display: flex;
+        align-items: center;
+        flex: 0 0 240px;
+      }
+      .tpl-searchbox svg {
+        position: absolute;
+        inset-inline-start: var(--sp-4);
+        color: var(--muted);
+        pointer-events: none;
+      }
+      .tpl-searchbox input {
+        width: 100%;
+        height: var(--h-md);
+        padding-inline: calc(var(--sp-4) + 20px) var(--sp-4);
+        border: 1px solid var(--border);
+        border-radius: var(--r-pill);
+        background: var(--field);
+        font-size: var(--fs-xs);
+      }
+      .tpl-searchbox input::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+      }
+      .tpl-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sp-2);
+        flex: 1 1 auto;
+      }
+      .tpl-chip {
+        height: var(--h-sm);
+        padding: 0 var(--sp-5);
+        border: 1px solid var(--border);
+        border-radius: var(--r-pill);
+        background: transparent;
+        color: var(--muted);
+        font-size: var(--fs-2xs);
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+          background var(--dur-base),
+          color var(--dur-base),
+          border-color var(--dur-base);
+      }
+      .tpl-chip:hover {
+        color: var(--ink);
+        border-color: var(--border-strong);
+      }
+      .tpl-chip[aria-selected='true'] {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .tpl-palette {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+      }
+      .tpl-palette-l {
+        font-size: var(--fs-2xs);
+        color: var(--muted);
+      }
+      .tpl-swatches {
+        display: flex;
+        gap: var(--sp-1);
+      }
+      .tpl-sw {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        border: 2px solid transparent;
+        border-radius: var(--r-pill);
+        cursor: pointer;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+        transition:
+          transform var(--dur-base),
+          border-color var(--dur-base);
+      }
+      .tpl-sw:hover {
+        transform: scale(1.15);
+      }
+      .tpl-sw[aria-checked='true'] {
+        border-color: var(--ink);
+        transform: scale(1.15);
+      }
+      .tpl-lucky {
+        height: var(--h-sm);
+        padding: 0 var(--sp-5);
+        border: 1px dashed var(--border-strong);
+        border-radius: var(--r-pill);
+        background: transparent;
+        color: var(--muted);
+        font-size: var(--fs-2xs);
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+          color var(--dur-base),
+          border-color var(--dur-base),
+          background var(--dur-base);
+      }
+      .tpl-lucky:hover {
+        color: var(--accent);
+        border-color: var(--accent);
+        background: var(--accent-weak);
+      }
+
+      /* ---- cards ---- */
       .gallery-cards {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(224px, 1fr));
         gap: var(--sp-6);
         padding: var(--sp-7) var(--sp-8) var(--sp-8);
         overflow: auto;
+        flex: 1 1 auto;
       }
       .tpl-card {
         border: 1px solid var(--border);
@@ -1503,30 +1627,113 @@
         text-align: start;
         padding: 0;
         transition:
-          box-shadow 0.18s,
-          border-color 0.18s,
-          transform 0.18s;
+          box-shadow var(--dur-base),
+          border-color var(--dur-base),
+          transform var(--dur-base);
       }
-      .tpl-card:hover {
+      .tpl-card:hover,
+      .tpl-card:focus-visible {
         border-color: var(--accent);
         box-shadow: 0 14px 34px -10px rgba(20, 30, 50, 0.35);
         transform: translateY(-3px);
       }
+      /* thumbnail: the page is scaled to *fit* the box, never cropped */
       .tpl-thumb {
-        height: 165px;
+        position: relative;
+        height: 180px;
         overflow: hidden;
         display: flex;
+        align-items: center;
         justify-content: center;
         background: var(--workspace);
-        pointer-events: none;
         border-bottom: 1px solid var(--border);
       }
-      .tpl-thumb svg {
-        transform-origin: top center;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+      /* The paper box is sized to the *scaled* page, and the engine's SVG is
+         scaled into it from the top-left — physical, so RTL never flips it. */
+      .tpl-paper {
+        position: relative;
+        overflow: hidden;
+        background: #fff;
+        box-shadow:
+          0 0 0 1px rgba(20, 30, 50, 0.14),
+          0 6px 18px -4px rgba(20, 30, 50, 0.3);
+      }
+      .tpl-paper svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: block;
+        transform-origin: top left;
+      }
+      .tpl-badge,
+      .tpl-size {
+        position: absolute;
+        z-index: 2;
+        border-radius: var(--r-pill);
+        font-size: 10px;
+        line-height: 1;
+        padding: 4px var(--sp-3);
+        pointer-events: none;
+      }
+      .tpl-badge {
+        top: var(--sp-3);
+        inset-inline-start: var(--sp-3);
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .tpl-size {
+        bottom: var(--sp-3);
+        inset-inline-end: var(--sp-3);
+        background: rgba(15, 20, 30, 0.68);
+        color: #fff;
+        font-variant-numeric: tabular-nums;
+      }
+      .tpl-actions {
+        position: absolute;
+        inset: auto 0 0 0;
+        z-index: 3;
+        display: flex;
+        gap: var(--sp-3);
+        padding: var(--sp-4);
+        background: linear-gradient(to top, rgba(10, 14, 22, 0.82), transparent);
+        opacity: 0;
+        transform: translateY(6px);
+        transition:
+          opacity var(--dur-base),
+          transform var(--dur-base);
+      }
+      .tpl-card:hover .tpl-actions,
+      .tpl-card:focus-within .tpl-actions {
+        opacity: 1;
+        transform: none;
+      }
+      .tpl-use,
+      .tpl-peek {
+        height: 28px;
+        border: 0;
+        border-radius: var(--r-md);
+        font-size: var(--fs-2xs);
+        cursor: pointer;
+      }
+      .tpl-use {
+        flex: 1 1 auto;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .tpl-peek {
+        flex: 0 0 32px;
+        background: rgba(255, 255, 255, 0.92);
+        color: #16202e;
+        font-size: var(--fs-sm);
+      }
+      .tpl-use:hover,
+      .tpl-peek:hover {
+        filter: brightness(1.08);
       }
       .tpl-meta {
-        padding: var(--sp-5) var(--sp-6) var(--sp-5);
+        padding: var(--sp-5) var(--sp-6);
       }
       .tpl-meta strong {
         display: block;
@@ -1537,6 +1744,77 @@
       .tpl-meta span {
         font-size: var(--fs-2xs);
         color: var(--muted);
+        line-height: 1.55;
+      }
+      /* ---- empty state + footer ---- */
+      .tpl-empty {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--sp-2);
+        padding: var(--sp-10) var(--sp-8);
+        text-align: center;
+      }
+      .tpl-empty.show {
+        display: flex;
+      }
+      .tpl-empty strong {
+        font-size: var(--fs-md);
+      }
+      .tpl-empty span {
+        font-size: var(--fs-xs);
+        color: var(--muted);
+      }
+      .tpl-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--sp-5);
+        padding: var(--sp-4) var(--sp-8);
+        border-top: 1px solid var(--border);
+        font-size: var(--fs-2xs);
+        color: var(--muted);
+      }
+      .tpl-foot-hint {
+        opacity: 0.75;
+      }
+
+      /* ---- large preview ---- */
+      .tpl-zoom-backdrop {
+        z-index: 110;
+      }
+      .tpl-zoom-panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-2xl);
+        width: min(760px, 94vw);
+        max-height: 92vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--shadow-pop);
+        overflow: hidden;
+      }
+      .tpl-zoom-stage {
+        flex: 1 1 auto;
+        overflow: auto;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: var(--sp-7);
+        background: var(--workspace);
+      }
+      .tpl-zoom-stage svg {
+        display: block;
+        background: #fff;
+        box-shadow: var(--shadow-page);
+        max-width: 100%;
+        height: auto;
+      }
+      .tpl-zoom-foot {
+        display: flex;
+        justify-content: flex-end;
+        padding: var(--sp-5) var(--sp-7);
+        border-top: 1px solid var(--border);
       }
 
       /* ================= help center ================= */
@@ -2123,6 +2401,30 @@
         }
         .gallery-cards {
           grid-template-columns: 1fr !important;
+        }
+        /* the gallery toolbar stacks: search, then chips, then the palette */
+        .tpl-toolbar {
+          padding-inline: var(--sp-6);
+          gap: var(--sp-4);
+        }
+        .tpl-searchbox {
+          flex: 1 1 100%;
+        }
+        .tpl-chips {
+          flex: 1 1 100%;
+          overflow-x: auto;
+          flex-wrap: nowrap;
+          scrollbar-width: none;
+        }
+        .tpl-chips::-webkit-scrollbar {
+          display: none;
+        }
+        .tpl-palette {
+          flex: 1 1 100%;
+          justify-content: space-between;
+        }
+        .tpl-foot-hint {
+          display: none;
         }
       }
 
@@ -2889,15 +3191,86 @@
     </div>
 
     <div id="gallery" class="gallery-backdrop">
-      <div class="gallery-panel" role="dialog" aria-modal="true" aria-labelledby="galleryTitle">
+      <div
+        class="gallery-panel tpl-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="galleryTitle"
+      >
         <div class="gallery-head">
           <div>
             <strong id="galleryTitle">گالری قالب‌ها</strong>
-            <p>با یک کلیک شروع کن — قالب و دادهٔ نمونه با هم لود می‌شوند.</p>
+            <p>با یک کلیک شروع کن — قالب، دادهٔ نمونه و پالت رنگی با هم لود می‌شوند.</p>
           </div>
           <button id="closeGallery" aria-label="بستن">✕</button>
         </div>
+
+        <div class="tpl-toolbar">
+          <div class="tpl-searchbox">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            >
+              <circle cx="9" cy="9" r="5.5" />
+              <path d="m13.5 13.5 3.5 3.5" />
+            </svg>
+            <input
+              id="tplSearch"
+              type="search"
+              autocomplete="off"
+              placeholder="جست‌وجو… فاکتور، رزومه، بلیط، داشبورد"
+              aria-label="جست‌وجوی قالب"
+            />
+          </div>
+          <div id="tplCats" class="tpl-chips" role="tablist" aria-label="دسته‌بندی قالب‌ها"></div>
+          <div class="tpl-palette">
+            <span class="tpl-palette-l">پالت رنگی</span>
+            <div
+              id="tplThemes"
+              class="tpl-swatches"
+              role="radiogroup"
+              aria-label="پالت رنگی قالب‌ها"
+            ></div>
+            <button
+              id="tplLucky"
+              class="tpl-lucky"
+              data-tip="یک قالب و پالت تصادفی — برای وقتی که نمی‌دانی از کجا شروع کنی"
+            >
+              ✦ شانسی
+            </button>
+          </div>
+        </div>
+
         <div id="galleryCards" class="gallery-cards"></div>
+        <div id="tplEmpty" class="tpl-empty">
+          <strong>قالبی با این عنوان پیدا نشد</strong>
+          <span>عبارت دیگری را امتحان کن یا دستهٔ «همه» را انتخاب کن.</span>
+        </div>
+        <div class="tpl-foot">
+          <span id="tplCount"></span>
+          <span class="tpl-foot-hint">↑↓ حرکت • Enter انتخاب • Esc بستن</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="tplZoom" class="gallery-backdrop tpl-zoom-backdrop">
+      <div class="tpl-zoom-panel" role="dialog" aria-modal="true" aria-labelledby="tplZoomTitle">
+        <div class="gallery-head">
+          <div>
+            <strong id="tplZoomTitle">پیش‌نمایش قالب</strong>
+            <p id="tplZoomDesc"></p>
+          </div>
+          <button id="closeTplZoom" aria-label="بستن">✕</button>
+        </div>
+        <div id="tplZoomStage" class="tpl-zoom-stage"></div>
+        <div class="tpl-zoom-foot">
+          <button id="tplZoomUse" class="btn primary">استفاده از این قالب</button>
+        </div>
       </div>
     </div>
 

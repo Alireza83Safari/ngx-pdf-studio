@@ -9,12 +9,24 @@
   'use strict';
 
   var V = 'Vazirmatn';
-  function rgb(r, g, b) {
-    return { space: 'rgb', r: r, g: g, b: b };
+  function rgb(r, g, b, a) {
+    var c = { space: 'rgb', r: r, g: g, b: b };
+    if (a !== undefined) c.a = a;
+    return c;
   }
   var INK = rgb(15, 23, 42);
-  var BLUE = rgb(37, 99, 235);
   var MUTED = rgb(100, 116, 139);
+  var HAIR = rgb(203, 213, 225);
+  var PAPER = rgb(255, 255, 255);
+
+  /**
+   * Two themeable tokens. Every template paints its brand colour with `ACCENT`
+   * and its light wash with `TINT`; `themeTemplate()` below swaps exactly those
+   * two values, so one palette click re-skins the whole gallery (§8B).
+   */
+  var ACCENT = rgb(37, 99, 235);
+  var TINT = rgb(219, 234, 254);
+  var BLUE = ACCENT; // legacy alias used by the first-generation templates
 
   function page(overrides) {
     return Object.assign(
@@ -55,8 +67,91 @@
       type: 'line',
       bounds: { x: x, y: y, width: w, height: 2 },
       zIndex: 1,
-      stroke: { width: width || 1, color: color || rgb(203, 213, 225) },
+      stroke: { width: width || 1, color: color || HAIR },
     };
+  }
+  /** Truly vertical rule (the painter draws bounds → bounds+size, so width 0). */
+  function vline(id, x, y, h, color, width) {
+    return {
+      id: id,
+      type: 'line',
+      bounds: { x: x, y: y, width: 0, height: h },
+      zIndex: 1,
+      stroke: { width: width || 1, color: color || HAIR },
+    };
+  }
+  /**
+   * Background panel. `opts` = { fill, border, radius, borderWidth }. Painted at
+   * zIndex 0 so it always sits under the content laid on top of it.
+   */
+  function panel(id, x, y, w, h, opts) {
+    var o = opts || {};
+    var box = {};
+    if (o.fill) box.fill = { color: o.fill };
+    if (o.border || o.radius !== undefined) {
+      box.border = {};
+      if (o.border) box.border.all = { width: o.borderWidth || 0.8, color: o.border };
+      if (o.radius !== undefined) box.border.radius = o.radius;
+    }
+    return {
+      id: id,
+      type: 'rectangle',
+      bounds: { x: x, y: y, width: w, height: h },
+      zIndex: 0,
+      box: box,
+    };
+  }
+  function ellipse(id, x, y, w, h, opts) {
+    var e = panel(id, x, y, w, h, opts);
+    e.type = 'ellipse';
+    return e;
+  }
+  function qr(id, x, y, w, h, src) {
+    return {
+      id: id,
+      type: 'qrcode',
+      bounds: { x: x, y: y, width: w, height: h },
+      zIndex: 1,
+      value: { source: src },
+    };
+  }
+  function barcode(id, x, y, w, h, src, showText) {
+    return {
+      id: id,
+      type: 'barcode',
+      symbology: 'code128',
+      bounds: { x: x, y: y, width: w, height: h },
+      zIndex: 1,
+      value: { source: src },
+      showText: showText !== false,
+    };
+  }
+  /** Label/value pair on one row — the workhorse of every form-like template. */
+  function pair(idBase, label, src, x, y, w, labelW, ty) {
+    return [
+      text(idBase + '-l', label, x, y, labelW, 12, { fontSize: 8, color: MUTED }),
+      fieldEl(idBase, src, x + labelW, y - 1, w - labelW, 13, Object.assign({ fontSize: 9 }, ty)),
+    ];
+  }
+  /** Flatten nested element arrays so `pair()` can be spread inline. */
+  function flat(list) {
+    var out = [];
+    list.forEach(function (item) {
+      if (Object.prototype.toString.call(item) === '[object Array]') out = out.concat(flat(item));
+      else if (item) out.push(item);
+    });
+    return out;
+  }
+  /** Standard body/header cell columns for a table. */
+  function col(id, pct, header, src, footer) {
+    var c = {
+      id: id,
+      width: { kind: 'percent', value: pct },
+      header: { text: header, styleId: 'cellHead' },
+      detail: { content: { source: src }, styleId: 'cell' },
+    };
+    if (footer) c.footer = { aggregate: footer, styleId: 'cellHead' };
+    return c;
   }
   function baseTemplate(name, pageSetup, bands, extra) {
     return Object.assign(
@@ -74,7 +169,7 @@
             id: 'cellHead',
             name: 'سرستون جدول',
             typography: { fontFamily: V, fontSize: 10, fontWeight: 'bold', color: INK },
-            box: { fill: { color: rgb(241, 245, 249) } },
+            box: { fill: { color: TINT } },
           },
         ],
         datasets: [{ name: 'items', source: { kind: 'path', path: 'items' } }],
@@ -292,10 +387,13 @@
   };
 
   // --- ۴) برچسب محصول ---------------------------------------------------------
+  // NB: `resolvePageSize` normalises custom sizes to portrait, so any page that
+  // is designed wider than it is tall must say so with `orientation`.
   var label = baseTemplate(
     'برچسب محصول',
     page({
       size: { width: 283, height: 170 },
+      orientation: 'landscape',
       margins: { top: 12, right: 12, bottom: 12, left: 12 },
     }),
     [
@@ -690,6 +788,7 @@
     'کارت ویزیت',
     page({
       size: { width: 252, height: 144 },
+      orientation: 'landscape',
       margins: { top: 16, right: 18, bottom: 16, left: 18 },
     }),
     [
@@ -1227,97 +1326,1633 @@
     ],
   };
 
+  // --- ۱۳) فیش حقوقی ------------------------------------------------------------
+  var payslip = baseTemplate(
+    'فیش حقوقی',
+    page(),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 740 },
+        elements: flat([
+          panel('ps-hd', 0, 0, 523, 62, { fill: ACCENT, radius: 10 }),
+          text('ps-title', 'فیش حقوقی', 14, 10, 240, 24, {
+            fontSize: 17,
+            fontWeight: 'bold',
+            color: PAPER,
+          }),
+          fieldEl('ps-co', 'company.name', 14, 38, 260, 14, {
+            fontSize: 9,
+            color: rgb(255, 255, 255, 0.85),
+          }),
+          text('ps-mon-l', 'دورهٔ حقوقی', 300, 12, 209, 12, {
+            fontSize: 8,
+            color: rgb(255, 255, 255, 0.8),
+            align: 'end',
+          }),
+          fieldEl('ps-mon', 'payroll.period', 300, 26, 209, 22, {
+            fontSize: 14,
+            fontWeight: 'bold',
+            color: PAPER,
+            align: 'end',
+          }),
+
+          panel('ps-ib', 0, 76, 523, 62, { fill: rgb(248, 250, 252), border: HAIR, radius: 8 }),
+          pair('ps-nm', 'نام و نام‌خانوادگی', 'employee.name', 12, 90, 245, 92, {
+            fontSize: 10,
+            fontWeight: 'bold',
+          }),
+          pair('ps-cd', 'کد پرسنلی', 'employee.code', 275, 90, 236, 70),
+          pair('ps-rl', 'سمت سازمانی', 'employee.role', 12, 112, 245, 92),
+          pair('ps-ac', 'شمارهٔ حساب', 'employee.account', 275, 112, 236, 70),
+
+          text('ps-e-h', 'دریافتی‌ها', 0, 152, 200, 16, {
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          {
+            id: 'ps-e',
+            type: 'table',
+            bounds: { x: 0, y: 174, width: 255, height: 140 },
+            zIndex: 1,
+            dataset: 'earnings',
+            rowStripeStyleId: 'cell',
+            repeatHeader: true,
+            columns: [
+              col('pe-t', 58, 'عنوان', 'title'),
+              col('pe-a', 42, 'مبلغ (ریال)', 'amount', 'sum'),
+            ],
+          },
+
+          text('ps-d-h', 'کسورات', 268, 152, 200, 16, {
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          {
+            id: 'ps-d',
+            type: 'table',
+            bounds: { x: 268, y: 174, width: 255, height: 140 },
+            zIndex: 1,
+            dataset: 'deductions',
+            rowStripeStyleId: 'cell',
+            repeatHeader: true,
+            columns: [
+              col('pd-t', 58, 'عنوان', 'title'),
+              col('pd-a', 42, 'مبلغ (ریال)', 'amount', 'sum'),
+            ],
+          },
+
+          panel('ps-net', 0, 350, 523, 76, { fill: TINT, radius: 10 }),
+          text('ps-net-l', 'خالص پرداختی', 16, 362, 200, 14, { fontSize: 10, color: MUTED }),
+          fieldEl('ps-net-v', 'sum(earnings, amount) - sum(deductions, amount)', 16, 380, 230, 28, {
+            fontSize: 21,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          text('ps-net-u', 'ریال', 16, 410, 60, 12, { fontSize: 8, color: MUTED }),
+          text('ps-w-l', 'به حروف', 268, 362, 240, 12, { fontSize: 8, color: MUTED }),
+          fieldEl(
+            'ps-w',
+            "toWords(round(sum(earnings, amount) - sum(deductions, amount)), 'rial')",
+            268,
+            378,
+            241,
+            34,
+            { fontSize: 9, fontWeight: 'bold', lineHeight: 1.6 },
+          ),
+
+          qr('ps-qr', 0, 444, 62, 62, 'payroll.slipId'),
+          text('ps-qr-l', 'کد فیش', 0, 508, 62, 11, { fontSize: 7, color: MUTED, align: 'center' }),
+          text('ps-id-l', 'شناسهٔ فیش:', 74, 448, 70, 12, { fontSize: 8, color: MUTED }),
+          fieldEl('ps-id', 'payroll.slipId', 74, 462, 200, 13, { fontSize: 9 }),
+          text(
+            'ps-note',
+            'این فیش به‌صورت الکترونیکی صادر شده است. در صورت مغایرت، ظرف ۷ روز کاری به واحد منابع انسانی اطلاع دهید.',
+            74,
+            484,
+            300,
+            26,
+            { fontSize: 7.5, color: MUTED, lineHeight: 1.6 },
+          ),
+          hline('ps-sig', 340, 500, 180, HAIR, 1),
+          text('ps-sig-l', 'مهر و امضای کارفرما', 340, 508, 180, 13, {
+            fontSize: 8.5,
+            align: 'center',
+            color: MUTED,
+          }),
+        ]),
+      },
+    ],
+    {
+      datasets: [
+        { name: 'earnings', source: { kind: 'path', path: 'earnings' } },
+        { name: 'deductions', source: { kind: 'path', path: 'deductions' } },
+      ],
+    },
+  );
+  var payslipData = {
+    company: { name: 'شرکت فناوری نوآوران' },
+    payroll: { period: 'تیر ۱۴۰۵', slipId: 'PS-1405-04-0231' },
+    employee: {
+      name: 'امیرحسین کاظمی',
+      code: '۱۰۲۴۷',
+      role: 'کارشناس ارشد نرم‌افزار',
+      account: 'IR۳۲۰۱۷۰۰۰۰۰۲۱۱۰۸۴۵۶۹۰۰۱',
+    },
+    earnings: [
+      { title: 'حقوق پایه', amount: 145000000 },
+      { title: 'حق مسکن و خواربار', amount: 22000000 },
+      { title: 'حق اولاد', amount: 8500000 },
+      { title: 'اضافه‌کاری (۲۴ ساعت)', amount: 31200000 },
+      { title: 'پاداش عملکرد', amount: 40000000 },
+    ],
+    deductions: [
+      { title: 'بیمهٔ تأمین اجتماعی', amount: 25690000 },
+      { title: 'مالیات بر حقوق', amount: 14300000 },
+      { title: 'وام مسکن', amount: 12000000 },
+      { title: 'بیمهٔ تکمیلی', amount: 3400000 },
+    ],
+  };
+
+  // --- ۱۴) قرارداد خدمات ---------------------------------------------------------
+  var contract = baseTemplate(
+    'قرارداد خدمات',
+    page(),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 740 },
+        elements: flat([
+          panel('ct-hd', 0, 0, 523, 56, { fill: TINT, radius: 10 }),
+          text('ct-title', 'قرارداد ارائهٔ خدمات', 0, 8, 523, 26, {
+            fontSize: 19,
+            fontWeight: 'bold',
+            color: ACCENT,
+            align: 'center',
+          }),
+          text('ct-no-l', 'شمارهٔ قرارداد:', 16, 38, 70, 12, { fontSize: 8, color: MUTED }),
+          fieldEl('ct-no', 'contract.number', 88, 37, 130, 13, { fontSize: 9, fontWeight: 'bold' }),
+          text('ct-dt-l', 'تاریخ انعقاد:', 330, 38, 60, 12, { fontSize: 8, color: MUTED }),
+          fieldEl('ct-dt', 'contract.date', 392, 37, 115, 13, {
+            fontSize: 9,
+            fontWeight: 'bold',
+            align: 'end',
+          }),
+
+          panel('ct-p1', 0, 70, 255, 72, { border: HAIR, radius: 8 }),
+          text('ct-p1-t', 'طرف اول — کارفرما', 10, 76, 200, 13, {
+            fontSize: 9,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          fieldEl('ct-p1-n', 'employer.name', 10, 92, 235, 15, {
+            fontSize: 10,
+            fontWeight: 'bold',
+          }),
+          pair('ct-p1-i', 'شناسهٔ ملی', 'employer.nationalId', 10, 112, 235, 60),
+          pair('ct-p1-r', 'نمایندهٔ قانونی', 'employer.rep', 10, 128, 235, 60),
+
+          panel('ct-p2', 268, 70, 255, 72, { border: HAIR, radius: 8 }),
+          text('ct-p2-t', 'طرف دوم — پیمانکار', 278, 76, 200, 13, {
+            fontSize: 9,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          fieldEl('ct-p2-n', 'contractor.name', 278, 92, 235, 15, {
+            fontSize: 10,
+            fontWeight: 'bold',
+          }),
+          pair('ct-p2-i', 'شناسهٔ ملی', 'contractor.nationalId', 278, 112, 235, 60),
+          pair('ct-p2-r', 'نمایندهٔ قانونی', 'contractor.rep', 278, 128, 235, 60),
+
+          text('ct-cl-h', 'مواد قرارداد', 0, 158, 200, 16, {
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          {
+            id: 'ct-cl',
+            type: 'list',
+            dataset: 'clauses',
+            bounds: { x: 0, y: 182, width: 523, height: 300 },
+            zIndex: 1,
+            itemHeight: 54,
+            gap: 8,
+            itemTemplate: [
+              panel('cl-bg', 0, 0, 523, 54, { fill: rgb(248, 250, 252), radius: 8 }),
+              panel('cl-tab', 0, 0, 4, 54, { fill: ACCENT, radius: 2 }),
+              fieldEl('cl-n', "'مادهٔ ' + ($index + 1)", 14, 7, 70, 12, {
+                fontSize: 8,
+                fontWeight: 'bold',
+                color: ACCENT,
+              }),
+              fieldEl('cl-t', 'title', 88, 6, 300, 14, { fontSize: 10, fontWeight: 'bold' }),
+              fieldEl('cl-b', 'body', 14, 24, 495, 26, {
+                fontSize: 8.5,
+                color: MUTED,
+                lineHeight: 1.6,
+              }),
+            ],
+          },
+
+          hline('ct-ln2', 0, 520, 523, HAIR, 1),
+          text(
+            'ct-note',
+            'این قرارداد در ۲ نسخهٔ واحد‌الاعتبار تنظیم و پس از امضای طرفین لازم‌الاجرا است.',
+            0,
+            532,
+            523,
+            14,
+            { fontSize: 8.5, color: MUTED, align: 'center' },
+          ),
+          hline('ct-s1', 40, 600, 180, HAIR, 1),
+          text('ct-s1-l', 'مهر و امضای کارفرما', 40, 608, 180, 13, {
+            fontSize: 9,
+            align: 'center',
+          }),
+          hline('ct-s2', 300, 600, 180, HAIR, 1),
+          text('ct-s2-l', 'مهر و امضای پیمانکار', 300, 608, 180, 13, {
+            fontSize: 9,
+            align: 'center',
+          }),
+        ]),
+      },
+    ],
+    { datasets: [{ name: 'clauses', source: { kind: 'path', path: 'clauses' } }] },
+  );
+  var contractData = {
+    contract: { number: 'CT-1405-0087', date: '۱۴۰۵/۰۴/۱۵' },
+    employer: {
+      name: 'شرکت بازرگانی نمونهٔ پارس',
+      nationalId: '۱۰۱۰۲۳۴۵۶۷۸',
+      rep: 'مهندس رضا احمدی',
+    },
+    contractor: {
+      name: 'استودیو نرم‌افزاری نارنج',
+      nationalId: '۱۴۰۰۹۸۷۶۵۴۳',
+      rep: 'نگار صادقی',
+    },
+    clauses: [
+      {
+        title: 'موضوع قرارداد',
+        body: 'طراحی، پیاده‌سازی و استقرار سامانهٔ گزارش‌ساز سازمانی مطابق سند نیازمندی‌های پیوست شمارهٔ ۱.',
+      },
+      {
+        title: 'مدت قرارداد',
+        body: 'مدت اجرا شش ماه شمسی از تاریخ ابلاغ است و تمدید آن منوط به توافق کتبی طرفین خواهد بود.',
+      },
+      {
+        title: 'مبلغ و نحوهٔ پرداخت',
+        body: 'مبلغ کل ۲٬۴۰۰٬۰۰۰٬۰۰۰ ریال، در چهار قسط مساوی و پس از تأیید هر فاز پرداخت می‌شود.',
+      },
+      {
+        title: 'تعهدات پیمانکار',
+        body: 'تحویل به‌موقع فازها، رعایت استانداردهای امنیتی و ارائهٔ مستندات فنی و آموزش کاربران.',
+      },
+      {
+        title: 'محرمانگی',
+        body: 'طرفین متعهدند اطلاعات فنی و تجاری یکدیگر را تا سه سال پس از خاتمهٔ قرارداد محرمانه نگاه دارند.',
+      },
+      {
+        title: 'فسخ و حل اختلاف',
+        body: 'در صورت بروز اختلاف، موضوع ابتدا از طریق مذاکره و در غیر این صورت از طریق داوری مرضی‌الطرفین حل می‌شود.',
+      },
+    ],
+  };
+
+  // --- ۱۵) رزومهٔ حرفه‌ای ----------------------------------------------------------
+  var resume = baseTemplate(
+    'رزومهٔ حرفه‌ای',
+    page({ margins: { top: 30, right: 30, bottom: 30, left: 30 } }),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 736 },
+        elements: flat([
+          // ---- ستون کناری (برند) ----
+          panel('cv-side', 365, 0, 170, 736, { fill: ACCENT }),
+          ellipse('cv-av', 410, 26, 80, 80, {
+            fill: rgb(255, 255, 255, 0.18),
+            border: rgb(255, 255, 255, 0.55),
+            borderWidth: 1.5,
+          }),
+          fieldEl('cv-ini', 'person.initials', 410, 52, 80, 30, {
+            fontSize: 24,
+            fontWeight: 'bold',
+            color: PAPER,
+            align: 'center',
+          }),
+          fieldEl('cv-nm', 'person.name', 375, 120, 150, 22, {
+            fontSize: 15,
+            fontWeight: 'bold',
+            color: PAPER,
+            align: 'center',
+          }),
+          fieldEl('cv-rl', 'person.role', 375, 144, 150, 14, {
+            fontSize: 9,
+            color: rgb(255, 255, 255, 0.85),
+            align: 'center',
+          }),
+          hline('cv-s1', 385, 172, 130, rgb(255, 255, 255, 0.35), 1),
+
+          text('cv-c-h', 'ارتباط', 375, 186, 150, 14, {
+            fontSize: 9.5,
+            fontWeight: 'bold',
+            color: PAPER,
+          }),
+          fieldEl('cv-ph', 'person.phone', 375, 204, 150, 12, {
+            fontSize: 8,
+            color: rgb(255, 255, 255, 0.9),
+          }),
+          fieldEl('cv-em', 'person.email', 375, 220, 150, 12, {
+            fontSize: 8,
+            color: rgb(255, 255, 255, 0.9),
+          }),
+          fieldEl('cv-st', 'person.site', 375, 236, 150, 12, {
+            fontSize: 8,
+            color: rgb(255, 255, 255, 0.9),
+          }),
+          fieldEl('cv-ct', 'person.city', 375, 252, 150, 12, {
+            fontSize: 8,
+            color: rgb(255, 255, 255, 0.9),
+          }),
+
+          text('cv-sk-h', 'مهارت‌ها', 375, 282, 150, 14, {
+            fontSize: 9.5,
+            fontWeight: 'bold',
+            color: PAPER,
+          }),
+          {
+            id: 'cv-sk',
+            type: 'list',
+            dataset: 'skills',
+            bounds: { x: 375, y: 302, width: 150, height: 160 },
+            zIndex: 1,
+            itemHeight: 30,
+            itemTemplate: [
+              fieldEl('sk-n', 'name', 0, 0, 110, 12, { fontSize: 8, color: PAPER }),
+              fieldEl('sk-v', "level + '٪'", 110, 0, 40, 12, {
+                fontSize: 7.5,
+                color: rgb(255, 255, 255, 0.75),
+                align: 'end',
+              }),
+              {
+                id: 'sk-bar',
+                type: 'rectangle',
+                bounds: { x: 0, y: 15, width: 150, height: 6 },
+                zIndex: 1,
+                box: { fill: { color: rgb(255, 255, 255, 0.25) }, border: { radius: 3 } },
+                dataBar: { value: { source: 'level' }, min: 0, max: 100, color: PAPER },
+              },
+            ],
+          },
+
+          text('cv-lg-h', 'زبان‌ها', 375, 480, 150, 14, {
+            fontSize: 9.5,
+            fontWeight: 'bold',
+            color: PAPER,
+          }),
+          {
+            id: 'cv-lg',
+            type: 'list',
+            dataset: 'languages',
+            bounds: { x: 375, y: 500, width: 150, height: 60 },
+            zIndex: 1,
+            itemHeight: 17,
+            itemTemplate: [
+              fieldEl('lg-n', 'name', 0, 0, 90, 12, { fontSize: 8, color: PAPER }),
+              fieldEl('lg-l', 'level', 90, 0, 60, 12, {
+                fontSize: 7.5,
+                color: rgb(255, 255, 255, 0.75),
+                align: 'end',
+              }),
+            ],
+          },
+          qr('cv-qr', 420, 640, 60, 60, 'person.site'),
+
+          // ---- ستون اصلی ----
+          text('cv-sm-h', 'خلاصهٔ حرفه‌ای', 0, 6, 200, 18, {
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          hline('cv-sm-r', 0, 26, 60, ACCENT, 2),
+          fieldEl('cv-sm', 'person.summary', 0, 36, 345, 50, {
+            fontSize: 9,
+            color: MUTED,
+            lineHeight: 1.8,
+          }),
+
+          text('cv-jb-h', 'سوابق شغلی', 0, 100, 200, 18, {
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          hline('cv-jb-r', 0, 120, 60, ACCENT, 2),
+          {
+            id: 'cv-jb',
+            type: 'list',
+            dataset: 'jobs',
+            bounds: { x: 0, y: 132, width: 345, height: 220 },
+            zIndex: 1,
+            itemHeight: 66,
+            gap: 8,
+            itemTemplate: [
+              ellipse('jb-d', 1, 4, 8, 8, { fill: ACCENT }),
+              vline('jb-v', 5, 16, 46, TINT, 1.5),
+              fieldEl('jb-t', 'title', 18, 0, 200, 15, { fontSize: 10.5, fontWeight: 'bold' }),
+              fieldEl('jb-c', 'company', 18, 17, 200, 12, { fontSize: 8.5, color: ACCENT }),
+              fieldEl('jb-p', 'period', 220, 0, 125, 12, {
+                fontSize: 8,
+                color: MUTED,
+                align: 'end',
+              }),
+              fieldEl('jb-b', 'summary', 18, 32, 327, 30, {
+                fontSize: 8,
+                color: MUTED,
+                lineHeight: 1.6,
+              }),
+            ],
+          },
+
+          text('cv-ed-h', 'تحصیلات', 0, 372, 200, 18, {
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          hline('cv-ed-r', 0, 392, 60, ACCENT, 2),
+          {
+            id: 'cv-ed',
+            type: 'list',
+            dataset: 'education',
+            bounds: { x: 0, y: 404, width: 345, height: 90 },
+            zIndex: 1,
+            itemHeight: 36,
+            gap: 6,
+            itemTemplate: [
+              panel('ed-bg', 0, 0, 345, 36, { fill: rgb(248, 250, 252), radius: 6 }),
+              fieldEl('ed-d', 'degree', 10, 4, 220, 14, { fontSize: 9.5, fontWeight: 'bold' }),
+              fieldEl('ed-s', 'school', 10, 19, 220, 12, { fontSize: 8, color: MUTED }),
+              fieldEl('ed-y', 'year', 240, 10, 95, 12, {
+                fontSize: 8,
+                color: ACCENT,
+                align: 'end',
+              }),
+            ],
+          },
+
+          text('cv-pr-h', 'پروژه‌های شاخص', 0, 512, 220, 18, {
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          hline('cv-pr-r', 0, 532, 60, ACCENT, 2),
+          {
+            id: 'cv-pr',
+            type: 'list',
+            dataset: 'projects',
+            bounds: { x: 0, y: 544, width: 345, height: 110 },
+            zIndex: 1,
+            itemHeight: 32,
+            gap: 4,
+            itemTemplate: [
+              panel('pr-d', 2, 6, 6, 6, { fill: ACCENT, radius: 3 }),
+              fieldEl('pr-n', 'name', 18, 0, 200, 13, { fontSize: 9.5, fontWeight: 'bold' }),
+              fieldEl('pr-s', 'stack', 220, 1, 125, 12, {
+                fontSize: 7.5,
+                color: ACCENT,
+                align: 'end',
+              }),
+              fieldEl('pr-b', 'summary', 18, 15, 327, 14, { fontSize: 8, color: MUTED }),
+            ],
+          },
+        ]),
+      },
+    ],
+    {
+      datasets: [
+        { name: 'skills', source: { kind: 'path', path: 'skills' } },
+        { name: 'languages', source: { kind: 'path', path: 'languages' } },
+        { name: 'jobs', source: { kind: 'path', path: 'jobs' } },
+        { name: 'education', source: { kind: 'path', path: 'education' } },
+        { name: 'projects', source: { kind: 'path', path: 'projects' } },
+      ],
+    },
+  );
+  var resumeData = {
+    person: {
+      name: 'نگار صادقی',
+      initials: 'ن ص',
+      role: 'مهندس ارشد نرم‌افزار',
+      phone: '۰۹۱۲ ۳۴۵ ۶۷۸۹',
+      email: 'negar@naranj.studio',
+      site: 'https://naranj.studio',
+      city: 'تهران، ایران',
+      summary:
+        'هشت سال تجربهٔ طراحی و پیاده‌سازی سامانه‌های تحت وب در مقیاس سازمانی، با تمرکز بر معماری فرانت‌اند، کارایی و تجربهٔ کاربری فارسی‌زبان.',
+    },
+    skills: [
+      { name: 'TypeScript / Angular', level: 95 },
+      { name: 'معماری فرانت‌اند', level: 88 },
+      { name: 'Node.js و طراحی API', level: 80 },
+      { name: 'طراحی رابط کاربری', level: 72 },
+      { name: 'تست و CI/CD', level: 85 },
+    ],
+    languages: [
+      { name: 'فارسی', level: 'زبان مادری' },
+      { name: 'انگلیسی', level: 'پیشرفته' },
+      { name: 'آلمانی', level: 'مقدماتی' },
+    ],
+    jobs: [
+      {
+        title: 'مهندس ارشد نرم‌افزار',
+        company: 'استودیو نارنج',
+        period: '۱۴۰۲ — اکنون',
+        summary:
+          'راهبری تیم چهارنفرهٔ فرانت‌اند، بازطراحی معماری داشبورد سازمانی و کاهش ۴۰٪ زمان بارگذاری اولیه.',
+      },
+      {
+        title: 'توسعه‌دهندهٔ فرانت‌اند',
+        company: 'شرکت فناوری نوآوران',
+        period: '۱۳۹۹ — ۱۴۰۲',
+        summary:
+          'پیاده‌سازی پرتال مشتریان با Angular و طراحی کتابخانهٔ کامپوننت‌های راست‌به‌چپ مورد استفاده در پنج محصول.',
+      },
+      {
+        title: 'توسعه‌دهندهٔ وب',
+        company: 'آژانس دیجیتال آبان',
+        period: '۱۳۹۷ — ۱۳۹۹',
+        summary: 'ساخت بیش از ۲۰ وب‌سایت واکنش‌گرا و راه‌اندازی فرایند انتشار خودکار.',
+      },
+    ],
+    education: [
+      { degree: 'کارشناسی ارشد مهندسی نرم‌افزار', school: 'دانشگاه صنعتی شریف', year: '۱۳۹۷' },
+      { degree: 'کارشناسی مهندسی کامپیوتر', school: 'دانشگاه تهران', year: '۱۳۹۴' },
+    ],
+    projects: [
+      {
+        name: 'PDF Studio',
+        stack: 'TypeScript',
+        summary: 'موتور تولید PDF فارسی با گزارش‌ساز دیداری.',
+      },
+      {
+        name: 'سامانهٔ انبار ابری',
+        stack: 'Angular · Node',
+        summary: 'مدیریت موجودی چندانباره با گزارش‌های زنده.',
+      },
+      {
+        name: 'کتابخانهٔ RTL-UI',
+        stack: 'CSS · a11y',
+        summary: 'مجموعه کامپوننت‌های راست‌به‌چپ متن‌باز.',
+      },
+    ],
+  };
+
+  // --- ۱۶) بلیط رویداد ------------------------------------------------------------
+  var ticket = baseTemplate(
+    'بلیط رویداد',
+    page({
+      size: { width: 560, height: 210 },
+      orientation: 'landscape',
+      margins: { top: 14, right: 14, bottom: 14, left: 14 },
+    }),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 182 },
+        elements: flat([
+          panel('tk-bg', 0, 0, 532, 182, { fill: TINT, radius: 12 }),
+          panel('tk-stub', 0, 0, 150, 182, { fill: ACCENT, radius: 12 }),
+          text('tk-stub-l', 'بلیط ورود', 10, 12, 130, 12, {
+            fontSize: 8,
+            color: rgb(255, 255, 255, 0.85),
+            align: 'center',
+          }),
+          qr('tk-qr', 45, 28, 60, 60, 'ticket.code'),
+          text('tk-seat-l', 'صندلی', 10, 96, 130, 11, {
+            fontSize: 7,
+            color: rgb(255, 255, 255, 0.8),
+            align: 'center',
+          }),
+          fieldEl('tk-seat', 'ticket.seat', 10, 108, 130, 20, {
+            fontSize: 15,
+            fontWeight: 'bold',
+            color: PAPER,
+            align: 'center',
+          }),
+          fieldEl('tk-code', 'ticket.code', 10, 134, 130, 12, {
+            fontSize: 7,
+            color: rgb(255, 255, 255, 0.75),
+            align: 'center',
+          }),
+          vline('tk-cut', 150, 10, 162, PAPER, 2),
+
+          fieldEl('tk-ev', 'event.name', 164, 12, 368, 26, { fontSize: 17, fontWeight: 'bold' }),
+          fieldEl('tk-sub', 'event.subtitle', 164, 40, 368, 14, { fontSize: 9, color: MUTED }),
+          hline('tk-ln', 164, 60, 368, HAIR, 1),
+
+          text('tk-d-l', 'تاریخ', 164, 70, 88, 11, { fontSize: 7.5, color: MUTED }),
+          fieldEl('tk-d', 'event.date', 164, 82, 88, 15, { fontSize: 10, fontWeight: 'bold' }),
+          text('tk-t-l', 'ساعت', 256, 70, 88, 11, { fontSize: 7.5, color: MUTED }),
+          fieldEl('tk-t', 'event.time', 256, 82, 88, 15, { fontSize: 10, fontWeight: 'bold' }),
+          text('tk-v-l', 'سالن', 348, 70, 88, 11, { fontSize: 7.5, color: MUTED }),
+          fieldEl('tk-v', 'event.venue', 348, 82, 88, 15, { fontSize: 10, fontWeight: 'bold' }),
+          text('tk-g-l', 'درِ ورودی', 440, 70, 92, 11, { fontSize: 7.5, color: MUTED }),
+          fieldEl('tk-g', 'event.gate', 440, 82, 92, 15, { fontSize: 10, fontWeight: 'bold' }),
+
+          hline('tk-ln2', 164, 106, 368, HAIR, 1),
+          text('tk-p-l', 'بهای بلیط (ریال)', 164, 116, 120, 11, { fontSize: 7.5, color: MUTED }),
+          fieldEl('tk-p', 'ticket.price', 164, 130, 120, 20, {
+            fontSize: 14,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          barcode('tk-bc', 300, 114, 232, 46, 'ticket.code', true),
+          text(
+            'tk-note',
+            'این بلیط تنها یک‌بار قابل استفاده است — لطفاً کد QR را هنگام ورود ارائه دهید.',
+            164,
+            164,
+            368,
+            12,
+            { fontSize: 7, color: MUTED },
+          ),
+        ]),
+      },
+    ],
+  );
+  var ticketData = {
+    event: {
+      name: 'کنسرت ارکستر ملی ایران',
+      subtitle: 'شب‌های موسیقی سنتی — اجرای ویژهٔ تابستان',
+      date: '۱۴۰۵/۰۵/۱۲',
+      time: '۲۱:۰۰',
+      venue: 'تالار وحدت',
+      gate: 'درِ شمالی — B',
+    },
+    ticket: { code: 'TKT-1405-88214', seat: 'ردیف ۷ / ۱۴', price: 4500000 },
+  };
+
+  // --- ۱۷) داشبورد مدیریتی --------------------------------------------------------
+  var dashboard = baseTemplate(
+    'داشبورد مدیریتی',
+    page({ orientation: 'landscape' }),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 520 },
+        elements: flat([
+          text('db-title', 'داشبورد عملکرد فروش', 0, 0, 420, 26, {
+            fontSize: 19,
+            fontWeight: 'bold',
+          }),
+          fieldEl('db-sub', 'report.subtitle', 0, 28, 420, 14, { fontSize: 9, color: MUTED }),
+          fieldEl('db-period', 'report.period', 460, 2, 309, 18, {
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: ACCENT,
+            align: 'end',
+          }),
+          fieldEl('db-owner', 'report.owner', 460, 24, 309, 13, {
+            fontSize: 8.5,
+            color: MUTED,
+            align: 'end',
+          }),
+          hline('db-ln', 0, 50, 769, ACCENT, 2),
+
+          // ---- کارت‌های شاخص ----
+          panel('db-k1', 0, 64, 180, 76, { fill: TINT, radius: 10 }),
+          text('db-k1-l', 'درآمد کل (م.ریال)', 12, 74, 156, 12, { fontSize: 8, color: MUTED }),
+          fieldEl('db-k1-v', 'sum(months, revenue)', 12, 90, 156, 26, {
+            fontSize: 20,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          fieldEl('db-k1-d', 'kpi.revenueDelta', 12, 118, 156, 13, { fontSize: 8, color: MUTED }),
+
+          panel('db-k2', 196, 64, 180, 76, { fill: TINT, radius: 10 }),
+          text('db-k2-l', 'تعداد سفارش', 208, 74, 156, 12, { fontSize: 8, color: MUTED }),
+          fieldEl('db-k2-v', 'sum(months, orders)', 208, 90, 156, 26, {
+            fontSize: 20,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          fieldEl('db-k2-d', 'kpi.ordersDelta', 208, 118, 156, 13, { fontSize: 8, color: MUTED }),
+
+          panel('db-k3', 392, 64, 180, 76, { fill: TINT, radius: 10 }),
+          text('db-k3-l', 'میانگین سبد (م.ریال)', 404, 74, 156, 12, { fontSize: 8, color: MUTED }),
+          fieldEl(
+            'db-k3-v',
+            'round(sum(months, revenue) / sum(months, orders), 1)',
+            404,
+            90,
+            156,
+            26,
+            {
+              fontSize: 20,
+              fontWeight: 'bold',
+              color: ACCENT,
+            },
+          ),
+          fieldEl('db-k3-d', 'kpi.basketDelta', 404, 118, 156, 13, { fontSize: 8, color: MUTED }),
+
+          panel('db-k4', 588, 64, 181, 76, { fill: TINT, radius: 10 }),
+          text('db-k4-l', 'نرخ تحقق هدف', 600, 74, 157, 12, { fontSize: 8, color: MUTED }),
+          fieldEl(
+            'db-k4-v',
+            "round(sum(months, revenue) / sum(months, target) * 100) + '٪'",
+            600,
+            90,
+            157,
+            26,
+            { fontSize: 20, fontWeight: 'bold', color: ACCENT },
+          ),
+          fieldEl('db-k4-d', 'kpi.targetNote', 600, 118, 157, 13, { fontSize: 8, color: MUTED }),
+
+          // ---- نمودارها ----
+          text('db-c1-h', 'روند درآمد در برابر هدف', 0, 156, 260, 15, {
+            fontSize: 10,
+            fontWeight: 'bold',
+          }),
+          panel('db-c1-bg', 0, 174, 380, 160, { fill: rgb(248, 250, 252), radius: 10 }),
+          {
+            id: 'db-c1',
+            type: 'chart',
+            chartKind: 'combo',
+            dataset: 'months',
+            bounds: { x: 10, y: 184, width: 360, height: 140 },
+            zIndex: 1,
+            categories: { source: 'month' },
+            series: [
+              { name: 'درآمد', values: { source: 'revenue' }, kind: 'column' },
+              { name: 'هدف', values: { source: 'target' }, kind: 'line' },
+            ],
+            showLegend: true,
+          },
+
+          text('db-c2-h', 'سهم کانال‌های فروش', 400, 156, 240, 15, {
+            fontSize: 10,
+            fontWeight: 'bold',
+          }),
+          panel('db-c2-bg', 400, 174, 369, 160, { fill: rgb(248, 250, 252), radius: 10 }),
+          {
+            id: 'db-c2',
+            type: 'chart',
+            chartKind: 'donut',
+            dataset: 'channels',
+            bounds: { x: 410, y: 184, width: 349, height: 140 },
+            zIndex: 1,
+            categories: { source: 'channel' },
+            series: [{ name: 'سهم', values: { source: 'share' } }],
+            showLegend: true,
+          },
+
+          // ---- جدول ----
+          text('db-t-h', 'پرفروش‌ترین محصولات', 0, 348, 300, 15, {
+            fontSize: 10,
+            fontWeight: 'bold',
+          }),
+          {
+            id: 'db-t',
+            type: 'table',
+            bounds: { x: 0, y: 368, width: 769, height: 130 },
+            zIndex: 1,
+            dataset: 'products',
+            rowStripeStyleId: 'cell',
+            repeatHeader: true,
+            columns: [
+              col('dp-i', 7, 'رتبه', '$index + 1'),
+              col('dp-n', 33, 'محصول', 'name'),
+              col('dp-c', 18, 'دسته', 'category'),
+              col('dp-u', 14, 'تعداد', 'units', 'sum'),
+              col('dp-r', 16, 'درآمد (م.ریال)', 'revenue', 'sum'),
+              col('dp-g', 12, 'رشد', 'growth'),
+            ],
+          },
+        ]),
+      },
+    ],
+    {
+      datasets: [
+        { name: 'months', source: { kind: 'path', path: 'months' } },
+        { name: 'channels', source: { kind: 'path', path: 'channels' } },
+        { name: 'products', source: { kind: 'path', path: 'products' } },
+      ],
+    },
+  );
+  var dashboardData = {
+    report: {
+      subtitle: 'عملکرد شش‌ماههٔ نخست به تفکیک کانال و محصول',
+      period: 'فروردین — شهریور ۱۴۰۵',
+      owner: 'تهیه‌شده توسط واحد تحلیل کسب‌وکار',
+    },
+    kpi: {
+      revenueDelta: '‎+۱۸٪ نسبت به دورهٔ پیشین',
+      ordersDelta: '‎+۱۲٪ نسبت به دورهٔ پیشین',
+      basketDelta: '‎+۵٪ نسبت به دورهٔ پیشین',
+      targetNote: 'هدف دوره: ۳٬۵۵۰ میلیون ریال',
+    },
+    months: [
+      { month: 'فروردین', revenue: 420, target: 400, orders: 118 },
+      { month: 'اردیبهشت', revenue: 610, target: 500, orders: 164 },
+      { month: 'خرداد', revenue: 380, target: 450, orders: 102 },
+      { month: 'تیر', revenue: 840, target: 700, orders: 219 },
+      { month: 'مرداد', revenue: 720, target: 700, orders: 188 },
+      { month: 'شهریور', revenue: 905, target: 800, orders: 241 },
+    ],
+    channels: [
+      { channel: 'فروشگاه اینترنتی', share: 46 },
+      { channel: 'نمایندگی‌ها', share: 27 },
+      { channel: 'فروش سازمانی', share: 18 },
+      { channel: 'بازارگاه‌ها', share: 9 },
+    ],
+    products: [
+      {
+        name: 'لپ‌تاپ ۱۴ اینچ سری X',
+        category: 'رایانه',
+        units: 312,
+        revenue: 1240,
+        growth: '‎+۲۴٪',
+      },
+      { name: 'مانیتور ۲۴ اینچ', category: 'جانبی', units: 486, revenue: 690, growth: '‎+۱۱٪' },
+      { name: 'هدفون بی‌سیم X200', category: 'صوتی', units: 731, revenue: 540, growth: '‎+۳۸٪' },
+      { name: 'کیبورد مکانیکی', category: 'جانبی', units: 398, revenue: 310, growth: '‎−۴٪' },
+      { name: 'هاب USB-C', category: 'جانبی', units: 902, revenue: 195, growth: '‎+۷٪' },
+    ],
+  };
+
+  // --- ۱۸) کارت گارانتی ------------------------------------------------------------
+  var warranty = baseTemplate(
+    'کارت گارانتی',
+    page({
+      size: { width: 350, height: 210 },
+      orientation: 'landscape',
+      margins: { top: 14, right: 14, bottom: 14, left: 14 },
+    }),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 182 },
+        elements: flat([
+          panel('wr-hd', 0, 0, 322, 46, { fill: ACCENT, radius: 8 }),
+          text('wr-title', 'کارت گارانتی', 12, 8, 190, 18, {
+            fontSize: 13,
+            fontWeight: 'bold',
+            color: PAPER,
+          }),
+          fieldEl('wr-brand', 'brand.name', 12, 28, 190, 12, {
+            fontSize: 8,
+            color: rgb(255, 255, 255, 0.85),
+          }),
+          fieldEl('wr-mo', "warranty.months + ' ماه'", 210, 8, 100, 20, {
+            fontSize: 14,
+            fontWeight: 'bold',
+            color: PAPER,
+            align: 'end',
+          }),
+          text('wr-mo-l', 'مدت ضمانت', 210, 30, 100, 11, {
+            fontSize: 7,
+            color: rgb(255, 255, 255, 0.8),
+            align: 'end',
+          }),
+
+          pair('wr-p', 'محصول', 'product.name', 0, 60, 322, 52, {
+            fontSize: 10,
+            fontWeight: 'bold',
+          }),
+          pair('wr-m', 'مدل', 'product.model', 0, 80, 160, 52),
+          pair('wr-s', 'شمارهٔ سریال', 'product.serial', 170, 80, 152, 66),
+          pair('wr-d', 'تاریخ خرید', 'warranty.purchasedAt', 0, 100, 160, 52),
+          pair('wr-x', 'اعتبار تا', 'warranty.expiresAt', 170, 100, 152, 66, {
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+
+          barcode('wr-bc', 0, 118, 170, 38, 'product.serial', true),
+          qr('wr-qr', 264, 114, 58, 58, 'warranty.verifyUrl'),
+          text('wr-qr-l', 'استعلام آنلاین', 244, 173, 78, 9, {
+            fontSize: 6,
+            color: MUTED,
+            align: 'center',
+          }),
+          text(
+            'wr-terms',
+            'ضمانت شامل نقص فنی و ایراد قطعات است. آسیب فیزیکی، نفوذ مایعات و باز شدن دستگاه توسط اشخاص غیرمجاز، گارانتی را باطل می‌کند.',
+            0,
+            160,
+            230,
+            22,
+            { fontSize: 6.5, color: MUTED, lineHeight: 1.5 },
+          ),
+        ]),
+      },
+    ],
+  );
+  var warrantyData = {
+    brand: { name: 'گروه صنعتی پارس‌الکترونیک' },
+    product: { name: 'هدفون بی‌سیم مدل X200', model: 'PX-X200-BK', serial: 'SN88412007' },
+    warranty: {
+      months: 18,
+      purchasedAt: '۱۴۰۵/۰۴/۲۲',
+      expiresAt: '۱۴۰۶/۱۰/۲۲',
+      verifyUrl: 'https://pars-electronic.ir/warranty/SN88412007',
+    },
+  };
+
+  // --- ۱۹) برچسب ارسال مرسوله -------------------------------------------------------
+  var shipping = baseTemplate(
+    'برچسب ارسال',
+    page({
+      size: { width: 283, height: 425 },
+      margins: { top: 12, right: 12, bottom: 12, left: 12 },
+    }),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 401 },
+        elements: flat([
+          panel('sh-hd', 0, 0, 259, 42, { fill: ACCENT, radius: 6 }),
+          text('sh-title', 'برچسب ارسال', 8, 6, 150, 15, {
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: PAPER,
+          }),
+          fieldEl('sh-carrier', 'carrier.name', 8, 24, 150, 12, {
+            fontSize: 8,
+            color: rgb(255, 255, 255, 0.85),
+          }),
+          fieldEl('sh-svc', 'shipment.service', 160, 12, 91, 20, {
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: PAPER,
+            align: 'end',
+          }),
+
+          panel('sh-fr', 0, 52, 259, 56, { border: HAIR, radius: 6 }),
+          text('sh-fr-l', 'فرستنده', 8, 58, 100, 11, { fontSize: 7, color: MUTED }),
+          fieldEl('sh-fr-n', 'from.name', 8, 70, 243, 14, { fontSize: 9, fontWeight: 'bold' }),
+          fieldEl('sh-fr-a', 'from.address', 8, 86, 243, 18, {
+            fontSize: 7.5,
+            color: MUTED,
+            lineHeight: 1.5,
+          }),
+
+          panel('sh-to', 0, 116, 259, 92, {
+            fill: rgb(248, 250, 252),
+            border: ACCENT,
+            borderWidth: 1.2,
+            radius: 6,
+          }),
+          text('sh-to-l', 'گیرنده', 8, 122, 100, 11, { fontSize: 7.5, color: MUTED }),
+          fieldEl('sh-to-n', 'to.name', 8, 135, 243, 20, { fontSize: 13, fontWeight: 'bold' }),
+          fieldEl('sh-to-a', 'to.address', 8, 157, 243, 28, { fontSize: 8.5, lineHeight: 1.6 }),
+          fieldEl('sh-to-p', 'to.phone', 8, 188, 243, 13, { fontSize: 8.5, fontWeight: 'bold' }),
+
+          text('sh-bc-l', 'کد رهگیری', 0, 214, 259, 11, { fontSize: 7, color: MUTED }),
+          barcode('sh-bc', 0, 228, 259, 68, 'shipment.tracking', true),
+
+          panel('sh-m1', 0, 304, 83, 44, { fill: TINT, radius: 6 }),
+          text('sh-m1-l', 'وزن', 8, 310, 67, 11, { fontSize: 7, color: MUTED }),
+          fieldEl('sh-m1', "shipment.weight + ' kg'", 8, 323, 67, 18, {
+            fontSize: 12,
+            fontWeight: 'bold',
+          }),
+          panel('sh-m2', 88, 304, 83, 44, { fill: TINT, radius: 6 }),
+          text('sh-m2-l', 'تعداد بسته', 96, 310, 67, 11, { fontSize: 7, color: MUTED }),
+          fieldEl('sh-m2', 'shipment.pieces', 96, 323, 67, 18, {
+            fontSize: 12,
+            fontWeight: 'bold',
+          }),
+          panel('sh-m3', 176, 304, 83, 44, { fill: TINT, radius: 6 }),
+          text('sh-m3-l', 'پس‌کرایه (ریال)', 184, 310, 67, 11, { fontSize: 7, color: MUTED }),
+          fieldEl('sh-m3', 'shipment.cod', 184, 323, 67, 18, {
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+
+          qr('sh-qr', 0, 355, 46, 46, 'shipment.trackUrl'),
+          text('sh-note-l', 'پیگیری مرسوله', 54, 355, 205, 12, {
+            fontSize: 8,
+            fontWeight: 'bold',
+          }),
+          text(
+            'sh-note',
+            'برای مشاهدهٔ وضعیت لحظه‌ای، کد QR را اسکن کنید. تحویل تنها با ارائهٔ کارت شناسایی گیرنده انجام می‌شود.',
+            54,
+            369,
+            205,
+            32,
+            { fontSize: 7, color: MUTED, lineHeight: 1.6 },
+          ),
+        ]),
+      },
+    ],
+  );
+  var shippingData = {
+    carrier: { name: 'پست پیشتاز ایران' },
+    shipment: {
+      service: 'اکسپرس',
+      tracking: 'IR140588412007',
+      weight: 2.4,
+      pieces: 3,
+      cod: '۱٬۲۵۰٬۰۰۰',
+      trackUrl: 'https://tracking.post.ir/IR140588412007',
+    },
+    from: {
+      name: 'فروشگاه پارس — انبار مرکزی',
+      address: 'تهران، خیابان ولیعصر، بالاتر از میدان ونک، پلاک ۲۵۴۰ — کدپستی ۱۹۶۹۶۳۳۱۱۱',
+    },
+    to: {
+      name: 'فروشگاه مرکزی کوروش',
+      address: 'اصفهان، خیابان چهارباغ بالا، مجتمع تجاری کوثر، واحد ۱۲ — کدپستی ۸۱۷۳۶۵۴۳۲۱',
+      phone: '۰۹۱۳ ۲۲۴ ۵۵۶۷',
+    },
+  };
+
+  // --- ۲۰) دعوت‌نامه ---------------------------------------------------------------
+  var invitation = baseTemplate(
+    'دعوت‌نامه',
+    page({
+      size: { width: 595, height: 420 },
+      orientation: 'landscape',
+      margins: { top: 28, right: 28, bottom: 28, left: 28 },
+    }),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 364 },
+        elements: flat([
+          panel('iv-fr', 0, 0, 539, 364, { border: ACCENT, borderWidth: 2, radius: 14 }),
+          panel('iv-fr2', 7, 7, 525, 350, { border: HAIR, borderWidth: 0.8, radius: 10 }),
+          ellipse('iv-o1', 18, 18, 76, 76, { fill: TINT }),
+          ellipse('iv-o2', 445, 270, 76, 76, { fill: TINT }),
+
+          text('iv-kicker', 'با افتخار دعوت می‌کنیم', 0, 40, 539, 14, {
+            fontSize: 9,
+            color: MUTED,
+            align: 'center',
+            letterSpacing: 1,
+          }),
+          text('iv-title', 'دعوت‌نامه', 0, 58, 539, 38, {
+            fontSize: 27,
+            fontWeight: 'bold',
+            color: ACCENT,
+            align: 'center',
+          }),
+          hline('iv-rule', 220, 102, 99, ACCENT, 1.5),
+
+          text('iv-lead', 'جناب آقای / سرکار خانم', 0, 118, 539, 15, {
+            fontSize: 9.5,
+            color: MUTED,
+            align: 'center',
+          }),
+          fieldEl('iv-guest', 'guest.name', 0, 138, 539, 30, {
+            fontSize: 20,
+            fontWeight: 'bold',
+            align: 'center',
+          }),
+          fieldEl(
+            'iv-body',
+            "'حضور شما در ' + event.title + ' مایهٔ افتخار ماست.'",
+            0,
+            176,
+            539,
+            18,
+            { fontSize: 11, align: 'center' },
+          ),
+
+          panel('iv-c1', 0, 210, 165, 58, { fill: rgb(248, 250, 252), radius: 8 }),
+          text('iv-c1-l', 'تاریخ', 0, 218, 165, 11, {
+            fontSize: 7.5,
+            color: MUTED,
+            align: 'center',
+          }),
+          fieldEl('iv-c1', 'event.date', 0, 232, 165, 20, {
+            fontSize: 12,
+            fontWeight: 'bold',
+            align: 'center',
+          }),
+          panel('iv-c2', 187, 210, 165, 58, { fill: rgb(248, 250, 252), radius: 8 }),
+          text('iv-c2-l', 'ساعت', 187, 218, 165, 11, {
+            fontSize: 7.5,
+            color: MUTED,
+            align: 'center',
+          }),
+          fieldEl('iv-c2', 'event.time', 187, 232, 165, 20, {
+            fontSize: 12,
+            fontWeight: 'bold',
+            align: 'center',
+          }),
+          panel('iv-c3', 374, 210, 165, 58, { fill: rgb(248, 250, 252), radius: 8 }),
+          text('iv-c3-l', 'مکان', 374, 218, 165, 11, {
+            fontSize: 7.5,
+            color: MUTED,
+            align: 'center',
+          }),
+          fieldEl('iv-c3', 'event.venue', 374, 232, 165, 20, {
+            fontSize: 12,
+            fontWeight: 'bold',
+            align: 'center',
+          }),
+
+          qr('iv-qr', 240, 284, 58, 58, 'event.rsvpUrl'),
+          text('iv-qr-l', 'تأیید حضور', 220, 344, 99, 12, {
+            fontSize: 7.5,
+            color: MUTED,
+            align: 'center',
+          }),
+          fieldEl('iv-host', 'event.host', 20, 336, 180, 14, { fontSize: 8, color: MUTED }),
+        ]),
+      },
+    ],
+  );
+  var invitationData = {
+    guest: { name: 'دکتر سارا محمدی' },
+    event: {
+      title: 'آیین رونمایی از محصول جدید',
+      date: '۱۴۰۵/۰۶/۰۳',
+      time: '۱۸:۰۰',
+      venue: 'هتل اسپیناس پالاس',
+      host: 'میزبان: شرکت فناوری نوآوران',
+      rsvpUrl: 'https://novaran.ir/rsvp/1405-06-03',
+    },
+  };
+
+  // --- ۲۱) چک‌لیست بازرسی ------------------------------------------------------------
+  var checklist = baseTemplate(
+    'چک‌لیست بازرسی',
+    page(),
+    [
+      {
+        id: 'main',
+        type: 'reportHeader',
+        height: { mode: 'fixed', value: 740 },
+        elements: flat([
+          text('ck-title', 'چک‌لیست بازرسی', 0, 0, 300, 26, { fontSize: 18, fontWeight: 'bold' }),
+          fieldEl('ck-site', 'inspection.site', 0, 28, 300, 14, { fontSize: 9, color: MUTED }),
+          pair('ck-i', 'بازرس', 'inspection.inspector', 330, 4, 193, 46, {
+            align: 'end',
+            fontWeight: 'bold',
+          }),
+          pair('ck-d', 'تاریخ', 'inspection.date', 330, 22, 193, 46, { align: 'end' }),
+          pair('ck-c', 'کد فرم', 'inspection.code', 330, 40, 193, 46, { align: 'end' }),
+          hline('ck-ln', 0, 62, 523, ACCENT, 2),
+
+          {
+            id: 'ck-list',
+            type: 'list',
+            dataset: 'checks',
+            bounds: { x: 0, y: 78, width: 523, height: 340 },
+            zIndex: 1,
+            itemHeight: 34,
+            gap: 5,
+            itemTemplate: [
+              panel('ci-bg', 0, 0, 523, 34, { fill: rgb(248, 250, 252), radius: 6 }),
+              panel('ci-box', 10, 9, 16, 16, { border: HAIR, borderWidth: 1, radius: 4 }),
+              {
+                id: 'ci-on',
+                type: 'rectangle',
+                bounds: { x: 13, y: 12, width: 10, height: 10 },
+                zIndex: 1,
+                box: { fill: { color: ACCENT }, border: { radius: 2 } },
+                visibleWhen: { source: 'done' },
+              },
+              fieldEl('ci-i', '$index + 1', 34, 11, 18, 12, { fontSize: 8, color: MUTED }),
+              fieldEl('ci-t', 'title', 56, 5, 300, 14, { fontSize: 9.5, fontWeight: 'bold' }),
+              fieldEl('ci-n', 'note', 56, 19, 300, 11, { fontSize: 7.5, color: MUTED }),
+              fieldEl('ci-s', 'status', 366, 11, 147, 13, {
+                fontSize: 8.5,
+                color: ACCENT,
+                align: 'end',
+              }),
+            ],
+          },
+
+          panel('ck-sum', 0, 440, 523, 56, { fill: TINT, radius: 10 }),
+          text('ck-sum-l', 'جمع‌بندی بازرسی', 14, 450, 200, 13, {
+            fontSize: 9,
+            color: MUTED,
+          }),
+          fieldEl('ck-sum-v', "'مجموع بندهای بررسی‌شده: ' + len(checks)", 14, 466, 250, 18, {
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: ACCENT,
+          }),
+          fieldEl('ck-verdict', 'inspection.verdict', 280, 462, 229, 24, {
+            fontSize: 13,
+            fontWeight: 'bold',
+            align: 'end',
+          }),
+
+          text('ck-note-l', 'توضیحات بازرس', 0, 512, 200, 13, { fontSize: 9, color: MUTED }),
+          panel('ck-note', 0, 528, 523, 60, { border: HAIR, radius: 8 }),
+          fieldEl('ck-note-v', 'inspection.notes', 10, 536, 503, 44, {
+            fontSize: 8.5,
+            lineHeight: 1.7,
+          }),
+
+          hline('ck-s1', 40, 640, 180, HAIR, 1),
+          text('ck-s1-l', 'امضای بازرس', 40, 648, 180, 13, { fontSize: 9, align: 'center' }),
+          hline('ck-s2', 300, 640, 180, HAIR, 1),
+          text('ck-s2-l', 'امضای مسئول واحد', 300, 648, 180, 13, {
+            fontSize: 9,
+            align: 'center',
+          }),
+        ]),
+      },
+    ],
+    { datasets: [{ name: 'checks', source: { kind: 'path', path: 'checks' } }] },
+  );
+  var checklistData = {
+    inspection: {
+      site: 'انبار مرکزی تهران — سالن شمارهٔ ۲',
+      inspector: 'مهدی رستمی',
+      date: '۱۴۰۵/۰۴/۲۸',
+      code: 'INS-1405-0142',
+      verdict: 'نتیجه: قابل قبول با اصلاحات',
+      notes:
+        'دو مورد جزئی در چیدمان کالاهای سنگین مشاهده شد که تا پایان هفته باید اصلاح شود. سایر بندها منطبق با دستورالعمل ایمنی انبار است.',
+    },
+    checks: [
+      {
+        title: 'سلامت کپسول‌های اطفای حریق',
+        note: 'تاریخ شارژ و پلمب',
+        done: true,
+        status: 'تأیید شد',
+      },
+      {
+        title: 'روشنایی اضطراری مسیرهای خروج',
+        note: 'آزمون قطع برق',
+        done: true,
+        status: 'تأیید شد',
+      },
+      {
+        title: 'علائم ایمنی و تابلوهای هشدار',
+        note: 'خوانایی و نصب صحیح',
+        done: true,
+        status: 'تأیید شد',
+      },
+      {
+        title: 'چیدمان کالاهای سنگین در قفسه',
+        note: 'رعایت سقف وزن مجاز',
+        done: false,
+        status: 'نیازمند اصلاح',
+      },
+      {
+        title: 'وضعیت لیفتراک و گواهی سرویس',
+        note: 'ساعت کارکرد و روغن‌کاری',
+        done: true,
+        status: 'تأیید شد',
+      },
+      {
+        title: 'دمای انبار سردخانه‌ای',
+        note: 'ثبت در بازه ۲ تا ۸ درجه',
+        done: true,
+        status: 'تأیید شد',
+      },
+      {
+        title: 'تجهیزات حفاظت فردی کارکنان',
+        note: 'کلاه، دستکش، کفش ایمنی',
+        done: false,
+        status: 'کمبود موجودی',
+      },
+      {
+        title: 'مسیرهای تخلیه و درهای اضطراری',
+        note: 'بدون انسداد',
+        done: true,
+        status: 'تأیید شد',
+      },
+      {
+        title: 'دفترچهٔ ثبت ورود و خروج کالا',
+        note: 'تطابق با سامانه',
+        done: true,
+        status: 'تأیید شد',
+      },
+    ],
+  };
+
+  // ---------------------------------------------------------------------------
+  // پالت‌های رنگی: هر پالت فقط دو توکن ACCENT/TINT را جابه‌جا می‌کند.
+  // ---------------------------------------------------------------------------
+  var THEMES = [
+    {
+      id: 'indigo',
+      name: 'نیلی',
+      accent: rgb(37, 99, 235),
+      tint: rgb(219, 234, 254),
+      css: '#2563eb',
+    },
+    {
+      id: 'emerald',
+      name: 'زمردی',
+      accent: rgb(5, 150, 105),
+      tint: rgb(209, 250, 229),
+      css: '#059669',
+    },
+    {
+      id: 'violet',
+      name: 'بنفش',
+      accent: rgb(124, 58, 237),
+      tint: rgb(237, 233, 254),
+      css: '#7c3aed',
+    },
+    {
+      id: 'amber',
+      name: 'کهربایی',
+      accent: rgb(180, 83, 9),
+      tint: rgb(254, 243, 199),
+      css: '#b45309',
+    },
+    { id: 'rose', name: 'گلی', accent: rgb(225, 29, 72), tint: rgb(255, 228, 230), css: '#e11d48' },
+    {
+      id: 'graphite',
+      name: 'گرافیتی',
+      accent: rgb(51, 65, 85),
+      tint: rgb(226, 232, 240),
+      css: '#334155',
+    },
+  ];
+
+  function isColor(v, ref) {
+    return (
+      v &&
+      typeof v === 'object' &&
+      v.space === 'rgb' &&
+      v.r === ref.r &&
+      v.g === ref.g &&
+      v.b === ref.b
+    );
+  }
+  /**
+   * Deep-clone `node`, swapping the two brand tokens for the theme's. Alpha is
+   * carried over, so translucent whites-on-accent keep their transparency.
+   */
+  function recolor(node, theme) {
+    if (node === null || typeof node !== 'object') return node;
+    if (Object.prototype.toString.call(node) === '[object Array]') {
+      return node.map(function (item) {
+        return recolor(item, theme);
+      });
+    }
+    var swap = isColor(node, ACCENT) ? theme.accent : isColor(node, TINT) ? theme.tint : null;
+    if (swap) {
+      var c = { space: 'rgb', r: swap.r, g: swap.g, b: swap.b };
+      if (node.a !== undefined) c.a = node.a;
+      return c;
+    }
+    var out = {};
+    Object.keys(node).forEach(function (k) {
+      out[k] = recolor(node[k], theme);
+    });
+    return out;
+  }
+
+  /** Public: a themed deep copy of a template (id unknown → plain deep copy). */
+  function themeTemplate(template, themeId) {
+    var theme = null;
+    THEMES.forEach(function (t) {
+      if (t.id === themeId) theme = t;
+    });
+    if (!theme || theme.id === 'indigo') return JSON.parse(JSON.stringify(template));
+    return recolor(template, theme);
+  }
+
+  window.PDFSTUDIO_THEMES = THEMES;
+  window.PDFSTUDIO_THEME_TEMPLATE = themeTemplate;
+  window.PDFSTUDIO_TEMPLATE_CATEGORIES = [
+    { id: 'all', name: 'همه' },
+    { id: 'finance', name: 'مالی و فروش' },
+    { id: 'office', name: 'اداری و منابع انسانی' },
+    { id: 'report', name: 'گزارش و تحلیل' },
+    { id: 'brand', name: 'بازاریابی و رویداد' },
+    { id: 'label', name: 'برچسب و کارت' },
+  ];
+
+  /**
+   * Gallery entries. `cat` drives the filter chips, `tags` feed the search box,
+   * and `badge` is the little corner label on the card.
+   */
   window.PDFSTUDIO_TEMPLATES = [
     {
       id: 'blank',
       name: 'سند خالی',
       desc: 'بوم سفید A4 — طراحی از صفر',
+      cat: 'all',
+      badge: 'شروع',
+      tags: ['خالی', 'blank', 'a4', 'از صفر'],
       template: blank,
       data: blankData,
     },
     {
       id: 'invoice',
       name: 'فاکتور فروش',
-      desc: 'جدول اقلام + جمع کل + QR',
+      desc: 'جدول اقلام، جمع کل و QR شمارهٔ فاکتور',
+      cat: 'finance',
+      badge: 'پرکاربرد',
+      tags: ['فاکتور', 'invoice', 'فروش', 'جدول', 'مالی'],
       template: invoice,
       data: invoiceData,
     },
     {
       id: 'taxInvoice',
       name: 'فاکتور رسمی مالیاتی',
-      desc: 'صورتحساب استاندارد + مبلغ به حروف + QR مودیان',
+      desc: 'صورتحساب استاندارد مودیان + مبلغ به حروف',
+      cat: 'finance',
+      badge: 'رسمی',
+      tags: ['مالیات', 'مودیان', 'صورتحساب', 'tax', 'ارزش افزوده'],
       template: taxInvoice,
       data: taxInvoiceData,
     },
     {
-      id: 'report',
-      name: 'گزارش فروش',
-      desc: 'چارت ستونی + جدول با جمع',
-      template: report,
-      data: reportData,
-    },
-    {
-      id: 'letterhead',
-      name: 'سربرگ نامه',
-      desc: 'سربرگ اداری با شماره/تاریخ',
-      template: letterhead,
-      data: letterheadData,
-    },
-    {
-      id: 'label',
-      name: 'برچسب محصول',
-      desc: 'بارکد + قیمت + QR (سایز کوچک)',
-      template: label,
-      data: labelData,
-    },
-    {
-      id: 'certificate',
-      name: 'گواهی‌نامه',
-      desc: 'افقی با قاب و امضا',
-      template: certificate,
-      data: certificateData,
-    },
-    {
-      id: 'receipt',
-      name: 'رسید پرداخت',
-      desc: 'عرض ۸cm حرارتی + QR پیگیری',
-      template: receipt,
-      data: receiptData,
-    },
-    {
       id: 'proforma',
       name: 'پیش‌فاکتور',
-      desc: 'با اعتبار، شرایط و جمع کل',
+      desc: 'با تاریخ اعتبار، شرایط پرداخت و جمع کل',
+      cat: 'finance',
+      tags: ['پیش‌فاکتور', 'proforma', 'استعلام', 'قیمت'],
       template: proforma,
       data: proformaData,
     },
     {
-      id: 'packing',
-      name: 'لیست بسته‌بندی',
-      desc: 'کارتن/تعداد/وزن + بارکد سفارش',
-      template: packing,
-      data: packingData,
+      id: 'receipt',
+      name: 'رسید پرداخت',
+      desc: 'رول حرارتی ۸ سانتی + QR پیگیری تراکنش',
+      cat: 'finance',
+      tags: ['رسید', 'receipt', 'صندوق', 'حرارتی', 'پرداخت'],
+      template: receipt,
+      data: receiptData,
     },
     {
-      id: 'card',
-      name: 'کارت ویزیت',
-      desc: 'سایز استاندارد + QR سایت',
-      template: card,
-      data: cardData,
+      id: 'payslip',
+      name: 'فیش حقوقی',
+      desc: 'دریافتی و کسورات، خالص پرداختی و مبلغ به حروف',
+      cat: 'office',
+      badge: 'تازه',
+      tags: ['حقوق', 'payslip', 'دستمزد', 'منابع انسانی', 'کسورات'],
+      template: payslip,
+      data: payslipData,
     },
     {
-      id: 'menu',
-      name: 'منوی رستوران',
-      desc: 'دو بخش غذا/نوشیدنی + سفارش آنلاین',
-      template: menu,
-      data: menuData,
+      id: 'contract',
+      name: 'قرارداد خدمات',
+      desc: 'طرفین، مواد شماره‌دار تکرارشونده و امضاها',
+      cat: 'office',
+      badge: 'تازه',
+      tags: ['قرارداد', 'contract', 'حقوقی', 'مواد', 'پیمانکار'],
+      template: contract,
+      data: contractData,
+    },
+    {
+      id: 'letterhead',
+      name: 'سربرگ نامه',
+      desc: 'سربرگ اداری با شماره، تاریخ و پیوست',
+      cat: 'office',
+      tags: ['سربرگ', 'نامه', 'letterhead', 'اداری', 'مکاتبه'],
+      template: letterhead,
+      data: letterheadData,
     },
     {
       id: 'timesheet',
       name: 'گزارش کارکرد',
-      desc: 'تایم‌شیت با جمع ساعت و امضا',
+      desc: 'تایم‌شیت روزانه با جمع ساعت و امضا',
+      cat: 'office',
+      tags: ['کارکرد', 'timesheet', 'ساعت', 'پروژه'],
       template: timesheet,
       data: timesheetData,
+    },
+    {
+      id: 'checklist',
+      name: 'چک‌لیست بازرسی',
+      desc: 'بندهای تیک‌خورده، جمع‌بندی و توضیحات بازرس',
+      cat: 'office',
+      badge: 'تازه',
+      tags: ['چک‌لیست', 'checklist', 'بازرسی', 'ایمنی', 'فرم'],
+      template: checklist,
+      data: checklistData,
+    },
+    {
+      id: 'resume',
+      name: 'رزومهٔ حرفه‌ای',
+      desc: 'ستون برند، نوار مهارت‌ها و تایم‌لاین سوابق',
+      cat: 'office',
+      badge: 'ویژه',
+      tags: ['رزومه', 'resume', 'cv', 'شغل', 'مهارت'],
+      template: resume,
+      data: resumeData,
+    },
+    {
+      id: 'dashboard',
+      name: 'داشبورد مدیریتی',
+      desc: 'کارت‌های شاخص، نمودار ترکیبی و دونات + جدول',
+      cat: 'report',
+      badge: 'ویژه',
+      tags: ['داشبورد', 'dashboard', 'kpi', 'نمودار', 'تحلیل', 'مدیریتی'],
+      template: dashboard,
+      data: dashboardData,
+    },
+    {
+      id: 'report',
+      name: 'گزارش فروش',
+      desc: 'نمودار ستونی ماهانه + جدول با جمع',
+      cat: 'report',
+      tags: ['گزارش', 'report', 'فروش', 'نمودار', 'ماهانه'],
+      template: report,
+      data: reportData,
+    },
+    {
+      id: 'packing',
+      name: 'لیست بسته‌بندی',
+      desc: 'کارتن، تعداد و وزن + بارکد سفارش',
+      cat: 'report',
+      tags: ['بسته‌بندی', 'packing', 'انبار', 'ارسال', 'بارکد'],
+      template: packing,
+      data: packingData,
+    },
+    {
+      id: 'ticket',
+      name: 'بلیط رویداد',
+      desc: 'ته‌بلیط جداشدنی با QR، بارکد و صندلی',
+      cat: 'brand',
+      badge: 'تازه',
+      tags: ['بلیط', 'ticket', 'رویداد', 'کنسرت', 'qr'],
+      template: ticket,
+      data: ticketData,
+    },
+    {
+      id: 'invitation',
+      name: 'دعوت‌نامه',
+      desc: 'کارت تشریفاتی افقی با قاب و QR تأیید حضور',
+      cat: 'brand',
+      badge: 'تازه',
+      tags: ['دعوت', 'invitation', 'مراسم', 'رویداد', 'rsvp'],
+      template: invitation,
+      data: invitationData,
+    },
+    {
+      id: 'menu',
+      name: 'منوی رستوران',
+      desc: 'دو بخش غذا و نوشیدنی + QR سفارش آنلاین',
+      cat: 'brand',
+      tags: ['منو', 'menu', 'رستوران', 'کافه', 'غذا'],
+      template: menu,
+      data: menuData,
+    },
+    {
+      id: 'certificate',
+      name: 'گواهی‌نامه',
+      desc: 'افقی با قاب دوخطه، امضاها و QR استعلام',
+      cat: 'brand',
+      tags: ['گواهی', 'certificate', 'دوره', 'آموزش', 'مدرک'],
+      template: certificate,
+      data: certificateData,
+    },
+    {
+      id: 'card',
+      name: 'کارت ویزیت',
+      desc: 'سایز استاندارد ۹×۵ با نوار برند و QR',
+      cat: 'label',
+      tags: ['کارت ویزیت', 'business card', 'ویزیت', 'برند'],
+      template: card,
+      data: cardData,
+    },
+    {
+      id: 'shipping',
+      name: 'برچسب ارسال',
+      desc: 'برچسب ۱۰×۱۵ با بارکد رهگیری و کادر گیرنده',
+      cat: 'label',
+      badge: 'تازه',
+      tags: ['ارسال', 'shipping', 'پست', 'رهگیری', 'مرسوله', 'برچسب'],
+      template: shipping,
+      data: shippingData,
+    },
+    {
+      id: 'warranty',
+      name: 'کارت گارانتی',
+      desc: 'سریال، مدت ضمانت، بارکد و QR استعلام',
+      cat: 'label',
+      badge: 'تازه',
+      tags: ['گارانتی', 'warranty', 'ضمانت', 'سریال', 'کارت'],
+      template: warranty,
+      data: warrantyData,
+    },
+    {
+      id: 'label',
+      name: 'برچسب محصول',
+      desc: 'بارکد، قیمت و QR در سایز قفسه‌ای',
+      cat: 'label',
+      tags: ['برچسب', 'label', 'قیمت', 'بارکد', 'قفسه'],
+      template: label,
+      data: labelData,
     },
   ];
 })();
