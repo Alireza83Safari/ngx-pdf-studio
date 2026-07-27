@@ -5,6 +5,7 @@
  * line (rect/line ops), area + pie/donut (filled path ops). Axis labels/legend
  * are a later step.
  */
+import { CHART_LABEL_SIZE } from '../layout/chart-resolve';
 import type { LaidChart, VectorOp } from '../layout/page';
 import type { Rgb01 } from './color';
 
@@ -21,18 +22,58 @@ const PALETTE: Rgb01[] = [
 const AXIS: Rgb01 = { r: 0.8, g: 0.84, b: 0.88 };
 const LABEL: Rgb01 = { r: 0.42, g: 0.45, b: 0.5 };
 const PAD = 8;
-const LABEL_SIZE = 7.5;
+const LABEL_SIZE = CHART_LABEL_SIZE;
 const LEGEND_H = 12;
 const AXIS_LABEL_H = 11;
+const SWATCH = 7;
+const SWATCH_GAP = 3;
+const ENTRY_GAP = 12;
 
-/** Legend rows: one colored swatch + name per series (§5). */
-function legendOps(names: string[], x: number, y: number): ChartOp[] {
+/**
+ * Width of a chart label. `resolveChart` measures these with the document's real
+ * font; the character-count fallback only applies to a hand-built `LaidChart`
+ * (it is Latin-calibrated and badly underestimates Persian).
+ */
+function labelWidth(text: string, measured: number | undefined): number {
+  return measured !== undefined && measured > 0 ? measured : text.length * LABEL_SIZE * 0.62;
+}
+
+/**
+ * Legend row: one swatch + name per series. Entries run in the reading
+ * direction, so on an RTL page the first series sits at the right.
+ */
+function legendOps(
+  names: string[],
+  widths: number[] | undefined,
+  x: number,
+  y: number,
+  rtl: boolean,
+  right: number,
+): ChartOp[] {
   const ops: ChartOp[] = [];
-  let cx = x;
+  let cursor = rtl ? right : x;
   names.forEach((name, i) => {
-    ops.push({ op: 'rect', x: cx, y: y, w: 7, h: 7, fill: PALETTE[i % PALETTE.length] as Rgb01 });
-    ops.push({ op: 'text', x: cx + 10, y: y + 6.5, text: name, size: LABEL_SIZE, color: LABEL });
-    cx += 10 + name.length * LABEL_SIZE * 0.62 + 12;
+    const w = labelWidth(name, widths?.[i]);
+    const entry = SWATCH + SWATCH_GAP + w;
+    const start = rtl ? cursor - entry : cursor;
+    ops.push({
+      op: 'rect',
+      x: rtl ? start + SWATCH_GAP + w : start,
+      y,
+      w: SWATCH,
+      h: SWATCH,
+      fill: PALETTE[i % PALETTE.length] as Rgb01,
+    });
+    ops.push({
+      op: 'text',
+      x: rtl ? start + w : start + SWATCH + SWATCH_GAP,
+      y: y + 6.5,
+      text: name,
+      size: LABEL_SIZE,
+      color: LABEL,
+      ...(rtl ? { align: 'end' as const } : {}),
+    });
+    cursor = rtl ? cursor - entry - ENTRY_GAP : cursor + entry + ENTRY_GAP;
   });
   return ops;
 }
@@ -48,20 +89,30 @@ interface Plot {
 /** Category-slot centre, the anchor line/area/scatter series hang off. */
 const centreOf = (plot: Plot, step: number, i: number): number => plot.x + step * (i + 0.5);
 
+/**
+ * Which physical slot a category index occupies. On an RTL page the first
+ * category belongs at the right, so the whole series reads right-to-left.
+ */
+const slotOf = (i: number, count: number, rtl: boolean): number => (rtl ? count - 1 - i : i);
+
+/** Maps a category index to its physical slot for one chart. */
+type ToSlot = (i: number) => number;
+
 function lineSeriesOps(
   values: number[],
   color: Rgb01,
   plot: Plot,
   step: number,
   yOf: (v: number) => number,
+  toSlot: ToSlot,
 ): ChartOp[] {
   const ops: ChartOp[] = [];
   for (let i = 0; i + 1 < values.length; i++) {
     ops.push({
       op: 'line',
-      x1: centreOf(plot, step, i),
+      x1: centreOf(plot, step, toSlot(i)),
       y1: yOf(values[i] as number),
-      x2: centreOf(plot, step, i + 1),
+      x2: centreOf(plot, step, toSlot(i + 1)),
       y2: yOf(values[i + 1] as number),
       color,
       width: 1.5,
@@ -77,9 +128,11 @@ function areaSeriesOps(
   step: number,
   yOf: (v: number) => number,
   baselineY: number,
+  toSlot: ToSlot,
 ): ChartOp[] {
   if (values.length === 0) return [];
-  const pts = values.map((v, i) => ({ x: centreOf(plot, step, i), y: yOf(v) }));
+  const pts = values.map((v, i) => ({ x: centreOf(plot, step, toSlot(i)), y: yOf(v) }));
+  pts.sort((a, b) => a.x - b.x);
   const first = pts[0] as { x: number; y: number };
   const lastPt = pts[pts.length - 1] as { x: number; y: number };
   const d =
@@ -96,11 +149,12 @@ function scatterSeriesOps(
   plot: Plot,
   step: number,
   yOf: (v: number) => number,
+  toSlot: ToSlot,
 ): ChartOp[] {
   const s = 3.5;
   return values.map((v, i) => ({
     op: 'rect' as const,
-    x: centreOf(plot, step, i) - s / 2,
+    x: centreOf(plot, step, toSlot(i)) - s / 2,
     y: yOf(v) - s / 2,
     w: s,
     h: s,
@@ -118,13 +172,14 @@ function columnSeriesOps(
   slots: number,
   baselineY: number,
   yOf: (v: number) => number,
+  toSlot: ToSlot,
 ): ChartOp[] {
   const barW = (groupW * 0.8) / Math.max(1, slots);
   return values.map((v, gi) => {
     const top = yOf(v);
     return {
       op: 'rect' as const,
-      x: plot.x + groupW * gi + groupW * 0.1 + barW * slot,
+      x: plot.x + groupW * toSlot(gi) + groupW * 0.1 + barW * slot,
       y: top,
       w: barW,
       h: baselineY - top,
@@ -141,7 +196,8 @@ function sparklineOps(chart: LaidChart, width: number, height: number): ChartOp[
   const max = Math.max(1, ...values.map((v) => (v > 0 ? v : 0)));
   const step = plot.w / Math.max(1, values.length);
   const yOf = (v: number): number => plot.y + plot.h - (Math.max(0, v) / max) * plot.h;
-  return lineSeriesOps(values, PALETTE[0] as Rgb01, plot, step, yOf);
+  const toSlot: ToSlot = (i) => slotOf(i, values.length, chart.rtl === true);
+  return lineSeriesOps(values, PALETTE[0] as Rgb01, plot, step, yOf, toSlot);
 }
 
 export function chartOps(chart: LaidChart, width: number, height: number): ChartOp[] {
@@ -157,8 +213,19 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
     h: Math.max(1, height - PAD * 2 - legendH - AXIS_LABEL_H),
   };
   const baselineY = plot.y + plot.h;
+  const rtl = chart.rtl === true;
+  // The value axis hugs the reading-start edge, so it flips with the direction.
+  const valueAxisX = rtl ? plot.x + plot.w : plot.x;
   const ops: ChartOp[] = [
-    { op: 'line', x1: plot.x, y1: plot.y, x2: plot.x, y2: baselineY, color: AXIS, width: 0.75 },
+    {
+      op: 'line',
+      x1: valueAxisX,
+      y1: plot.y,
+      x2: valueAxisX,
+      y2: baselineY,
+      color: AXIS,
+      width: 0.75,
+    },
     {
       op: 'line',
       x1: plot.x,
@@ -179,24 +246,29 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
 
   // Legend + axis labels (§5). Horizontal bars label their rows instead of
   // the x-axis; every vertical kind centers a category label under its slot.
-  if (legendH > 0) ops.push(...legendOps(seriesNames, plot.x, PAD + 1));
+  if (legendH > 0) {
+    ops.push(
+      ...legendOps(seriesNames, chart.seriesNameWidths, plot.x, PAD + 1, rtl, plot.x + plot.w),
+    );
+  }
   if (chart.kind === 'bar') {
     chart.categories.forEach((cat, gi) => {
       const rowH = plot.h / categories;
       ops.push({
         op: 'text',
-        x: plot.x + 2,
+        x: rtl ? plot.x + plot.w - 2 : plot.x + 2,
         y: plot.y + rowH * gi + rowH / 2 + LABEL_SIZE * 0.35,
         text: cat,
         size: LABEL_SIZE,
         color: LABEL,
+        ...(rtl ? { align: 'end' as const } : {}),
       });
     });
   } else {
     chart.categories.forEach((cat, gi) => {
       ops.push({
         op: 'text',
-        x: plot.x + step * (gi + 0.5),
+        x: centreOf(plot, step, slotOf(gi, categories, rtl)),
         y: baselineY + LABEL_SIZE + 1.5,
         text: cat,
         size: LABEL_SIZE,
@@ -216,16 +288,21 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
       : maxValue;
   ops.push({
     op: 'text',
-    x: plot.x + 2,
+    x: rtl ? valueAxisX - 2 : valueAxisX + 2,
     y: plot.y + LABEL_SIZE,
     text: String(axisMax),
     size: LABEL_SIZE,
     color: LABEL,
+    ...(rtl ? { align: 'end' as const } : {}),
   });
+
+  const toSlot: ToSlot = (i) => slotOf(i, categories, rtl);
 
   if (chart.kind === 'line') {
     series.forEach((s, si) => {
-      ops.push(...lineSeriesOps(s.values, PALETTE[si % PALETTE.length] as Rgb01, plot, step, yOf));
+      ops.push(
+        ...lineSeriesOps(s.values, PALETTE[si % PALETTE.length] as Rgb01, plot, step, yOf, toSlot),
+      );
     });
     return ops;
   }
@@ -240,6 +317,7 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
           step,
           yOf,
           baselineY,
+          toSlot,
         ),
       );
     });
@@ -249,7 +327,14 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
   if (chart.kind === 'scatter') {
     series.forEach((s, si) => {
       ops.push(
-        ...scatterSeriesOps(s.values, PALETTE[si % PALETTE.length] as Rgb01, plot, step, yOf),
+        ...scatterSeriesOps(
+          s.values,
+          PALETTE[si % PALETTE.length] as Rgb01,
+          plot,
+          step,
+          yOf,
+          toSlot,
+        ),
       );
     });
     return ops;
@@ -266,17 +351,27 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
       const color = PALETTE[si % PALETTE.length] as Rgb01;
       switch (kindOf(s)) {
         case 'line':
-          ops.push(...lineSeriesOps(s.values, color, plot, step, yOf));
+          ops.push(...lineSeriesOps(s.values, color, plot, step, yOf, toSlot));
           break;
         case 'area':
-          ops.push(...areaSeriesOps(s.values, color, plot, step, yOf, baselineY));
+          ops.push(...areaSeriesOps(s.values, color, plot, step, yOf, baselineY, toSlot));
           break;
         case 'scatter':
-          ops.push(...scatterSeriesOps(s.values, color, plot, step, yOf));
+          ops.push(...scatterSeriesOps(s.values, color, plot, step, yOf, toSlot));
           break;
         default:
           ops.push(
-            ...columnSeriesOps(s.values, color, plot, groupW, slot, columnSlots, baselineY, yOf),
+            ...columnSeriesOps(
+              s.values,
+              color,
+              plot,
+              groupW,
+              slot,
+              columnSlots,
+              baselineY,
+              yOf,
+              toSlot,
+            ),
           );
           slot++;
       }
@@ -303,7 +398,7 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
         const top = (cursorTop[gi] ?? baselineY) - h;
         ops.push({
           op: 'rect',
-          x: plot.x + groupW * gi + groupW * 0.2,
+          x: plot.x + groupW * toSlot(gi) + groupW * 0.2,
           y: top,
           w: barW,
           h,
@@ -323,7 +418,9 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
       s.values.forEach((v, gi) => {
         const len = (Math.max(0, v) / maxValue) * plot.w;
         const y = plot.y + groupH * gi + groupH * 0.1 + barH * si;
-        ops.push({ op: 'rect', x: plot.x, y, w: len, h: barH, fill: color });
+        // horizontal bars grow away from the reading-start edge
+        const x = rtl ? plot.x + plot.w - len : plot.x;
+        ops.push({ op: 'rect', x, y, w: len, h: barH, fill: color });
       });
     });
   } else {
@@ -339,6 +436,7 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
           seriesCount,
           baselineY,
           yOf,
+          toSlot,
         ),
       );
     });
@@ -366,14 +464,18 @@ function pieOps(chart: LaidChart, width: number, height: number): ChartOp[] {
   if (total <= 0) return [];
 
   // Reserve a legend column on the side when category names are shown (§5).
+  // It sits opposite the reading-start edge — right of the pie under LTR, left
+  // of it under RTL — and is sized from measured label widths, not a
+  // Latin-calibrated character count that Persian names overflow.
+  const rtl = chart.rtl === true;
   const legend = chart.showLegend && chart.categories.length > 0;
-  const legendW = legend
-    ? Math.min(
-        width * 0.45,
-        Math.max(...chart.categories.map((c) => c.length)) * LABEL_SIZE * 0.62 + 18,
-      )
+  const widest = legend
+    ? Math.max(...chart.categories.map((c, i) => labelWidth(c, chart.categoryWidths?.[i])))
     : 0;
-  const cx = (width - legendW) / 2;
+  const legendW = legend ? Math.min(width * 0.45, widest + SWATCH + SWATCH_GAP + PAD) : 0;
+  const legendX = rtl ? 0 : width - legendW;
+  // the pie takes the remaining column, on the other side
+  const cx = (rtl ? legendW : 0) + (width - legendW) / 2;
   const cy = height / 2;
   const r = Math.min(width - legendW, height) / 2 - PAD;
   const ri = chart.kind === 'donut' ? r * 0.55 : 0;
@@ -382,21 +484,23 @@ function pieOps(chart: LaidChart, width: number, height: number): ChartOp[] {
   if (legend) {
     chart.categories.forEach((cat, i) => {
       const y = PAD + i * (LABEL_SIZE + 4);
+      // swatch on the reading-start side of its own label
       ops.push({
         op: 'rect',
-        x: width - legendW,
+        x: rtl ? legendX + legendW - SWATCH : legendX,
         y,
-        w: 7,
-        h: 7,
+        w: SWATCH,
+        h: SWATCH,
         fill: PALETTE[i % PALETTE.length] as Rgb01,
       });
       ops.push({
         op: 'text',
-        x: width - legendW + 10,
+        x: rtl ? legendX + legendW - SWATCH - SWATCH_GAP : legendX + SWATCH + SWATCH_GAP,
         y: y + 6.5,
         text: cat,
         size: LABEL_SIZE,
         color: LABEL,
+        ...(rtl ? { align: 'end' as const } : {}),
       });
     });
   }

@@ -90,6 +90,16 @@ export interface LaidChart {
   categories: string[];
   series: LaidChartSeries[];
   showLegend: boolean;
+  /** Resolved direction: categories run right-to-left and the axis flips (§7). */
+  rtl?: boolean;
+  /**
+   * Label widths measured with the document's real font at layout time. The
+   * painters have no metrics of their own, and the old character-count estimate
+   * was Latin-calibrated, so Persian legends overlapped or clipped. Optional:
+   * `chartOps` falls back to the estimate when a `LaidChart` is built by hand.
+   */
+  seriesNameWidths?: number[];
+  categoryWidths?: number[];
 }
 
 /** One element placed on a page with absolute geometry and resolved content. */

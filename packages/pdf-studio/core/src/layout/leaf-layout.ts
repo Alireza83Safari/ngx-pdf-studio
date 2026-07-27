@@ -114,7 +114,7 @@ export function layoutLeaf(
     image = resolveImage(el, scope, locale, deps);
   }
   if (el.type === 'chart') {
-    chart = resolveChart(el, scope, locale, deps);
+    chart = resolveChart(el, scope, locale, deps, direction);
   }
   if (el.type === 'qrcode') {
     qr = resolveQr(el, scope, locale, deps);
