@@ -6,8 +6,9 @@
     <title>@ngx-pdf-studio — موتور ساخت PDF فارسی</title>
     <meta
       name="description"
-      content="موتور تولید PDF و گزارش‌ساز بصری برای TypeScript و Angular، با پشتیبانی درجه‌یک از راست‌به‌چپ، فارسی و تقویم جلالی."
+      content="موتور تولید PDF و گزارش‌ساز بصری برای TypeScript و Angular، با پشتیبانی درجه‌یک از راست‌به‌چپ، فارسی و تقویم جلالی. توسعه‌یافته توسط علیرضا صفری."
     />
+    <meta name="author" content="Alireza Safari" />
     <meta property="og:title" content="@ngx-pdf-studio" />
     <meta
       property="og:description"
@@ -15,119 +16,133 @@
     />
     <meta property="og:type" content="website" />
     <style>
-      /* ---------------------------------------------------------------- *
-       * Tokens. Ground = printed paper under office light (cool, not cream).
-       * Accent = process cyan; magenta is reserved for warnings, because the
-       * engine paints real DeviceCMYK and those are its two ink primaries.
-       * ---------------------------------------------------------------- */
+      /* =================================================================
+       * A typeset document, not a dashboard.
+       *
+       * Ground and ink come from offset printing: paper is a cool, slightly
+       * cyan-biased white; the dark theme is not "dark UI" but *ink* — the
+       * plate, with process cyan pulled bright the way it prints on black.
+       * Magenta is the second process ink and is spent only on warnings and
+       * on the Persian/RTL material, never as general decoration.
+       *
+       * The display face is monospace on purpose. This engine's own
+       * vernacular is coordinates, point sizes and code; a mono display set
+       * large, loose and lowercase is the subject speaking in its own voice
+       * rather than a neutral sans borrowed from every other docs site.
+       * ================================================================= */
+
       :root {
         color-scheme: light;
 
-        --paper: #fbfcfd;
-        --paper-sunk: #f2f5f8;
+        --paper: #f7f9fa;
         --paper-raised: #ffffff;
-        --ink: #12161c;
-        --ink-muted: #5c6672;
-        --ink-faint: #8b96a3;
-        --rule: #dbe1e8;
-        --rule-strong: #c3ccd6;
+        --paper-sunk: #eef2f5;
+        --ink: #0b0e11;
+        --ink-soft: #46535f;
+        --ink-faint: #7d8b98;
+        --rule: #d6dee5;
+        --rule-hair: #e6ecf1;
 
-        --cyan: #0a7194;
-        --cyan-bright: #0b8fbc;
-        --cyan-wash: #e7f4f9;
-        --magenta: #a8186f;
-        --magenta-wash: #fbeaf3;
+        --cyan: #0e7c9b;
+        --cyan-lift: #0b6b87;
+        --cyan-wash: #e2f1f7;
+        --magenta: #b01374;
+        --magenta-wash: #fbe8f2;
 
-        --code-bg: #0f1720;
-        --code-fg: #d8e2ea;
-        --code-dim: #7c8e9e;
-        --code-key: #74d0f1;
-        --code-str: #f0a3cd;
-        --code-num: #ffc98b;
-        --code-com: #64798a;
+        --plate: #0b0e11;
+        --plate-fg: #dbe5ec;
+        --plate-dim: #6f8493;
+        --tok-str: #f2a4d2;
+        --tok-num: #ffca8c;
+        --tok-key: #6fd2f5;
+        --tok-com: #5b7183;
 
-        --sans:
-          Vazirmatn, 'Segoe UI', Tahoma, 'Iranian Sans', system-ui, -apple-system, sans-serif;
         --mono: ui-monospace, 'Cascadia Mono', 'Cascadia Code', Consolas, 'SF Mono', monospace;
+        --sans: Vazirmatn, 'Segoe UI', Tahoma, 'Iranian Sans', system-ui, sans-serif;
 
-        --step--1: 0.8125rem;
-        --step-0: 1rem;
-        --step-1: 1.1875rem;
-        --step-2: 1.4375rem;
-        --step-3: 1.75rem;
-        --step-4: 2.25rem;
-        --step-5: 2.875rem;
+        --t-xs: 0.6875rem;
+        --t-sm: 0.8125rem;
+        --t-base: 1rem;
+        --t-md: 1.125rem;
+        --t-lg: 1.4375rem;
+        --t-xl: 1.9375rem;
+        --t-2xl: 2.625rem;
+        --t-3xl: 3.75rem;
 
-        --s1: 0.25rem;
-        --s2: 0.5rem;
-        --s3: 0.75rem;
-        --s4: 1rem;
-        --s5: 1.5rem;
-        --s6: 2rem;
-        --s7: 3rem;
-        --s8: 4.5rem;
+        --u1: 0.25rem;
+        --u2: 0.5rem;
+        --u3: 0.75rem;
+        --u4: 1rem;
+        --u5: 1.5rem;
+        --u6: 2.25rem;
+        --u7: 3.5rem;
+        --u8: 5.5rem;
 
-        --rail: 16.5rem;
-        --measure: 68ch;
+        --ruler: 2.75rem;
+        --index: 15.5rem;
+        --measure: 66ch;
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
           color-scheme: dark;
-          --paper: #0e1217;
-          --paper-sunk: #141a21;
-          --paper-raised: #171e26;
-          --ink: #e4eaf0;
-          --ink-muted: #97a4b2;
-          --ink-faint: #6a7887;
-          --rule: #262f3a;
-          --rule-strong: #36414e;
-          --cyan: #52c0e4;
-          --cyan-bright: #7dd3f0;
-          --cyan-wash: #0e2b36;
-          --magenta: #ef7cc0;
-          --magenta-wash: #2e1122;
-          --code-bg: #0a0e13;
+          --paper: #0b0e11;
+          --paper-raised: #12171c;
+          --paper-sunk: #161d23;
+          --ink: #e2eaf0;
+          --ink-soft: #9aabb8;
+          --ink-faint: #667685;
+          --rule: #232d36;
+          --rule-hair: #1a222a;
+          --cyan: #47cdf0;
+          --cyan-lift: #7adcf7;
+          --cyan-wash: #0b2b36;
+          --magenta: #f584c4;
+          --magenta-wash: #2b0f1f;
+          --plate: #05070a;
+          --plate-fg: #dbe5ec;
         }
       }
 
       :root[data-theme='dark'] {
         color-scheme: dark;
-        --paper: #0e1217;
-        --paper-sunk: #141a21;
-        --paper-raised: #171e26;
-        --ink: #e4eaf0;
-        --ink-muted: #97a4b2;
-        --ink-faint: #6a7887;
-        --rule: #262f3a;
-        --rule-strong: #36414e;
-        --cyan: #52c0e4;
-        --cyan-bright: #7dd3f0;
-        --cyan-wash: #0e2b36;
-        --magenta: #ef7cc0;
-        --magenta-wash: #2e1122;
-        --code-bg: #0a0e13;
+        --paper: #0b0e11;
+        --paper-raised: #12171c;
+        --paper-sunk: #161d23;
+        --ink: #e2eaf0;
+        --ink-soft: #9aabb8;
+        --ink-faint: #667685;
+        --rule: #232d36;
+        --rule-hair: #1a222a;
+        --cyan: #47cdf0;
+        --cyan-lift: #7adcf7;
+        --cyan-wash: #0b2b36;
+        --magenta: #f584c4;
+        --magenta-wash: #2b0f1f;
+        --plate: #05070a;
+        --plate-fg: #dbe5ec;
       }
 
       :root[data-theme='light'] {
         color-scheme: light;
-        --paper: #fbfcfd;
-        --paper-sunk: #f2f5f8;
+        --paper: #f7f9fa;
         --paper-raised: #ffffff;
-        --ink: #12161c;
-        --ink-muted: #5c6672;
-        --ink-faint: #8b96a3;
-        --rule: #dbe1e8;
-        --rule-strong: #c3ccd6;
-        --cyan: #0a7194;
-        --cyan-bright: #0b8fbc;
-        --cyan-wash: #e7f4f9;
-        --magenta: #a8186f;
-        --magenta-wash: #fbeaf3;
-        --code-bg: #0f1720;
+        --paper-sunk: #eef2f5;
+        --ink: #0b0e11;
+        --ink-soft: #46535f;
+        --ink-faint: #7d8b98;
+        --rule: #d6dee5;
+        --rule-hair: #e6ecf1;
+        --cyan: #0e7c9b;
+        --cyan-lift: #0b6b87;
+        --cyan-wash: #e2f1f7;
+        --magenta: #b01374;
+        --magenta-wash: #fbe8f2;
+        --plate: #0b0e11;
+        --plate-fg: #dbe5ec;
       }
 
-      /* ---------------------------------------------------------------- */
+      /* ----------------------------- reset ----------------------------- */
 
       *,
       *::before,
@@ -137,7 +152,7 @@
 
       html {
         scroll-behavior: smooth;
-        scroll-padding-block-start: 5.5rem;
+        scroll-padding-block-start: 4.5rem;
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -157,494 +172,647 @@
         background: var(--paper);
         color: var(--ink);
         font-family: var(--sans);
-        font-size: var(--step-0);
-        line-height: 1.85;
+        font-size: var(--t-base);
+        line-height: 1.9;
         -webkit-font-smoothing: antialiased;
         overflow-x: hidden;
       }
 
       html[lang='en'] body {
-        line-height: 1.7;
+        line-height: 1.72;
       }
 
       :focus-visible {
-        outline: 2px solid var(--cyan-bright);
+        outline: 2px solid var(--cyan);
         outline-offset: 3px;
-        border-radius: 2px;
       }
 
       a {
         color: var(--cyan);
-        text-decoration-thickness: 1px;
         text-underline-offset: 3px;
+        text-decoration-thickness: 1px;
       }
       a:hover {
-        color: var(--cyan-bright);
+        color: var(--cyan-lift);
       }
 
       code,
-      kbd,
-      samp,
-      pre {
+      pre,
+      kbd {
         font-family: var(--mono);
         font-variant-ligatures: none;
       }
 
-      /* Inline code: always reads left-to-right, even inside Persian prose. */
+      /* Inline code always reads LTR, even mid-sentence in Persian. */
       :not(pre) > code {
         direction: ltr;
         unicode-bidi: isolate;
         display: inline-block;
-        background: var(--paper-sunk);
-        border: 1px solid var(--rule);
-        border-radius: 3px;
-        padding: 0.05em 0.35em;
-        font-size: 0.875em;
+        font-size: 0.86em;
         line-height: 1.5;
+        padding: 0.02em 0.32em;
+        background: var(--paper-sunk);
+        border-block-end: 1px solid var(--rule);
+        border-radius: 2px;
       }
 
-      /* ------------------------------ chrome ------------------------------ */
+      /* ============================ RULER ============================ *
+       * A real ruler down the start edge: ticks every 8px, a heavier tick
+       * every 40px. It doubles as the scroll position, which is the only
+       * honest reason to keep it on screen.
+       * =============================================================== */
 
-      .topbar {
+      .ruler {
+        position: fixed;
+        inset-block: 0;
+        inset-inline-start: 0;
+        width: var(--ruler);
+        border-inline-end: 1px solid var(--rule);
+        background: var(--paper);
+        z-index: 30;
+        pointer-events: none;
+      }
+
+      .ruler__ticks {
+        position: absolute;
+        inset: 0;
+        background-image:
+          repeating-linear-gradient(
+            to bottom,
+            var(--rule) 0 1px,
+            transparent 1px 40px
+          ),
+          repeating-linear-gradient(
+            to bottom,
+            var(--rule-hair) 0 1px,
+            transparent 1px 8px
+          );
+        background-size:
+          0.75rem 40px,
+          0.4rem 8px;
+        background-position: 100% 0;
+        background-repeat: repeat-y;
+      }
+      html[dir='ltr'] .ruler__ticks {
+        background-position: 0 0;
+      }
+
+      .ruler__progress {
+        position: absolute;
+        inset-block-start: 0;
+        inset-inline-start: 0;
+        width: 2px;
+        height: 0;
+        background: var(--cyan);
+      }
+
+      .ruler__pt {
+        position: absolute;
+        inset-block-end: var(--u4);
+        inset-inline-start: 50%;
+        transform: translateX(50%) rotate(180deg);
+        writing-mode: vertical-rl;
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.18em;
+        color: var(--ink-faint);
+      }
+      html[dir='ltr'] .ruler__pt {
+        transform: translateX(-50%) rotate(180deg);
+      }
+
+      /* ============================ HEADER ============================ */
+
+      .bar {
         position: sticky;
         inset-block-start: 0;
         z-index: 40;
         display: flex;
         align-items: center;
-        gap: var(--s3);
-        padding: var(--s3) var(--s5);
+        gap: var(--u3);
+        padding: var(--u3) var(--u5);
+        padding-inline-start: calc(var(--ruler) + var(--u5));
         background: var(--paper);
-        background: color-mix(in srgb, var(--paper) 88%, transparent);
-        backdrop-filter: blur(10px);
         border-block-end: 1px solid var(--rule);
       }
 
-      .topbar__mark {
+      .bar__mark {
         font-family: var(--mono);
-        font-size: var(--step--1);
+        font-size: var(--t-sm);
         font-weight: 700;
-        letter-spacing: 0.02em;
+        letter-spacing: -0.02em;
         color: var(--ink);
         text-decoration: none;
         direction: ltr;
       }
-      .topbar__mark span {
+      .bar__mark i {
+        font-style: normal;
         color: var(--cyan);
       }
 
-      .topbar__spacer {
+      .bar__gap {
         flex: 1;
       }
 
-      .btn {
+      .ctl {
         font: inherit;
-        font-size: var(--step--1);
-        display: inline-flex;
-        align-items: center;
-        gap: var(--s2);
-        padding: 0.35rem 0.7rem;
-        background: var(--paper-raised);
-        color: var(--ink-muted);
-        border: 1px solid var(--rule);
-        border-radius: 5px;
-        cursor: pointer;
-        transition:
-          color 0.15s,
-          border-color 0.15s;
-      }
-      .btn:hover {
-        color: var(--ink);
-        border-color: var(--rule-strong);
-      }
-
-      .btn--ghost {
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 0.3rem 0.6rem;
+        color: var(--ink-soft);
         background: none;
-      }
-
-      .langset {
-        display: flex;
         border: 1px solid var(--rule);
-        border-radius: 5px;
-        overflow: hidden;
-      }
-      .langset button {
-        font: inherit;
-        font-size: var(--step--1);
-        padding: 0.35rem 0.65rem;
-        background: var(--paper-raised);
-        color: var(--ink-faint);
-        border: 0;
         cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
       }
-      .langset button[aria-pressed='true'] {
-        background: var(--cyan);
-        color: #fff;
+      .ctl:hover {
+        color: var(--ink);
+        border-color: var(--ink-faint);
       }
 
-      /* ------------------------------ shell ------------------------------ */
+      .lang {
+        display: flex;
+      }
+      .lang .ctl {
+        margin-inline-start: -1px;
+      }
+      .lang .ctl[aria-pressed='true'] {
+        color: var(--paper);
+        background: var(--ink);
+        border-color: var(--ink);
+      }
+
+      /* ============================ SHELL ============================ */
 
       .shell {
         display: grid;
-        grid-template-columns: var(--rail) minmax(0, 1fr);
-        align-items: start;
-        max-width: 84rem;
+        grid-template-columns: var(--index) minmax(0, 1fr);
+        gap: var(--u7);
+        max-width: 82rem;
         margin-inline: auto;
+        padding-inline-start: var(--ruler);
+        align-items: start;
       }
 
-      .rail {
+      /* --- contents, set like a document's table of contents, not a menu --- */
+
+      .toc {
         position: sticky;
-        inset-block-start: 3.6rem;
-        max-height: calc(100vh - 3.6rem);
+        inset-block-start: 4rem;
+        max-height: calc(100vh - 5rem);
         overflow-y: auto;
-        padding: var(--s6) var(--s4) var(--s7);
-        border-inline-end: 1px solid var(--rule);
+        padding-block: var(--u7);
+        padding-inline: var(--u4) 0;
       }
 
-      .rail__group {
-        font-size: var(--step--1);
+      .toc__h {
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.18em;
         text-transform: uppercase;
-        letter-spacing: 0.09em;
         color: var(--ink-faint);
-        margin-block: var(--s5) var(--s2);
-      }
-      .rail__group:first-child {
-        margin-block-start: 0;
+        padding-block-end: var(--u2);
+        margin-block-end: var(--u3);
+        border-block-end: 1px solid var(--ink-faint);
       }
 
-      .rail a {
-        display: block;
-        padding: 0.28rem var(--s3);
-        font-size: 0.9375rem;
-        color: var(--ink-muted);
-        text-decoration: none;
-        border-inline-start: 2px solid transparent;
-        margin-inline-start: -1px;
+      .toc ol {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        counter-reset: toc;
       }
-      .rail a:hover {
+
+      .toc li {
+        counter-increment: toc;
+        margin: 0;
+      }
+
+      .toc a {
+        display: flex;
+        align-items: baseline;
+        gap: var(--u2);
+        padding-block: 0.3rem;
+        font-size: 0.9375rem;
+        color: var(--ink-soft);
+        text-decoration: none;
+      }
+      .toc a::before {
+        content: counter(toc, decimal-leading-zero);
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        font-variant-numeric: tabular-nums;
+        color: var(--ink-faint);
+      }
+      /* the dotted leader of a printed contents page */
+      .toc a::after {
+        content: '';
+        flex: 1;
+        align-self: center;
+        height: 1px;
+        background-image: radial-gradient(circle, var(--rule) 1px, transparent 1px);
+        background-size: 5px 1px;
+        background-repeat: repeat-x;
+      }
+      .toc a:hover {
         color: var(--ink);
       }
-      .rail a[aria-current='true'] {
+      .toc a[aria-current='true'] {
         color: var(--cyan);
-        border-inline-start-color: var(--cyan);
-        background: var(--cyan-wash);
+      }
+      .toc a[aria-current='true']::before {
+        color: var(--cyan);
       }
 
+      /* ============================= MAIN ============================= */
+
       .main {
-        padding: var(--s7) var(--s6) var(--s8);
         min-width: 0;
+        padding-block: var(--u7) var(--u8);
+        padding-inline-end: var(--u5);
       }
 
       section {
         max-width: var(--measure);
-        margin-block-end: var(--s8);
-        scroll-margin-block-start: 5rem;
+        margin-block-end: var(--u8);
+        scroll-margin-block-start: 4.5rem;
       }
 
-      /* --------------------------- typography --------------------------- */
+      /* section number typeset in the margin, like a folio */
+      .sec__folio {
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--cyan);
+        margin-block-end: var(--u2);
+      }
 
       h1,
       h2,
       h3,
       h4 {
-        text-wrap: balance;
-        line-height: 1.3;
         margin: 0;
-        font-weight: 700;
+        text-wrap: balance;
+        line-height: 1.25;
       }
 
       h1 {
-        font-size: var(--step-5);
-        letter-spacing: -0.02em;
+        font-family: var(--mono);
+        font-size: var(--t-3xl);
+        font-weight: 600;
+        letter-spacing: -0.045em;
+        direction: ltr;
       }
+      html[dir='rtl'] h1 {
+        text-align: right;
+      }
+
       h2 {
-        font-size: var(--step-3);
-        letter-spacing: -0.01em;
-        margin-block-end: var(--s4);
-        padding-block-end: var(--s3);
-        border-block-end: 1px solid var(--rule);
+        font-family: var(--mono);
+        font-size: var(--t-xl);
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        margin-block-end: var(--u5);
+        padding-block-end: var(--u3);
+        border-block-end: 2px solid var(--ink);
       }
+
       h3 {
-        font-size: var(--step-1);
-        margin-block: var(--s6) var(--s3);
+        font-size: var(--t-md);
+        font-weight: 700;
+        margin-block: var(--u6) var(--u3);
       }
+
       h4 {
-        font-size: var(--step-0);
-        margin-block: var(--s5) var(--s2);
+        font-size: var(--t-base);
+        font-weight: 700;
+        margin-block: var(--u5) var(--u2);
       }
 
       p {
-        margin-block: 0 var(--s4);
-      }
-
-      .eyebrow {
-        font-family: var(--mono);
-        font-size: var(--step--1);
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--cyan);
-        margin-block-end: var(--s2);
+        margin-block: 0 var(--u4);
       }
 
       .lede {
-        font-size: var(--step-1);
-        color: var(--ink-muted);
+        font-size: var(--t-md);
+        color: var(--ink-soft);
+        max-width: 54ch;
       }
 
       ul,
       ol {
-        margin-block: 0 var(--s4);
-        padding-inline-start: 1.35em;
+        margin-block: 0 var(--u4);
+        padding-inline-start: 1.3em;
       }
       li {
-        margin-block-end: var(--s2);
+        margin-block-end: var(--u2);
       }
 
-      /* ------------------------------ hero ------------------------------ */
+      /* ============================= HERO ============================= */
 
       .hero {
         max-width: none;
-        display: grid;
-        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-        gap: var(--s7);
-        align-items: center;
-        margin-block-end: var(--s8);
+        margin-block-end: var(--u8);
       }
 
-      .hero__title {
-        font-family: var(--mono);
-        direction: ltr;
-        text-align: start;
+      .hero__grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+        gap: var(--u7);
+        align-items: end;
       }
-      html[dir='rtl'] .hero__title {
+
+      .hero__sub {
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        margin-block-end: var(--u4);
+      }
+
+      .hero__spec {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0;
+        margin-block: var(--u5) var(--u5);
+        border: 1px solid var(--rule);
+      }
+      .hero__spec div {
+        flex: 1 1 7rem;
+        padding: var(--u3) var(--u4);
+        border-inline-start: 1px solid var(--rule);
+      }
+      .hero__spec div:first-child {
+        border-inline-start: 0;
+      }
+      .hero__spec dt {
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+      }
+      .hero__spec dd {
+        margin: 0;
+        font-family: var(--mono);
+        font-size: 0.9375rem;
+        font-variant-numeric: tabular-nums;
+        direction: ltr;
+        color: var(--ink);
+      }
+      html[dir='rtl'] .hero__spec dd {
         text-align: right;
       }
 
-      .hero__meta {
+      .actions {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--s2);
-        margin-block: var(--s5);
+        gap: var(--u3);
       }
 
-      .chip {
+      .act {
         font-family: var(--mono);
-        font-size: var(--step--1);
-        direction: ltr;
-        padding: 0.15rem 0.5rem;
-        border: 1px solid var(--rule);
-        border-radius: 999px;
-        color: var(--ink-muted);
-        background: var(--paper-raised);
-      }
-      .chip--live {
-        border-color: var(--cyan);
-        color: var(--cyan);
-        background: var(--cyan-wash);
-      }
-
-      .hero__cta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--s3);
-      }
-
-      .cta {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--s2);
-        padding: 0.55rem 1.1rem;
-        border-radius: 6px;
-        font-size: 0.9375rem;
-        font-weight: 600;
+        font-size: var(--t-sm);
+        letter-spacing: 0.04em;
+        padding: 0.6rem 1.1rem;
         text-decoration: none;
-        border: 1px solid transparent;
+        border: 1px solid var(--ink);
       }
-      .cta--solid {
+      .act--fill {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .act--fill:hover {
         background: var(--cyan);
-        color: #fff;
+        border-color: var(--cyan);
+        color: var(--paper);
       }
-      .cta--solid:hover {
-        background: var(--cyan-bright);
-        color: #fff;
-      }
-      .cta--line {
-        border-color: var(--rule-strong);
+      .act--line {
         color: var(--ink);
       }
-      .cta--line:hover {
+      .act--line:hover {
         border-color: var(--cyan);
         color: var(--cyan);
       }
 
-      /* The specimen: a real page, drawn to scale, with its margins visible. */
-      .specimen {
+      /* the specimen, presented as a proof with crop marks */
+      .proof {
         position: relative;
-        background: var(--paper-raised);
-        border: 1px solid var(--rule);
-        border-radius: 4px;
-        padding: var(--s4);
-        box-shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 12px 32px -18px rgb(0 0 0 / 35%);
+        margin: 0;
+        padding: var(--u5);
       }
-      .specimen svg {
+      .proof::before,
+      .proof::after {
+        content: '';
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        border: 1px solid var(--ink-faint);
+      }
+      .proof::before {
+        inset-block-start: 0;
+        inset-inline-start: 0;
+        border-width: 1px 0 0 1px;
+      }
+      html[dir='rtl'] .proof::before {
+        border-width: 1px 1px 0 0;
+      }
+      .proof::after {
+        inset-block-end: 0;
+        inset-inline-end: 0;
+        border-width: 0 1px 1px 0;
+      }
+      html[dir='rtl'] .proof::after {
+        border-width: 0 0 1px 1px;
+      }
+
+      .proof svg {
         display: block;
         width: 100%;
         height: auto;
+        background: var(--paper-raised);
+        box-shadow: 0 1px 1px rgb(0 0 0 / 5%), 0 18px 40px -24px rgb(0 0 0 / 45%);
       }
-      .specimen__cap {
+
+      .proof figcaption {
         font-family: var(--mono);
-        font-size: 0.6875rem;
+        font-size: var(--t-xs);
+        letter-spacing: 0.12em;
         color: var(--ink-faint);
         text-align: center;
-        margin-block-start: var(--s3);
         direction: ltr;
+        margin-block-start: var(--u3);
       }
 
-      /* ---------------------------- callouts ---------------------------- */
+      /* colophon: the print-world way to credit a document */
+      .colophon {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--u2) var(--u4);
+        margin-block-start: var(--u6);
+        padding-block-start: var(--u4);
+        border-block-start: 1px solid var(--rule);
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+      }
+      .colophon b {
+        font-weight: 600;
+        color: var(--ink);
+        letter-spacing: 0.06em;
+      }
+      .colophon a {
+        color: var(--ink-soft);
+        text-decoration: none;
+        border-block-end: 1px solid var(--rule);
+      }
+      .colophon a:hover {
+        color: var(--cyan);
+        border-block-end-color: var(--cyan);
+      }
+
+      /* ============================ BLOCKS ============================ */
 
       .note {
-        border-inline-start: 3px solid var(--cyan);
-        background: var(--cyan-wash);
-        padding: var(--s4) var(--s4);
-        border-radius: 0 4px 4px 0;
-        margin-block-end: var(--s4);
+        --note-ink: var(--cyan);
+        --note-bg: var(--cyan-wash);
+        position: relative;
+        margin-block-end: var(--u4);
+        padding: var(--u4) var(--u5);
+        background: var(--note-bg);
+        border-inline-start: 2px solid var(--note-ink);
       }
-      html[dir='rtl'] .note {
-        border-radius: 4px 0 0 4px;
+      .note--warn {
+        --note-ink: var(--magenta);
+        --note-bg: var(--magenta-wash);
       }
       .note > :last-child {
         margin-block-end: 0;
       }
-
-      .note--warn {
-        border-inline-start-color: var(--magenta);
-        background: var(--magenta-wash);
+      .note__t {
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--note-ink);
+        margin-block-end: var(--u2);
       }
-
-      .note__title {
-        font-weight: 700;
-        font-size: 0.9375rem;
-        margin-block-end: var(--s2);
-        color: var(--cyan);
-      }
-      .note--warn .note__title {
-        color: var(--magenta);
-      }
-
-      /* ------------------------------ code ------------------------------ */
 
       .code {
-        position: relative;
-        margin-block-end: var(--s4);
-        background: var(--code-bg);
-        border-radius: 6px;
-        overflow: hidden;
+        margin-block-end: var(--u4);
+        background: var(--plate);
+        border: 1px solid var(--plate);
       }
 
       .code__bar {
         display: flex;
         align-items: center;
-        gap: var(--s3);
-        padding: 0.4rem var(--s4);
-        border-block-end: 1px solid rgb(255 255 255 / 8%);
+        gap: var(--u3);
+        padding: 0.35rem var(--u4);
+        border-block-end: 1px solid rgb(255 255 255 / 9%);
         direction: ltr;
       }
-
       .code__lang {
-        font-family: var(--mono);
-        font-size: 0.6875rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--code-dim);
         flex: 1;
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--plate-dim);
       }
 
       .copy {
-        font: inherit;
         font-family: var(--mono);
-        font-size: 0.6875rem;
-        padding: 0.15rem 0.5rem;
-        color: var(--code-dim);
+        font-size: var(--t-xs);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 0.1rem 0.45rem;
+        color: var(--plate-dim);
         background: none;
-        border: 1px solid rgb(255 255 255 / 14%);
-        border-radius: 4px;
+        border: 1px solid rgb(255 255 255 / 16%);
         cursor: pointer;
       }
       .copy:hover {
-        color: var(--code-fg);
-        border-color: rgb(255 255 255 / 30%);
+        color: var(--plate-fg);
+        border-color: rgb(255 255 255 / 34%);
       }
       .copy[data-copied='true'] {
-        color: #7ee2b8;
-        border-color: #7ee2b8;
+        color: #74e3b4;
+        border-color: #74e3b4;
       }
 
       .code pre {
         margin: 0;
-        padding: var(--s4);
+        padding: var(--u4);
         overflow-x: auto;
         direction: ltr;
         text-align: left;
-        font-size: 0.8125rem;
-        line-height: 1.75;
-        color: var(--code-fg);
+        font-size: var(--t-sm);
+        line-height: 1.8;
+        color: var(--plate-fg);
         tab-size: 2;
       }
 
-      .tok-key {
-        color: var(--code-key);
-      }
       .tok-str {
-        color: var(--code-str);
+        color: var(--tok-str);
       }
       .tok-num {
-        color: var(--code-num);
+        color: var(--tok-num);
+      }
+      .tok-key {
+        color: var(--tok-key);
       }
       .tok-com {
-        color: var(--code-com);
+        color: var(--tok-com);
         font-style: italic;
       }
 
-      /* ------------------------------ tabs ------------------------------ */
+      /* ----------------------------- tabs ----------------------------- */
 
       .tabs {
         display: flex;
-        gap: var(--s1);
-        margin-block-end: 0;
         border-block-end: 1px solid var(--rule);
       }
       .tabs button {
-        font: inherit;
-        font-size: 0.875rem;
-        padding: 0.4rem 0.8rem;
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 0.45rem 0.9rem;
         background: none;
         border: 0;
         border-block-end: 2px solid transparent;
+        margin-block-end: -1px;
         color: var(--ink-faint);
         cursor: pointer;
       }
       .tabs button[aria-selected='true'] {
-        color: var(--cyan);
+        color: var(--ink);
         border-block-end-color: var(--cyan);
       }
       .tabpanel[hidden] {
         display: none;
       }
       .tabwrap {
-        margin-block-end: var(--s4);
+        margin-block-end: var(--u4);
       }
       .tabwrap .code {
         margin-block-end: 0;
-        border-start-start-radius: 0;
-        border-start-end-radius: 0;
       }
 
-      /* ----------------------------- tables ----------------------------- */
+      /* ---------------------------- tables ---------------------------- */
 
       .tablewrap {
         overflow-x: auto;
-        border: 1px solid var(--rule);
-        border-radius: 6px;
-        margin-block-end: var(--s4);
+        margin-block-end: var(--u4);
+        border-block: 1px solid var(--ink);
       }
 
       table {
@@ -652,199 +820,205 @@
         border-collapse: collapse;
         font-size: 0.875rem;
       }
-
       th,
       td {
         text-align: start;
-        padding: 0.55rem var(--s4);
-        border-block-end: 1px solid var(--rule);
+        padding: 0.5rem var(--u4);
         vertical-align: top;
+        border-block-end: 1px solid var(--rule-hair);
       }
       thead th {
-        background: var(--paper-sunk);
-        font-size: 0.75rem;
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        font-weight: 400;
+        letter-spacing: 0.14em;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--ink-muted);
+        color: var(--ink-faint);
         white-space: nowrap;
+        border-block-end: 1px solid var(--rule);
       }
-      tbody tr:last-child td,
-      tbody tr:last-child th {
+      tbody tr:last-child td {
         border-block-end: 0;
       }
       td code {
         white-space: nowrap;
       }
-      .num {
-        font-variant-numeric: tabular-nums;
+
+      /* -------------------------- band diagram -------------------------- */
+
+      .bands {
+        margin-block-end: var(--u4);
+        border: 1px solid var(--rule);
+        font-size: var(--t-sm);
       }
-
-      /* --------------------------- band stack --------------------------- */
-
-      .bandpage {
-        border: 1px solid var(--rule-strong);
-        border-radius: 4px;
-        overflow: hidden;
-        background: var(--paper-raised);
-        margin-block-end: var(--s4);
-        font-size: 0.8125rem;
-      }
-
       .band {
         display: flex;
-        align-items: center;
-        gap: var(--s3);
-        padding: 0.5rem var(--s4);
-        border-block-end: 1px dashed var(--rule);
+        align-items: baseline;
+        gap: var(--u4);
+        padding: 0.45rem var(--u4);
+        border-block-end: 1px solid var(--rule-hair);
       }
       .band:last-child {
         border-block-end: 0;
       }
-      .band__name {
+      .band__n {
         font-family: var(--mono);
         direction: ltr;
-        color: var(--cyan);
         min-width: 8.5rem;
-      }
-      .band__what {
-        color: var(--ink-muted);
-        flex: 1;
-      }
-      .band--repeat {
-        background: var(--cyan-wash);
-      }
-      .band--repeat .band__what {
         color: var(--ink);
       }
-      .band--faint .band__name {
+      .band__d {
+        flex: 1;
+        color: var(--ink-soft);
+      }
+      .band--hot {
+        background: var(--cyan-wash);
+      }
+      .band--hot .band__n {
+        color: var(--cyan);
+      }
+      .band--ghost .band__n,
+      .band--ghost .band__d {
         color: var(--ink-faint);
       }
 
-      /* ---------------------------- pipeline ---------------------------- */
+      /* --------------------------- pipeline --------------------------- */
 
       .pipe {
         display: flex;
         flex-wrap: wrap;
-        align-items: stretch;
-        gap: var(--s2);
-        margin-block-end: var(--s5);
+        gap: var(--u2);
+        margin-block-end: var(--u5);
       }
-      .pipe__node {
+      .pipe__n {
         flex: 1 1 8rem;
-        padding: var(--s3);
+        padding: var(--u3);
         border: 1px solid var(--rule);
-        border-radius: 5px;
-        background: var(--paper-raised);
         text-align: center;
       }
-      .pipe__node b {
+      .pipe__n b {
         display: block;
         font-family: var(--mono);
-        font-size: 0.8125rem;
+        font-size: var(--t-sm);
+        font-weight: 600;
         direction: ltr;
         color: var(--ink);
       }
-      .pipe__node span {
-        font-size: 0.75rem;
+      .pipe__n span {
+        font-size: var(--t-xs);
         color: var(--ink-faint);
       }
-      .pipe__node--out {
+      .pipe__n--out {
         border-color: var(--cyan);
         background: var(--cyan-wash);
       }
-      .pipe__arrow {
+      .pipe__a {
         align-self: center;
-        color: var(--rule-strong);
-        font-size: 1.25rem;
-        line-height: 1;
+        color: var(--ink-faint);
+        font-family: var(--mono);
       }
-      html[dir='rtl'] .pipe__arrow {
+      html[dir='rtl'] .pipe__a {
         transform: scaleX(-1);
       }
 
-      /* ------------------------------ misc ------------------------------ */
+      /* ----------------------------- misc ----------------------------- */
 
-      .grid2 {
+      .duo {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-        gap: var(--s4);
-        margin-block-end: var(--s4);
-      }
-
-      .card {
+        gap: 0;
+        margin-block-end: var(--u4);
         border: 1px solid var(--rule);
-        border-radius: 6px;
-        padding: var(--s4);
-        background: var(--paper-raised);
       }
-      .card h4 {
-        margin-block-start: 0;
+      .duo > div {
+        padding: var(--u4);
+        border-inline-start: 1px solid var(--rule);
       }
-      .card p:last-child {
+      .duo > div:first-child {
+        border-inline-start: 0;
+      }
+      .duo p:last-child {
         margin-block-end: 0;
       }
-      .card__mark {
+      .duo__tag {
         font-family: var(--mono);
-        font-size: 0.6875rem;
-        letter-spacing: 0.08em;
+        font-size: var(--t-xs);
+        letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--ink-faint);
+        margin-block-end: var(--u2);
       }
 
       details {
-        border: 1px solid var(--rule);
-        border-radius: 6px;
-        padding: var(--s3) var(--s4);
-        margin-block-end: var(--s3);
-        background: var(--paper-raised);
+        border-block-end: 1px solid var(--rule);
+        padding-block: var(--u3);
       }
       summary {
         cursor: pointer;
-        font-weight: 600;
+        font-weight: 700;
         font-size: 0.9375rem;
       }
-      details[open] summary {
-        margin-block-end: var(--s3);
+      summary::marker {
         color: var(--cyan);
+      }
+      details[open] summary {
+        color: var(--cyan);
+        margin-block-end: var(--u3);
       }
       details > :last-child {
         margin-block-end: 0;
       }
 
       .steps {
-        counter-reset: step;
         list-style: none;
+        counter-reset: step;
         padding: 0;
       }
       .steps > li {
         counter-increment: step;
         position: relative;
-        padding-inline-start: 2.4rem;
-        margin-block-end: var(--s5);
+        padding-inline-start: 2.6rem;
+        margin-block-end: var(--u6);
       }
       .steps > li::before {
-        content: counter(step);
+        content: counter(step, decimal-leading-zero);
         position: absolute;
         inset-inline-start: 0;
-        inset-block-start: 0.15rem;
-        width: 1.6rem;
-        height: 1.6rem;
-        display: grid;
-        place-items: center;
+        inset-block-start: 0.1rem;
         font-family: var(--mono);
-        font-size: 0.75rem;
+        font-size: var(--t-sm);
         font-variant-numeric: tabular-nums;
         color: var(--cyan);
-        border: 1px solid var(--cyan);
-        border-radius: 50%;
+        border-block-end: 1px solid var(--cyan);
+      }
+      .steps h3 {
+        margin-block-start: 0;
       }
 
-      footer {
+      .foot {
         max-width: none;
-        border-block-start: 1px solid var(--rule);
-        padding-block-start: var(--s5);
-        color: var(--ink-muted);
+        margin-block-end: 0;
+        padding-block-start: var(--u5);
+        border-block-start: 2px solid var(--ink);
+        color: var(--ink-soft);
         font-size: 0.875rem;
+      }
+      .foot__row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--u3) var(--u6);
+        align-items: baseline;
+      }
+      .foot__by {
+        font-family: var(--mono);
+        font-size: var(--t-xs);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+      }
+      .foot__by b {
+        color: var(--ink);
+        font-weight: 600;
       }
 
       .skip {
@@ -854,49 +1028,67 @@
       .skip:focus {
         position: static;
         display: inline-block;
-        margin: var(--s2);
+        margin: var(--u2);
+      }
+
+      .toc__toggle {
+        display: none;
       }
 
       /* --------------------------- responsive --------------------------- */
 
-      .rail__toggle {
-        display: none;
-      }
-
-      @media (max-width: 60rem) {
-        .shell {
-          grid-template-columns: minmax(0, 1fr);
-        }
-        .rail {
-          position: static;
-          max-height: none;
-          border-inline-end: 0;
-          border-block-end: 1px solid var(--rule);
-          padding-block: var(--s4);
-        }
-        .rail[hidden] {
+      @media (max-width: 62rem) {
+        .ruler {
           display: none;
         }
-        .rail__toggle {
+        .bar {
+          padding-inline-start: var(--u5);
+        }
+        .shell {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 0;
+          padding-inline-start: 0;
+        }
+        .toc {
+          position: static;
+          max-height: none;
+          padding: var(--u5) var(--u5) 0;
+        }
+        .toc[hidden] {
+          display: none;
+        }
+        .toc__toggle {
           display: inline-flex;
         }
         .main {
-          padding: var(--s5) var(--s4) var(--s7);
+          padding-inline: var(--u5);
         }
-        .hero {
+        .hero__grid {
           grid-template-columns: minmax(0, 1fr);
-          gap: var(--s5);
+          gap: var(--u6);
+          align-items: start;
         }
       }
 
-      @media (max-width: 34rem) {
+      @media (max-width: 36rem) {
         :root {
-          --step-5: 2rem;
-          --step-4: 1.75rem;
-          --step-3: 1.4375rem;
+          --t-3xl: 2.375rem;
+          --t-2xl: 1.875rem;
+          --t-xl: 1.5rem;
         }
-        .topbar {
-          padding-inline: var(--s4);
+        .bar {
+          padding-inline: var(--u4);
+        }
+        .main {
+          padding-inline: var(--u4);
+        }
+        .toc {
+          padding-inline: var(--u4);
+        }
+        .hero__spec div {
+          flex-basis: 50%;
+          border-inline-start: 0;
+          border-block-start: 1px solid var(--rule);
         }
       }
     </style>
@@ -905,160 +1097,184 @@
   <body>
     <a class="skip" href="#main" data-i18n="skip">پرش به محتوا</a>
 
-    <header class="topbar">
-      <a class="topbar__mark" href="#top">@ngx-pdf-studio<span>/core</span></a>
-      <span class="topbar__spacer"></span>
-      <button class="btn rail__toggle" id="railToggle" aria-expanded="false" aria-controls="rail">
+    <div class="ruler" aria-hidden="true">
+      <div class="ruler__ticks"></div>
+      <div class="ruler__progress" id="progress"></div>
+      <span class="ruler__pt">pt</span>
+    </div>
+
+    <header class="bar">
+      <a class="bar__mark" href="#top">@ngx-pdf-studio<i>/core</i></a>
+      <span class="bar__gap"></span>
+      <button class="ctl toc__toggle" id="tocToggle" aria-expanded="false" aria-controls="toc">
         <span data-i18n="nav.menu">فهرست</span>
       </button>
-      <div class="langset" role="group" aria-label="Language">
-        <button type="button" data-lang="fa" aria-pressed="true">فا</button>
-        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      <div class="lang" role="group" aria-label="Language">
+        <button class="ctl" type="button" data-lang="fa" aria-pressed="true">فا</button>
+        <button class="ctl" type="button" data-lang="en" aria-pressed="false">En</button>
       </div>
-      <button class="btn btn--ghost" id="themeToggle" aria-label="Toggle colour theme">
-        <span id="themeIcon" aria-hidden="true">◐</span>
+      <button class="ctl" id="themeToggle" aria-label="Toggle colour theme">
+        <span id="themeIcon" aria-hidden="true">●</span>
       </button>
     </header>
 
     <div class="shell" id="top">
-      <nav class="rail" id="rail" aria-label="On this page">
-        <p class="rail__group" data-i18n="nav.start">شروع</p>
-        <a href="#why" data-i18n="nav.why">چرا این کتابخانه</a>
-        <a href="#model" data-i18n="nav.model">مدل ذهنی</a>
-        <a href="#install" data-i18n="nav.install">نصب</a>
-        <a href="#quickstart" data-i18n="nav.quickstart">شروع سریع</a>
-
-        <p class="rail__group" data-i18n="nav.build">ساختن</p>
-        <a href="#invoice" data-i18n="nav.invoice">گام‌به‌گام: یک فاکتور</a>
-        <a href="#expressions" data-i18n="nav.expressions">داده و Expression</a>
-        <a href="#rtl" data-i18n="nav.rtl">فارسی و راست‌به‌چپ</a>
-
-        <p class="rail__group" data-i18n="nav.integrate">اتصال</p>
-        <a href="#angular" data-i18n="nav.angular">Angular</a>
-        <a href="#store" data-i18n="nav.store">ادیتور اختصاصی</a>
-        <a href="#designer" data-i18n="nav.designer">دیزاینر بصری</a>
-
-        <p class="rail__group" data-i18n="nav.ref">مرجع</p>
-        <a href="#api" data-i18n="nav.api">مرجع API</a>
-        <a href="#faq" data-i18n="nav.faq">عیب‌یابی</a>
+      <nav class="toc" id="toc" aria-label="Contents">
+        <p class="toc__h" data-i18n="nav.contents">فهرست مطالب</p>
+        <ol>
+          <li><a href="#why" data-i18n="nav.why">چرا این کتابخانه</a></li>
+          <li><a href="#model" data-i18n="nav.model">مدل ذهنی</a></li>
+          <li><a href="#install" data-i18n="nav.install">نصب</a></li>
+          <li><a href="#quickstart" data-i18n="nav.quickstart">شروع سریع</a></li>
+          <li><a href="#invoice" data-i18n="nav.invoice">گام‌به‌گام: فاکتور</a></li>
+          <li><a href="#expressions" data-i18n="nav.expressions">داده و Expression</a></li>
+          <li><a href="#rtl" data-i18n="nav.rtl">فارسی و راست‌به‌چپ</a></li>
+          <li><a href="#angular" data-i18n="nav.angular">Angular</a></li>
+          <li><a href="#store" data-i18n="nav.store">ادیتور اختصاصی</a></li>
+          <li><a href="#designer" data-i18n="nav.designer">دیزاینر بصری</a></li>
+          <li><a href="#api" data-i18n="nav.api">مرجع API</a></li>
+          <li><a href="#faq" data-i18n="nav.faq">عیب‌یابی</a></li>
+        </ol>
       </nav>
 
       <main class="main" id="main">
         <!-- ============================ HERO ============================ -->
         <section class="hero">
-          <div>
-            <p class="eyebrow" data-i18n="hero.eyebrow">موتور PDF · TypeScript</p>
-            <h1 class="hero__title">@ngx-pdf-studio</h1>
-            <p class="lede" data-i18n="hero.lede">
-              یک قالب JSON و یک دادهٔ JSON بده، یک PDF واقعی بگیر — در مرورگر و در نود، با
-              بایت‌های یکسان. راست‌به‌چپ، فارسی و تقویم جلالی از روز اول، نه به‌عنوان وصله.
-            </p>
-            <div class="hero__meta">
-              <span class="chip">MIT</span>
-              <span class="chip">Angular 12 → latest</span>
-              <span class="chip">Node ≥ 18.13</span>
-              <span class="chip chip--live" data-i18n="hero.tests">۲۸۹ تست سبز</span>
+          <div class="hero__grid">
+            <div>
+              <p class="hero__sub" data-i18n="hero.eyebrow">موتور PDF · TypeScript · MIT</p>
+              <h1>@ngx-pdf-studio</h1>
+              <p class="lede" data-i18n="hero.lede">
+                یک قالب JSON و یک دادهٔ JSON بده، یک PDF واقعی بگیر — در مرورگر و در نود، با
+                بایت‌های یکسان. راست‌به‌چپ، فارسی و تقویم جلالی از روز اول، نه به‌عنوان وصله.
+              </p>
+
+              <dl class="hero__spec">
+                <div>
+                  <dt data-i18n="spec.runtime">اجرا</dt>
+                  <dd>Node ≥ 18.13</dd>
+                </div>
+                <div>
+                  <dt data-i18n="spec.angular">انگولار</dt>
+                  <dd>12 → latest</dd>
+                </div>
+                <div>
+                  <dt data-i18n="spec.tests">تست</dt>
+                  <dd>289 green</dd>
+                </div>
+                <div>
+                  <dt data-i18n="spec.license">پروانه</dt>
+                  <dd>MIT</dd>
+                </div>
+              </dl>
+
+              <div class="actions">
+                <a class="act act--fill" href="#quickstart" data-i18n="hero.ctaStart">شروع سریع</a>
+                <a class="act act--line" href="#designer" data-i18n="hero.ctaDesigner"
+                  >دیزاینر بصری</a
+                >
+              </div>
             </div>
-            <div class="hero__cta">
-              <a class="cta cta--solid" href="#quickstart" data-i18n="hero.ctaStart">شروع سریع</a>
-              <a class="cta cta--line" href="#designer" data-i18n="hero.ctaDesigner"
-                >دیزاینر بصری</a
-              >
-            </div>
+
+            <figure class="proof">
+              <svg viewBox="0 0 210 297" role="img" aria-labelledby="proofTitle">
+                <title id="proofTitle" data-i18n="hero.specimenAlt">
+                  نمونهٔ خروجی: فاکتور فارسی راست‌به‌چپ
+                </title>
+                <rect x="0" y="0" width="210" height="297" fill="var(--paper-raised)" />
+                <rect
+                  x="15"
+                  y="15"
+                  width="180"
+                  height="267"
+                  fill="none"
+                  stroke="var(--rule)"
+                  stroke-width="0.4"
+                  stroke-dasharray="2 2"
+                />
+                <rect x="15" y="15" width="180" height="26" fill="var(--cyan-wash)" />
+                <rect x="150" y="21" width="40" height="5" rx="1" fill="var(--cyan)" />
+                <rect x="150" y="29" width="26" height="3" rx="1" fill="var(--ink-faint)" />
+                <rect
+                  x="20"
+                  y="21"
+                  width="18"
+                  height="14"
+                  rx="1.5"
+                  fill="var(--cyan)"
+                  opacity="0.32"
+                />
+                <rect x="15" y="52" width="180" height="8" fill="var(--paper-sunk)" />
+                <g fill="var(--ink-soft)">
+                  <rect x="160" y="55" width="30" height="2.4" rx="0.8" />
+                  <rect x="110" y="55" width="34" height="2.4" rx="0.8" />
+                  <rect x="70" y="55" width="24" height="2.4" rx="0.8" />
+                  <rect x="22" y="55" width="26" height="2.4" rx="0.8" />
+                </g>
+                <g fill="var(--ink-faint)">
+                  <rect x="150" y="66" width="40" height="2.2" rx="0.7" />
+                  <rect x="104" y="66" width="40" height="2.2" rx="0.7" />
+                  <rect x="70" y="66" width="20" height="2.2" rx="0.7" />
+                  <rect x="22" y="66" width="30" height="2.2" rx="0.7" />
+                  <rect x="150" y="76" width="40" height="2.2" rx="0.7" />
+                  <rect x="112" y="76" width="32" height="2.2" rx="0.7" />
+                  <rect x="70" y="76" width="20" height="2.2" rx="0.7" />
+                  <rect x="22" y="76" width="24" height="2.2" rx="0.7" />
+                  <rect x="150" y="86" width="40" height="2.2" rx="0.7" />
+                  <rect x="100" y="86" width="44" height="2.2" rx="0.7" />
+                  <rect x="70" y="86" width="20" height="2.2" rx="0.7" />
+                  <rect x="22" y="86" width="34" height="2.2" rx="0.7" />
+                  <rect x="150" y="96" width="40" height="2.2" rx="0.7" />
+                  <rect x="116" y="96" width="28" height="2.2" rx="0.7" />
+                  <rect x="70" y="96" width="20" height="2.2" rx="0.7" />
+                  <rect x="22" y="96" width="28" height="2.2" rx="0.7" />
+                </g>
+                <line
+                  x1="15"
+                  y1="104"
+                  x2="195"
+                  y2="104"
+                  stroke="var(--ink-faint)"
+                  stroke-width="0.4"
+                />
+                <rect x="128" y="110" width="62" height="3" rx="1" fill="var(--ink-soft)" />
+                <rect x="140" y="118" width="50" height="3.6" rx="1" fill="var(--cyan)" />
+                <rect
+                  x="22"
+                  y="110"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="var(--ink-faint)"
+                  stroke-width="0.6"
+                />
+                <g fill="var(--ink-faint)">
+                  <rect x="24" y="112" width="5" height="5" />
+                  <rect x="35" y="112" width="5" height="5" />
+                  <rect x="24" y="123" width="5" height="5" />
+                  <rect x="31" y="118" width="2.5" height="2.5" />
+                  <rect x="35" y="123" width="2.5" height="2.5" />
+                </g>
+                <line x1="15" y1="272" x2="195" y2="272" stroke="var(--rule)" stroke-width="0.4" />
+                <rect x="15" y="276" width="24" height="2.4" rx="0.8" fill="var(--ink-faint)" />
+                <rect x="170" y="276" width="20" height="2.4" rx="0.8" fill="var(--ink-faint)" />
+              </svg>
+              <figcaption>A4 · 210×297mm · rtl · jalali</figcaption>
+            </figure>
           </div>
 
-          <figure class="specimen" style="margin: 0">
-            <!-- A page at A4 proportion with its margins drawn, RTL invoice. -->
-            <svg viewBox="0 0 210 297" role="img" aria-labelledby="specimenTitle">
-              <title id="specimenTitle" data-i18n="hero.specimenAlt">
-                نمونهٔ خروجی: فاکتور فارسی راست‌به‌چپ
-              </title>
-              <rect x="0" y="0" width="210" height="297" fill="var(--paper-raised)" />
-              <!-- margin guides -->
-              <rect
-                x="15"
-                y="15"
-                width="180"
-                height="267"
-                fill="none"
-                stroke="var(--rule)"
-                stroke-width="0.4"
-                stroke-dasharray="2 2"
-              />
-              <!-- report header -->
-              <rect x="15" y="15" width="180" height="26" fill="var(--cyan-wash)" />
-              <rect x="150" y="21" width="40" height="5" rx="1" fill="var(--cyan)" />
-              <rect x="150" y="29" width="26" height="3" rx="1" fill="var(--ink-faint)" />
-              <rect x="20" y="21" width="18" height="14" rx="1.5" fill="var(--cyan)" opacity="0.3" />
-              <!-- table header -->
-              <rect x="15" y="52" width="180" height="8" fill="var(--paper-sunk)" />
-              <g fill="var(--ink-muted)">
-                <rect x="160" y="55" width="30" height="2.4" rx="0.8" />
-                <rect x="110" y="55" width="34" height="2.4" rx="0.8" />
-                <rect x="70" y="55" width="24" height="2.4" rx="0.8" />
-                <rect x="22" y="55" width="26" height="2.4" rx="0.8" />
-              </g>
-              <!-- detail rows -->
-              <g fill="var(--ink-faint)">
-                <rect x="150" y="66" width="40" height="2.2" rx="0.7" />
-                <rect x="104" y="66" width="40" height="2.2" rx="0.7" />
-                <rect x="70" y="66" width="20" height="2.2" rx="0.7" />
-                <rect x="22" y="66" width="30" height="2.2" rx="0.7" />
-
-                <rect x="150" y="76" width="40" height="2.2" rx="0.7" />
-                <rect x="112" y="76" width="32" height="2.2" rx="0.7" />
-                <rect x="70" y="76" width="20" height="2.2" rx="0.7" />
-                <rect x="22" y="76" width="24" height="2.2" rx="0.7" />
-
-                <rect x="150" y="86" width="40" height="2.2" rx="0.7" />
-                <rect x="100" y="86" width="44" height="2.2" rx="0.7" />
-                <rect x="70" y="86" width="20" height="2.2" rx="0.7" />
-                <rect x="22" y="86" width="34" height="2.2" rx="0.7" />
-
-                <rect x="150" y="96" width="40" height="2.2" rx="0.7" />
-                <rect x="116" y="96" width="28" height="2.2" rx="0.7" />
-                <rect x="70" y="96" width="20" height="2.2" rx="0.7" />
-                <rect x="22" y="96" width="28" height="2.2" rx="0.7" />
-              </g>
-              <line
-                x1="15"
-                y1="104"
-                x2="195"
-                y2="104"
-                stroke="var(--rule-strong)"
-                stroke-width="0.4"
-              />
-              <!-- totals -->
-              <rect x="128" y="110" width="62" height="3" rx="1" fill="var(--ink-muted)" />
-              <rect x="140" y="118" width="50" height="3.6" rx="1" fill="var(--cyan)" />
-              <!-- QR + stamp -->
-              <rect
-                x="22"
-                y="110"
-                width="20"
-                height="20"
-                fill="none"
-                stroke="var(--ink-faint)"
-                stroke-width="0.6"
-              />
-              <g fill="var(--ink-faint)">
-                <rect x="24" y="112" width="5" height="5" />
-                <rect x="35" y="112" width="5" height="5" />
-                <rect x="24" y="123" width="5" height="5" />
-                <rect x="31" y="118" width="2.5" height="2.5" />
-                <rect x="35" y="123" width="2.5" height="2.5" />
-              </g>
-              <!-- page footer -->
-              <line x1="15" y1="272" x2="195" y2="272" stroke="var(--rule)" stroke-width="0.4" />
-              <rect x="15" y="276" width="24" height="2.4" rx="0.8" fill="var(--ink-faint)" />
-              <rect x="170" y="276" width="20" height="2.4" rx="0.8" fill="var(--ink-faint)" />
-            </svg>
-            <figcaption class="specimen__cap">A4 · 210×297mm · rtl · jalali</figcaption>
-          </figure>
+          <p class="colophon">
+            <span data-i18n="colophon.by">توسعه‌یافته توسط <b>علیرضا صفری</b></span>
+            <a href="https://github.com/Alireza83Safari" rel="noopener">github.com/Alireza83Safari</a>
+            <a href="https://github.com/Alireza83Safari/ngx-pdf-studio" rel="noopener"
+              ><span data-i18n="colophon.repo">مخزن پروژه</span></a
+            >
+          </p>
         </section>
 
         <!-- ============================ WHY ============================ -->
         <section id="why">
+          <p class="sec__folio">01</p>
           <h2 data-i18n="why.h">چرا این کتابخانه</h2>
           <p data-i18n="why.p1">
             برای تولید PDF در جاوااسکریپت گزینه کم نیست. تفاوت اینجا در چیزیست که بقیه آخر از همه
@@ -1066,16 +1282,16 @@
             بایت‌های امروز باشد.
           </p>
 
-          <div class="grid2">
-            <div class="card">
-              <p class="card__mark">jsPDF / pdfmake</p>
+          <div class="duo">
+            <div>
+              <p class="duo__tag">jsPDF / pdfmake</p>
               <p data-i18n="why.jspdf">
                 سبک و سرراست‌اند، ولی چیدمان راست‌به‌چپ و اتصال حروف فارسی را خودت باید سرِهم
                 کنی، و مفهوم «باند» و صفحه‌بندی گزارشی ندارند.
               </p>
             </div>
-            <div class="card">
-              <p class="card__mark">Puppeteer / HTML → PDF</p>
+            <div>
+              <p class="duo__tag">Puppeteer / HTML → PDF</p>
               <p data-i18n="why.puppeteer">
                 هر چیزی که مرورگر بلد است را می‌کشد، ولی یک مرورگر کامل را با خودت حمل می‌کنی و
                 خروجی بین نسخه‌های Chrome عوض می‌شود — برای اسناد مالی که باید بایت‌به‌بایت
@@ -1091,12 +1307,12 @@
               تقویم جلالی — نه به‌عنوان افزونه، بلکه در هستهٔ موتور.
             </li>
             <li data-i18n="why.s2">
-              <b>پیش‌نمایش دقیقاً همان PDF است:</b> یک درخت لایوت ساخته می‌شود و هر دو نقاش
-              (SVG و PDF) از همان می‌خوانند. اختلاف پیش‌نمایش و خروجی از نظر ساختاری ممکن نیست.
+              <b>پیش‌نمایش دقیقاً همان PDF است:</b> یک درخت لایوت ساخته می‌شود و هر دو نقاش (SVG و
+              PDF) از همان می‌خوانند. اختلاف پیش‌نمایش و خروجی از نظر ساختاری ممکن نیست.
             </li>
             <li data-i18n="why.s3">
-              <b>خروجی قطعی:</b> دو بار رندر با ورودی یکسان، بایت‌های یکسان می‌دهد — یعنی
-              snapshot test واقعی ممکن است.
+              <b>خروجی قطعی:</b> دو بار رندر با ورودی یکسان، بایت‌های یکسان می‌دهد — یعنی snapshot
+              test واقعی ممکن است.
             </li>
             <li data-i18n="why.s4">
               <b>Expression بدون <code>eval</code>:</b> یک زبان کوچک با lexer و parser اختصاصی و
@@ -1105,17 +1321,18 @@
           </ul>
 
           <div class="note note--warn">
-            <p class="note__title" data-i18n="why.honestTitle">حرف راست</p>
+            <p class="note__t" data-i18n="why.honestTitle">حرف راست</p>
             <p data-i18n="why.honest">
-              این پکیج هنوز روی npm منتشر نشده و نسخه‌اش <code>0.0.0</code> است؛ نصب فعلاً از
-              روی تارball محلی است. دیزاینر بصری هم امروز یک اپ مستقل در همین مخزن است، نه یک
-              کامپوننت Angular آماده — آن فاز بعدی است.
+              این پکیج هنوز روی npm منتشر نشده و نسخه‌اش <code>0.0.0</code> است؛ نصب فعلاً از روی
+              تارball محلی است. دیزاینر بصری هم امروز یک اپ مستقل در همین مخزن است، نه یک کامپوننت
+              Angular آماده — آن فاز بعدی است.
             </p>
           </div>
         </section>
 
         <!-- =========================== MODEL =========================== -->
         <section id="model">
+          <p class="sec__folio">02</p>
           <h2 data-i18n="model.h">مدل ذهنی</h2>
           <p data-i18n="model.p1">
             کل کتابخانه یک تابع است: قالب و داده می‌گیرد، فهرستی از صفحه‌های چیده‌شده می‌سازد، و
@@ -1123,19 +1340,19 @@
           </p>
 
           <div class="pipe">
-            <div class="pipe__node">
+            <div class="pipe__n">
               <b>PdfTemplate</b><span data-i18n="model.n1">قالب، JSON خالص</span>
             </div>
-            <div class="pipe__arrow" aria-hidden="true">→</div>
-            <div class="pipe__node">
+            <div class="pipe__a" aria-hidden="true">→</div>
+            <div class="pipe__n">
               <b>paginate()</b><span data-i18n="model.n2">چیدمان و صفحه‌بندی</span>
             </div>
-            <div class="pipe__arrow" aria-hidden="true">→</div>
-            <div class="pipe__node pipe__node--out">
+            <div class="pipe__a" aria-hidden="true">→</div>
+            <div class="pipe__n pipe__n--out">
               <b>Page[]</b><span data-i18n="model.n3">هندسهٔ نهایی</span>
             </div>
-            <div class="pipe__arrow" aria-hidden="true">→</div>
-            <div class="pipe__node">
+            <div class="pipe__a" aria-hidden="true">→</div>
+            <div class="pipe__n">
               <b>paintToSvg / paintToPdf</b><span data-i18n="model.n4">پیش‌نمایش یا فایل</span>
             </div>
           </div>
@@ -1143,56 +1360,58 @@
           <h3 data-i18n="model.bandsH">باند چیست</h3>
           <p data-i18n="model.bandsP">
             برخلاف HTML که همه‌چیز در یک جریان می‌ریزد، یک گزارش از نوارهای افقی ساخته می‌شود که
-            هرکدام قانون تکرار خودشان را دارند. این تنها مفهومی است که اگر از دنیای وب می‌آیی
-            باید تازه یاد بگیری — بقیه آشناست.
+            هرکدام قانون تکرار خودشان را دارند. این تنها مفهومی است که اگر از دنیای وب می‌آیی باید
+            تازه یاد بگیری — بقیه آشناست.
           </p>
 
-          <div class="bandpage">
-            <div class="band band--faint">
-              <span class="band__name">background</span>
-              <span class="band__what" data-i18n="band.background">پشت همه‌چیز، هر صفحه</span>
+          <div class="bands">
+            <div class="band band--ghost">
+              <span class="band__n">background</span>
+              <span class="band__d" data-i18n="band.background">پشت همه‌چیز، هر صفحه</span>
             </div>
-            <div class="band band--faint">
-              <span class="band__name">watermark</span>
-              <span class="band__what" data-i18n="band.watermark">مهر یا نوشتهٔ کم‌رنگ روی صفحه</span>
-            </div>
-            <div class="band">
-              <span class="band__name">reportHeader</span>
-              <span class="band__what" data-i18n="band.reportHeader">فقط یک‌بار، ابتدای سند</span>
+            <div class="band band--ghost">
+              <span class="band__n">watermark</span>
+              <span class="band__d" data-i18n="band.watermark">مهر یا نوشتهٔ کم‌رنگ روی صفحه</span>
             </div>
             <div class="band">
-              <span class="band__name">pageHeader</span>
-              <span class="band__what" data-i18n="band.pageHeader">بالای هر صفحه</span>
+              <span class="band__n">reportHeader</span>
+              <span class="band__d" data-i18n="band.reportHeader">فقط یک‌بار، ابتدای سند</span>
             </div>
             <div class="band">
-              <span class="band__name">columnHeader</span>
-              <span class="band__what" data-i18n="band.columnHeader">بالای هر ستون، در چیدمان چندستونی</span>
+              <span class="band__n">pageHeader</span>
+              <span class="band__d" data-i18n="band.pageHeader">بالای هر صفحه</span>
             </div>
             <div class="band">
-              <span class="band__name">groupHeader</span>
-              <span class="band__what" data-i18n="band.groupHeader">ابتدای هر گروه؛ چندسطحی</span>
+              <span class="band__n">columnHeader</span>
+              <span class="band__d" data-i18n="band.columnHeader"
+                >بالای هر ستون، در چیدمان چندستونی</span
+              >
             </div>
-            <div class="band band--repeat">
-              <span class="band__name">detail</span>
-              <span class="band__what" data-i18n="band.detail"
+            <div class="band">
+              <span class="band__n">groupHeader</span>
+              <span class="band__d" data-i18n="band.groupHeader">ابتدای هر گروه؛ چندسطحی</span>
+            </div>
+            <div class="band band--hot">
+              <span class="band__n">detail</span>
+              <span class="band__d" data-i18n="band.detail"
                 ><b>به ازای هر سطر داده تکرار می‌شود</b> — قلب گزارش</span
               >
             </div>
             <div class="band">
-              <span class="band__name">groupFooter</span>
-              <span class="band__what" data-i18n="band.groupFooter">پایان هر گروه؛ جای جمع گروه</span>
+              <span class="band__n">groupFooter</span>
+              <span class="band__d" data-i18n="band.groupFooter">پایان هر گروه؛ جای جمع گروه</span>
             </div>
             <div class="band">
-              <span class="band__name">columnFooter</span>
-              <span class="band__what" data-i18n="band.columnFooter">پایین هر ستون</span>
+              <span class="band__n">columnFooter</span>
+              <span class="band__d" data-i18n="band.columnFooter">پایین هر ستون</span>
             </div>
             <div class="band">
-              <span class="band__name">pageFooter</span>
-              <span class="band__what" data-i18n="band.pageFooter">پایین هر صفحه؛ شمارهٔ صفحه</span>
+              <span class="band__n">pageFooter</span>
+              <span class="band__d" data-i18n="band.pageFooter">پایین هر صفحه؛ شمارهٔ صفحه</span>
             </div>
             <div class="band">
-              <span class="band__name">reportFooter</span>
-              <span class="band__what" data-i18n="band.reportFooter">فقط یک‌بار، انتهای سند</span>
+              <span class="band__n">reportFooter</span>
+              <span class="band__d" data-i18n="band.reportFooter">فقط یک‌بار، انتهای سند</span>
             </div>
           </div>
 
@@ -1201,21 +1420,22 @@
             گوشهٔ بالا-چپ). انواع موجود:
           </p>
           <p style="direction: ltr; text-align: start">
-            <code>staticText</code> <code>dataField</code> <code>richText</code>
-            <code>image</code> <code>table</code> <code>list</code> <code>line</code>
-            <code>rectangle</code> <code>ellipse</code> <code>barcode</code> <code>qrcode</code>
-            <code>chart</code> <code>crosstab</code> <code>subreport</code>
-            <code>pageField</code> <code>container</code> <code>spacer</code>
-            <code>pageBreak</code> <code>formField</code> <code>custom</code> <code>toc</code>
+            <code>staticText</code> <code>dataField</code> <code>richText</code> <code>image</code>
+            <code>table</code> <code>list</code> <code>line</code> <code>rectangle</code>
+            <code>ellipse</code> <code>barcode</code> <code>qrcode</code> <code>chart</code>
+            <code>crosstab</code> <code>subreport</code> <code>pageField</code>
+            <code>container</code> <code>spacer</code> <code>pageBreak</code>
+            <code>formField</code> <code>custom</code> <code>toc</code>
           </p>
         </section>
 
         <!-- ========================== INSTALL ========================== -->
         <section id="install">
+          <p class="sec__folio">03</p>
           <h2 data-i18n="install.h">نصب</h2>
 
           <div class="note note--warn">
-            <p class="note__title" data-i18n="install.warnTitle">هنوز روی npm نیست</p>
+            <p class="note__t" data-i18n="install.warnTitle">هنوز روی npm نیست</p>
             <p data-i18n="install.warnBody">
               نسخهٔ پکیج <code>0.0.0</code> است و هیچ ریلیزی منتشر نشده، پس
               <code>npm install @ngx-pdf-studio/core</code> شکست می‌خورد. تا اولین تگ
@@ -1236,7 +1456,9 @@ npm i /path/to/ngx-pdf-studio-core-0.0.0.tgz</code></pre>
           </div>
 
           <div class="note note--warn">
-            <p class="note__title" data-i18n="install.distTitle">حتماً از dist نصب کن، نه از پوشهٔ ورک‌اسپیس</p>
+            <p class="note__t" data-i18n="install.distTitle">
+              حتماً از dist نصب کن، نه از پوشهٔ ورک‌اسپیس
+            </p>
             <p data-i18n="install.distBody">
               در <code>package.json</code> خودِ پکیج، <code>main</code> به
               <code>src/index.ts</code> اشاره می‌کند. یعنی اگر با
@@ -1254,6 +1476,7 @@ npm i /path/to/ngx-pdf-studio-core-0.0.0.tgz</code></pre>
 
         <!-- ========================= QUICKSTART ========================= -->
         <section id="quickstart">
+          <p class="sec__folio">04</p>
           <h2 data-i18n="qs.h">شروع سریع</h2>
           <p data-i18n="qs.p">
             کوتاه‌ترین مسیر از صفر تا یک PDF فارسی. این کد را کپی کن و اجرا کن — کار می‌کند.
@@ -1264,7 +1487,12 @@ npm i /path/to/ngx-pdf-studio-core-0.0.0.tgz</code></pre>
               <button role="tab" id="tab-node" aria-controls="panel-node" aria-selected="true">
                 Node
               </button>
-              <button role="tab" id="tab-browser" aria-controls="panel-browser" aria-selected="false">
+              <button
+                role="tab"
+                id="tab-browser"
+                aria-controls="panel-browser"
+                aria-selected="false"
+              >
                 <span data-i18n="qs.browser">مرورگر</span>
               </button>
             </div>
@@ -1326,7 +1554,13 @@ console.log(result.pageCount, result.diagnostics);</code></pre>
               </div>
             </div>
 
-            <div class="tabpanel" id="panel-browser" role="tabpanel" aria-labelledby="tab-browser" hidden>
+            <div
+              class="tabpanel"
+              id="panel-browser"
+              role="tabpanel"
+              aria-labelledby="tab-browser"
+              hidden
+            >
               <div class="code" data-code>
                 <div class="code__bar">
                   <span class="code__lang">typescript</span>
@@ -1350,18 +1584,19 @@ const { pages } = renderToSvg(template, { data });</code></pre>
           </div>
 
           <div class="note">
-            <p class="note__title" data-i18n="qs.diagTitle">رندر برای خطای داده throw نمی‌کند</p>
+            <p class="note__t" data-i18n="qs.diagTitle">رندر برای خطای داده throw نمی‌کند</p>
             <p data-i18n="qs.diagBody">
               اگر یک expression بد باشد یا دیتاستی پیدا نشود، نتیجه <code>null</code> می‌شود و یک
-              پیام در <code>diagnostics</code> می‌نشیند. رندر ادامه پیدا می‌کند. همیشه بعد از
-              رندر <code>diagnostics</code> را نگاه کن — بیشتر «چرا این فیلد خالی است؟»ها همان‌جا
-              جواب دارند.
+              پیام در <code>diagnostics</code> می‌نشیند. رندر ادامه پیدا می‌کند. همیشه بعد از رندر
+              <code>diagnostics</code> را نگاه کن — بیشتر «چرا این فیلد خالی است؟»ها همان‌جا جواب
+              دارند.
             </p>
           </div>
         </section>
 
         <!-- ========================== INVOICE ========================== -->
         <section id="invoice">
+          <p class="sec__folio">05</p>
           <h2 data-i18n="inv.h">گام‌به‌گام: یک فاکتور</h2>
           <p data-i18n="inv.p">
             حالا از «سلام دنیا» به چیزی که واقعاً تحویل مشتری می‌دهی. هر گام یک تکه به قالب بالا
@@ -1370,7 +1605,7 @@ const { pages } = renderToSvg(template, { data });</code></pre>
 
           <ol class="steps">
             <li>
-              <h3 style="margin-block-start: 0" data-i18n="inv.s1h">دیتاست را اعلام کن</h3>
+              <h3 data-i18n="inv.s1h">دیتاست را اعلام کن</h3>
               <p data-i18n="inv.s1p">
                 باندی که قرار است تکرار شود باید بداند روی چه فهرستی می‌چرخد. دیتاست یک‌بار روی
                 قالب اعلام می‌شود و بعد با نام صدا زده می‌شود.
@@ -1387,7 +1622,7 @@ const { pages } = renderToSvg(template, { data });</code></pre>
             </li>
 
             <li>
-              <h3 style="margin-block-start: 0" data-i18n="inv.s2h">باند detail را بساز</h3>
+              <h3 data-i18n="inv.s2h">باند detail را بساز</h3>
               <p data-i18n="inv.s2p">
                 این باند به ازای هر سطر <code>items</code> یک‌بار کشیده می‌شود. داخلش، نام فیلدها
                 مستقیم در دسترس‌اند و <code>$index</code> شمارهٔ سطر است.
@@ -1421,10 +1656,10 @@ const { pages } = renderToSvg(template, { data });</code></pre>
             </li>
 
             <li>
-              <h3 style="margin-block-start: 0" data-i18n="inv.s3h">جمع کل را در پاورقی بگذار</h3>
+              <h3 data-i18n="inv.s3h">جمع کل را در پاورقی بگذار</h3>
               <p data-i18n="inv.s3p">
-                در <code>reportFooter</code> دیگر روی یک سطر نیستی، پس با
-                <code>$root</code> به کل داده دسترسی می‌گیری و روی فهرست جمع می‌زنی.
+                در <code>reportFooter</code> دیگر روی یک سطر نیستی، پس با <code>$root</code> به کل
+                داده دسترسی می‌گیری و روی فهرست جمع می‌زنی.
               </p>
               <div class="code" data-code>
                 <div class="code__bar">
@@ -1439,7 +1674,7 @@ const { pages } = renderToSvg(template, { data });</code></pre>
             </li>
 
             <li>
-              <h3 style="margin-block-start: 0" data-i18n="inv.s4h">تاریخ جلالی و شمارهٔ صفحه</h3>
+              <h3 data-i18n="inv.s4h">تاریخ جلالی و شمارهٔ صفحه</h3>
               <p data-i18n="inv.s4p">
                 تاریخ با فرمت <code>date</code> کشیده می‌شود و تقویمش را از locale مؤثر می‌گیرد —
                 چون در بالا <code>calendar: 'jalali'</code> گذاشتیم، جلالی درمی‌آید.
@@ -1458,7 +1693,7 @@ const { pages } = renderToSvg(template, { data });</code></pre>
             </li>
 
             <li>
-              <h3 style="margin-block-start: 0" data-i18n="inv.s5h">مهر تأیید بزن</h3>
+              <h3 data-i18n="inv.s5h">مهر تأیید بزن</h3>
               <p data-i18n="inv.s5p">
                 موتور می‌تواند یک مهر تأیید (QR به‌علاوهٔ یک کد کوتاه) روی خروجی بزند که هشِ همان
                 دادهٔ رندرشده را در خود دارد — برای فاکتوری که قرار است بعداً اصالتش بررسی شود.
@@ -1479,11 +1714,12 @@ const { pages } = renderToSvg(template, { data });</code></pre>
 
         <!-- ======================== EXPRESSIONS ======================== -->
         <section id="expressions">
+          <p class="sec__folio">06</p>
           <h2 data-i18n="expr.h">داده و Expression</h2>
           <p data-i18n="expr.p">
-            هر خاصیتی که تایپش <code>Expression</code> است، شکل
-            <code>{ source: '…' }</code> دارد و در زمان رندر ارزیابی می‌شود. زبانش کوچک و عمداً
-            محدود است: نه <code>eval</code>، نه <code>Function</code>، نه دسترسی به میزبان.
+            هر خاصیتی که تایپش <code>Expression</code> است، شکل <code>{ source: '…' }</code> دارد و
+            در زمان رندر ارزیابی می‌شود. زبانش کوچک و عمداً محدود است: نه <code>eval</code>، نه
+            <code>Function</code>، نه دسترسی به میزبان.
           </p>
 
           <h3 data-i18n="expr.scopeH">ترتیب یافتنِ نام‌ها</h3>
@@ -1493,13 +1729,16 @@ const { pages } = renderToSvg(template, { data });</code></pre>
           <ol>
             <li data-i18n="expr.sc1">
               <b>متغیرهای درون‌ساخت</b> — <code>$index</code>، <code>$first</code>،
-              <code>$last</code>، <code>$page</code>، <code>$pageCount</code>،
-              <code>$group</code>، <code>$groupKey</code>، <code>$groupIndex</code>،
-              <code>$vars</code>، <code>$item</code>، <code>$root</code>،
-              <code>$parameters</code>
+              <code>$last</code>، <code>$page</code>، <code>$pageCount</code>، <code>$group</code>،
+              <code>$groupKey</code>، <code>$groupIndex</code>، <code>$vars</code>،
+              <code>$item</code>، <code>$root</code>، <code>$parameters</code>
             </li>
-            <li data-i18n="expr.sc2"><b>سطر جاری</b> — فیلدهای همان سطر، از درونی‌ترین به بیرون</li>
-            <li data-i18n="expr.sc3"><b>پارامترها</b> — آنچه در <code>parameters</code> قالب اعلام شده</li>
+            <li data-i18n="expr.sc2">
+              <b>سطر جاری</b> — فیلدهای همان سطر، از درونی‌ترین به بیرون
+            </li>
+            <li data-i18n="expr.sc3">
+              <b>پارامترها</b> — آنچه در <code>parameters</code> قالب اعلام شده
+            </li>
             <li data-i18n="expr.sc4"><b>دادهٔ ریشه</b> — کلیدهای سطح بالای JSON داده</li>
           </ol>
 
@@ -1522,7 +1761,9 @@ const { pages } = renderToSvg(template, { data });</code></pre>
                 </tr>
                 <tr>
                   <td><code>avg</code> · <code>min</code> · <code>max</code></td>
-                  <td data-i18n="expr.fnAgg">همان شکل <code>sum</code>؛ روی فهرست خالی <code>null</code></td>
+                  <td data-i18n="expr.fnAgg">
+                    همان شکل <code>sum</code>؛ روی فهرست خالی <code>null</code>
+                  </td>
                 </tr>
                 <tr>
                   <td><code>count(list)</code> · <code>len(x)</code></td>
@@ -1558,8 +1799,8 @@ const { pages } = renderToSvg(template, { data });</code></pre>
                 <tr>
                   <td><code>toWords(n, currency?)</code></td>
                   <td data-i18n="expr.fnWords">
-                    مبلغ به حروف فارسی: <code>toWords(4850000, 'rial')</code> →
-                    «چهار میلیون و هشتصد و پنجاه هزار ریال»
+                    مبلغ به حروف فارسی: <code>toWords(4850000, 'rial')</code> → «چهار میلیون و
+                    هشتصد و پنجاه هزار ریال»
                   </td>
                 </tr>
                 <tr>
@@ -1567,7 +1808,9 @@ const { pages } = renderToSvg(template, { data });</code></pre>
                   <td data-i18n="expr.fnDigits">تبدیل ارقام</td>
                 </tr>
                 <tr>
-                  <td><code>formatNumber(n, opts?)</code> · <code>formatCurrency(n, opts?)</code></td>
+                  <td>
+                    <code>formatNumber(n, opts?)</code> · <code>formatCurrency(n, opts?)</code>
+                  </td>
                   <td data-i18n="expr.fnFmt">
                     گروه‌بندی و اعشار بر اساس locale؛ <code>opts.digits: 'persian' | 'latn'</code>
                   </td>
@@ -1575,14 +1818,12 @@ const { pages } = renderToSvg(template, { data });</code></pre>
               </tbody>
             </table>
           </div>
-          <p data-i18n="expr.fnMore">
-            توابع دلخواه هم بدون fork کردن روی رجیستری قابل ثبت‌اند.
-          </p>
+          <p data-i18n="expr.fnMore">توابع دلخواه هم بدون fork کردن روی رجیستری قابل ثبت‌اند.</p>
 
           <h3 data-i18n="expr.varH">متغیرهای گزارش</h3>
           <p data-i18n="expr.varP">
-            انباشتگرهای رونده را یک‌بار روی قالب اعلام کن و هرجا با <code>$vars.&lt;name&gt;</code>
-            بخوان.
+            انباشتگرهای رونده را یک‌بار روی قالب اعلام کن و هرجا با
+            <code>$vars.&lt;name&gt;</code> بخوان.
           </p>
           <div class="code" data-code>
             <div class="code__bar">
@@ -1598,18 +1839,19 @@ const { pages } = renderToSvg(template, { data });</code></pre>
 ]</code></pre>
           </div>
           <p data-i18n="expr.varCalc">
-            <code>calculation</code>: یکی از <code>sum · count · avg · min · max · first · last</code>
-            — و <code>reset</code> یا <code>report</code> (پیش‌فرض) است یا <code>group</code>.
+            <code>calculation</code>: یکی از
+            <code>sum · count · avg · min · max · first · last</code> — و <code>reset</code> یا
+            <code>report</code> (پیش‌فرض) است یا <code>group</code>.
           </p>
         </section>
 
         <!-- ============================ RTL ============================ -->
         <section id="rtl">
+          <p class="sec__folio">07</p>
           <h2 data-i18n="rtl.h">فارسی و راست‌به‌چپ</h2>
           <p data-i18n="rtl.p">
-            سه چیز جدا از هم‌اند و اغلب با هم قاطی می‌شوند: <b>جهت چیدمان</b>،
-            <b>شکل ارقام</b>، و <b>تقویم</b>. هر سه روی صفحه تنظیم می‌شوند و در باند و المان قابل
-            بازنویسی‌اند.
+            سه چیز جدا از هم‌اند و اغلب با هم قاطی می‌شوند: <b>جهت چیدمان</b>، <b>شکل ارقام</b>، و
+            <b>تقویم</b>. هر سه روی صفحه تنظیم می‌شوند و در باند و المان قابل بازنویسی‌اند.
           </p>
 
           <div class="code" data-code>
@@ -1619,6 +1861,7 @@ const { pages } = renderToSvg(template, { data });</code></pre>
             </div>
             <pre><code>"page": {
   "direction": "rtl",              // 'ltr' | 'rtl' | 'auto'
+  "coordinates": "logical",        // x=0 becomes the start edge, not the left
   "locale": {
     "language": "fa",
     "digits":   "persian",         // 'latn' | 'persian'
@@ -1627,8 +1870,21 @@ const { pages } = renderToSvg(template, { data });</code></pre>
 }</code></pre>
           </div>
 
+          <div class="note">
+            <p class="note__t" data-i18n="rtl.coordTitle">مختصات منطقی</p>
+            <p data-i18n="rtl.coordBody">
+              به‌طور پیش‌فرض <code>bounds.x</code> فیزیکی است: صفر یعنی لبهٔ چپ کاغذ، هر جهتی که
+              داشته باشی. برای یک سند فارسی یعنی عنوان باید در
+              <code>contentWidth - width</code> بنشیند و هر جفت برچسب/مقدار در سورس برعکس خوانده
+              شود. با <code>coordinates: 'logical'</code> صفر لبهٔ <b>شروع</b> می‌شود و قالب همان‌طور
+              نوشته می‌شود که خوانده می‌شود. روی صفحهٔ چپ‌به‌راست این دو یکی‌اند، پس گذاشتنش بی‌خطر است.
+            </p>
+          </div>
+
           <div class="note note--warn">
-            <p class="note__title" data-i18n="rtl.fontTitle">بدون فونت جاسازی‌شده، متن فارسی جعبه می‌شود</p>
+            <p class="note__t" data-i18n="rtl.fontTitle">
+              بدون فونت جاسازی‌شده، متن فارسی جعبه می‌شود
+            </p>
             <p data-i18n="rtl.fontBody">
               فونت‌های استاندارد PDF فقط WinAnsi را می‌شناسند. برای هر متن غیرلاتین باید یک فونت
               واقعی جاسازی کنی. Vazirmatn داخل خود پکیج هست:
@@ -1654,12 +1910,15 @@ typography: { fontFamily: VAZIRMATN_FAMILY }</code></pre>
           <p data-i18n="rtl.bidiP">
             چسبیدن حروف و ترتیب دوجهته با fontkit و پیاده‌سازی استاندارد
             <span dir="ltr">UAX #9</span> انجام می‌شود — یعنی جمله‌ای که فارسی و انگلیسی و عدد را
-            قاطی دارد، همان‌طور می‌نشیند که انتظار داری، بی‌آنکه کاری بکنی.
+            قاطی دارد، همان‌طور می‌نشیند که انتظار داری، بی‌آنکه کاری بکنی. برای متن هم‌تراز،
+            <code>typography.align: 'justify'</code> کشیدگی واقعی فارسی (کشیده/tatweel) می‌دهد، نه
+            فاصله‌های کش‌آمده.
           </p>
         </section>
 
         <!-- ========================== ANGULAR ========================== -->
         <section id="angular">
+          <p class="sec__folio">08</p>
           <h2 data-i18n="ng.h">Angular</h2>
           <p data-i18n="ng.p">
             سرویس رندر <code>providedIn: 'root'</code> است، پس برای تزریقش هیچ ماژولی لازم نیست.
@@ -1713,7 +1972,7 @@ export class ReportModule {}</code></pre>
           </div>
 
           <div class="note">
-            <p class="note__title" data-i18n="ng.compatTitle">سازگاری</p>
+            <p class="note__t" data-i18n="ng.compatTitle">سازگاری</p>
             <p data-i18n="ng.compatBody">
               پکیج منتشرشده Angular ۱۲ تا آخرین نسخه را هدف می‌گیرد و عمداً از Signals،
               <code>@if</code>/<code>@for</code>، <code>inject()</code> و تحویل standalone-only
@@ -1724,11 +1983,12 @@ export class ReportModule {}</code></pre>
 
         <!-- =========================== STORE =========================== -->
         <section id="store">
+          <p class="sec__folio">09</p>
           <h2 data-i18n="store.h">ادیتور اختصاصی خودت</h2>
           <p data-i18n="store.p">
-            زیر دیزاینر، یک لایهٔ command/store کاملاً فریم‌ورک‌اگنوستیک نشسته که هیچ وابستگی‌ای
-            به Angular یا RxJS ندارد. اگر می‌خواهی ادیتور خودت را با React، Vue یا هرچیز دیگری
-            بسازی، همین کافی است.
+            زیر دیزاینر، یک لایهٔ command/store کاملاً فریم‌ورک‌اگنوستیک نشسته که هیچ وابستگی‌ای به
+            Angular یا RxJS ندارد. اگر می‌خواهی ادیتور خودت را با React، Vue یا هرچیز دیگری بسازی،
+            همین کافی است.
           </p>
 
           <div class="code" data-code>
@@ -1754,7 +2014,7 @@ store.undoTo(2);       // jump back to a point in the history</code></pre>
           </div>
 
           <div class="note note--warn">
-            <p class="note__title" data-i18n="store.ruleTitle">قاعدهٔ طلایی</p>
+            <p class="note__t" data-i18n="store.ruleTitle">قاعدهٔ طلایی</p>
             <p data-i18n="store.ruleBody">
               هرگز درخت قالب را مستقیم دست نزن. state تغییرناپذیر است و هر ویرایش باید از
               <code>dispatch</code> رد شود؛ وگرنه undo از دستت در می‌رود.
@@ -1797,8 +2057,7 @@ store.undoTo(2);       // jump back to a point in the history</code></pre>
                   <td data-i18n="store.gStyle">سبک و جزء</td>
                   <td>
                     <code>addStyle</code> <code>updateStyle</code> <code>duplicateStyle</code>
-                    <code>removeStyle</code> <code>createSnippet</code>
-                    <code>insertSnippet</code>
+                    <code>removeStyle</code> <code>createSnippet</code> <code>insertSnippet</code>
                   </td>
                 </tr>
                 <tr>
@@ -1815,14 +2074,14 @@ store.undoTo(2);       // jump back to a point in the history</code></pre>
 
           <p data-i18n="store.coalesceP">
             دو نکتهٔ ریز که وقتش را می‌ارزد: کامندهایی که <code>coalesceKey</code> یکسان دارند در
-            تاریخچه یکی می‌شوند — یعنی کل یک درگ، یک قدم undo است. و
-            <code>applyRemote</code> سند را از یک همکار دیگر به‌روز می‌کند بی‌آنکه به تاریخچهٔ
-            undo محلی دست بزند.
+            تاریخچه یکی می‌شوند — یعنی کل یک درگ، یک قدم undo است. و <code>applyRemote</code> سند
+            را از یک همکار دیگر به‌روز می‌کند بی‌آنکه به تاریخچهٔ undo محلی دست بزند.
           </p>
         </section>
 
         <!-- ========================= DESIGNER ========================= -->
         <section id="designer">
+          <p class="sec__folio">10</p>
           <h2 data-i18n="des.h">دیزاینر بصری</h2>
           <p data-i18n="des.p">
             یک ویرایشگر WYSIWYG داخل مرورگر، بدون هیچ نصبی و بدون dev server، در همین مخزن.
@@ -1847,23 +2106,24 @@ npm run designer:build
               راست‌به‌چپ، با بندانگشتیِ رندرشده توسط خود موتور.
             </li>
             <li data-i18n="des.l3">
-              چسبیدن به شبکه و لبهٔ المان‌ها با راهنمای زنده، چندانتخابی، مستطیل انتخاب،
-              تراز و توزیع، ترتیب z، ویرایش درجا با دابل‌کلیک.
+              چسبیدن به شبکه و لبهٔ المان‌ها با راهنمای زنده، چندانتخابی، مستطیل انتخاب، تراز و
+              توزیع، ترتیب z، ویرایش درجا با دابل‌کلیک.
             </li>
             <li data-i18n="des.l4">
-              انتخابگر فیلد با <b>کشیدن برای بایند</b>، زوم، ذخیرهٔ خودکار، undo/redo، ورود و
-              خروج JSON، و دانلود مستقیم PDF.
+              انتخابگر فیلد با <b>کشیدن برای بایند</b>، زوم، ذخیرهٔ خودکار، undo/redo، ورود و خروج
+              JSON، و دانلود مستقیم PDF.
             </li>
           </ul>
 
           <p data-i18n="des.exportP">
-            خروجی دیزاینر همان JSON قالبی است که به رندرر می‌دهی — این JSON قرارداد بین زمان
-            طراحی و زمان اجراست.
+            خروجی دیزاینر همان JSON قالبی است که به رندرر می‌دهی — این JSON قرارداد بین زمان طراحی
+            و زمان اجراست.
           </p>
         </section>
 
         <!-- =========================== API =========================== -->
         <section id="api">
+          <p class="sec__folio">11</p>
           <h2 data-i18n="api.h">مرجع API</h2>
 
           <h3 data-i18n="api.coreH">هستهٔ مشترک — <code>@ngx-pdf-studio/core</code></h3>
@@ -1890,7 +2150,9 @@ npm run designer:build
                 </tr>
                 <tr>
                   <td><code>validateTemplate(t)</code></td>
-                  <td data-i18n="api.validate">اعتبارسنجی zod؛ <code>isValidTemplate</code> شکل بولی</td>
+                  <td data-i18n="api.validate">
+                    اعتبارسنجی zod؛ <code>isValidTemplate</code> شکل بولی
+                  </td>
                 </tr>
                 <tr>
                   <td><code>importTemplate(json)</code></td>
@@ -1966,6 +2228,7 @@ npm run designer:build
 
         <!-- =========================== FAQ =========================== -->
         <section id="faq">
+          <p class="sec__folio">12</p>
           <h2 data-i18n="faq.h">عیب‌یابی</h2>
 
           <details>
@@ -1982,8 +2245,8 @@ npm run designer:build
             <p data-i18n="faq.a2">
               <code>diagnostics</code> را چاپ کن. expression بد یا دیتاست پیدانشده باعث
               <code>null</code> می‌شود و رندر بی‌صدا ادامه می‌دهد. اگر داخل یک باند
-              <code>detail</code> هستی، دقت کن که نام فیلد نسبت به سطر جاری حل می‌شود؛ برای دستِ
-              کل داده باید <code>$root</code> بنویسی.
+              <code>detail</code> هستی، دقت کن که نام فیلد نسبت به سطر جاری حل می‌شود؛ برای دستِ کل
+              داده باید <code>$root</code> بنویسی.
             </p>
           </details>
 
@@ -2002,8 +2265,8 @@ npm run designer:build
             <summary data-i18n="faq.q4">خروجی دو بار رندر با هم فرق می‌کند</summary>
             <p data-i18n="faq.a4">
               نباید فرق کند — خروجی قطعی است و همین در تست‌ها بررسی می‌شود. اگر فرق کرد، تقریباً
-              همیشه به‌خاطر <code>now()</code> است که زمان واقعی می‌گیرد؛ زمان را از بیرون
-              به‌عنوان ورودی رندر تزریق کن.
+              همیشه به‌خاطر <code>now()</code> است که زمان واقعی می‌گیرد؛ زمان را از بیرون به‌عنوان
+              ورودی رندر تزریق کن.
             </p>
           </details>
 
@@ -2014,13 +2277,22 @@ npm run designer:build
             <p data-i18n="faq.a5">
               رفتار فعلی همین است: <code>dispatch</code> بی‌قید یک ورودی تاریخچه ثبت می‌کند، حتی
               اگر کامند در عمل بی‌اثر باشد (مثلاً <code>ensureStyles</code> وقتی سبک از قبل هست).
-              undo هیچ‌وقت چیزی را که از قبل بوده پاک نمی‌کند، ولی قدم خالی در فهرست تاریخچه
-              دیده می‌شود.
+              undo هیچ‌وقت چیزی را که از قبل بوده پاک نمی‌کند، ولی قدم خالی در فهرست تاریخچه دیده
+              می‌شود.
             </p>
           </details>
         </section>
 
-        <footer>
+        <footer class="foot">
+          <div class="foot__row">
+            <p class="foot__by">
+              <span data-i18n="colophon.by">توسعه‌یافته توسط <b>علیرضا صفری</b></span>
+            </p>
+            <a href="https://github.com/Alireza83Safari" rel="noopener">github.com/Alireza83Safari</a>
+            <a href="https://github.com/Alireza83Safari/ngx-pdf-studio" rel="noopener"
+              ><span data-i18n="colophon.repo">مخزن پروژه</span></a
+            >
+          </div>
           <p data-i18n="footer.p">
             MIT. فونت همراه، Vazirmatn، تحت پروانهٔ OFL است. تصمیم‌های معماری در
             <code>docs/adr/</code> ثبت شده‌اند.
@@ -2033,35 +2305,39 @@ npm run designer:build
       (function () {
         'use strict';
 
+        var root = document.documentElement;
+
         /* ------------------------------ i18n ------------------------------ */
         var EN = {
           skip: 'Skip to content',
           copy: 'Copy',
           'nav.menu': 'Contents',
-          'nav.start': 'Start',
+          'nav.contents': 'Contents',
           'nav.why': 'Why this library',
           'nav.model': 'Mental model',
           'nav.install': 'Install',
           'nav.quickstart': 'Quick start',
-          'nav.build': 'Build',
           'nav.invoice': 'Step by step: an invoice',
           'nav.expressions': 'Data & expressions',
           'nav.rtl': 'Persian & RTL',
-          'nav.integrate': 'Integrate',
           'nav.angular': 'Angular',
           'nav.store': 'Your own editor',
           'nav.designer': 'Visual designer',
-          'nav.ref': 'Reference',
           'nav.api': 'API reference',
           'nav.faq': 'Troubleshooting',
 
-          'hero.eyebrow': 'PDF engine · TypeScript',
+          'hero.eyebrow': 'PDF engine · TypeScript · MIT',
           'hero.lede':
             'Hand it a template JSON and a data JSON, get a real PDF — in the browser and on Node, byte for byte the same. Right-to-left, Persian and the Jalali calendar are in the core, not bolted on.',
-          'hero.tests': '289 tests green',
           'hero.ctaStart': 'Quick start',
           'hero.ctaDesigner': 'Visual designer',
           'hero.specimenAlt': 'Sample output: a right-to-left Persian invoice',
+          'spec.runtime': 'Runtime',
+          'spec.angular': 'Angular',
+          'spec.tests': 'Tests',
+          'spec.license': 'Licence',
+          'colophon.by': 'Built by <b>Alireza Safari</b>',
+          'colophon.repo': 'Project repository',
 
           'why.h': 'Why this library',
           'why.p1':
@@ -2119,8 +2395,7 @@ npm run designer:build
             'For Angular, run <code>npm run build</code> and install <b>both</b> tarballs — the Angular package depends on core.',
 
           'qs.h': 'Quick start',
-          'qs.p':
-            'The shortest path from nothing to a Persian PDF. Copy this and run it — it works.',
+          'qs.p': 'The shortest path from nothing to a Persian PDF. Copy this and run it — it works.',
           'qs.browser': 'Browser',
           'qs.diagTitle': 'Rendering never throws on bad data',
           'qs.diagBody':
@@ -2140,14 +2415,14 @@ npm run designer:build
             'In a <code>reportFooter</code> you are no longer on a row, so you reach the whole data through <code>$root</code> and aggregate over the list.',
           'inv.s4h': 'Jalali date and page numbers',
           'inv.s4p':
-            'A date is drawn with the <code>date</code> format and takes its calendar from the effective locale — since we set <code>calendar: \'jalali\'</code> above, it comes out Jalali. <code>$page</code> and <code>$pageCount</code> only mean something in page headers and footers.',
+            "A date is drawn with the <code>date</code> format and takes its calendar from the effective locale — since we set <code>calendar: 'jalali'</code> above, it comes out Jalali. <code>$page</code> and <code>$pageCount</code> only mean something in page headers and footers.",
           'inv.s5h': 'Stamp it for verification',
           'inv.s5p':
             'The engine can stamp a verification mark (a QR plus a short code) onto the output, hashing the very data that was rendered — for an invoice whose authenticity may be checked later.',
 
           'expr.h': 'Data & expressions',
           'expr.p':
-            'Every property typed <code>Expression</code> has the shape <code>{ source: \'…\' }</code> and is evaluated at render time. The language is small and deliberately limited: no <code>eval</code>, no <code>Function</code>, no host access.',
+            "Every property typed <code>Expression</code> has the shape <code>{ source: '…' }</code> and is evaluated at render time. The language is small and deliberately limited: no <code>eval</code>, no <code>Function</code>, no host access.",
           'expr.scopeH': 'How a name is resolved',
           'expr.scopeP':
             'A bare name is looked up in this order only; the first place it is found wins.',
@@ -2171,10 +2446,10 @@ npm run designer:build
           'expr.fnIf': 'The function form of <code>? :</code>',
           'expr.fnNow': 'The injected render timestamp — deterministic in tests',
           'expr.fnWords':
-            'An amount in Persian words: <code>toWords(4850000, \'rial\')</code> → «چهار میلیون و هشتصد و پنجاه هزار ریال»',
+            "An amount in Persian words: <code>toWords(4850000, 'rial')</code> → «چهار میلیون و هشتصد و پنجاه هزار ریال»",
           'expr.fnDigits': 'Digit transliteration',
           'expr.fnFmt':
-            'Locale-aware grouping and decimals; <code>opts.digits: \'persian\' | \'latn\'</code>',
+            "Locale-aware grouping and decimals; <code>opts.digits: 'persian' | 'latn'</code>",
           'expr.fnMore':
             'Custom functions can be registered on the registry without forking the package.',
           'expr.varH': 'Report variables',
@@ -2186,11 +2461,14 @@ npm run designer:build
           'rtl.h': 'Persian & RTL',
           'rtl.p':
             'Three separate things that are constantly conflated: <b>layout direction</b>, <b>digit shape</b>, and <b>calendar</b>. All three are set on the page and can be overridden per band and per element.',
+          'rtl.coordTitle': 'Logical coordinates',
+          'rtl.coordBody':
+            "By default <code>bounds.x</code> is physical: zero is the left paper edge whatever the direction. For a Persian document that means the title has to sit at <code>contentWidth - width</code> and every label/value pair reads backwards in the source. With <code>coordinates: 'logical'</code>, zero becomes the <b>start</b> edge and the template is written the way it reads. On an LTR page the two are identical, so setting it is safe.",
           'rtl.fontTitle': 'Without an embedded font, Persian text comes out as boxes',
           'rtl.fontBody':
             'The standard PDF fonts only know WinAnsi. Any non-Latin text needs a real embedded font. Vazirmatn ships inside the package:',
           'rtl.bidiP':
-            'Letter joining and bidirectional ordering are handled by fontkit and a standard <span dir="ltr">UAX #9</span> implementation — so a sentence mixing Persian, English and numbers lands the way you expect, with nothing to do on your side.',
+            'Letter joining and bidirectional ordering are handled by fontkit and a standard <span dir="ltr">UAX #9</span> implementation — so a sentence mixing Persian, English and numbers lands the way you expect, with nothing to do on your side. For justified text, <code>typography.align: \'justify\'</code> gives real Persian elongation (kashida/tatweel) rather than stretched spaces.',
 
           'ng.h': 'Angular',
           'ng.p':
@@ -2223,7 +2501,7 @@ npm run designer:build
           'des.p':
             'A WYSIWYG editor inside the browser, with nothing to install and no dev server, right here in the repo.',
           'des.l1':
-            '<b>A genuinely WYSIWYG canvas</b> — the page background is the engine\'s own SVG painting, not a CSS imitation.',
+            "<b>A genuinely WYSIWYG canvas</b> — the page background is the engine's own SVG painting, not a CSS imitation.",
           'des.l2':
             '<b>Template gallery</b> — invoice, sales report, letterhead, product label, certificate; all Persian and right-to-left, with thumbnails rendered by the engine itself.',
           'des.l3':
@@ -2239,8 +2517,7 @@ npm run designer:build
           'api.thName': 'Name',
           'api.thWhat': 'What it does',
           'api.renderToPdf': '<code>Promise&lt;{ bytes, pageCount, diagnostics }&gt;</code>',
-          'api.renderToSvg':
-            'Synchronous — <code>{ pages: string[], pageCount, diagnostics }</code>',
+          'api.renderToSvg': 'Synchronous — <code>{ pages: string[], pageCount, diagnostics }</code>',
           'api.validate': 'zod validation; <code>isValidTemplate</code> is the boolean form',
           'api.import': 'Parse, validate and migrate the schema, in one call',
           'api.serialize': 'Lossless round trip',
@@ -2257,13 +2534,13 @@ npm run designer:build
           'faq.h': 'Troubleshooting',
           'faq.q1': 'Persian text renders as boxes or question marks',
           'faq.a1':
-            'No font was embedded. The standard PDF fonts only carry WinAnsi. On Node, pass <code>loadBundledVazirmatn()</code> to <code>options.pdf.fonts</code> and make sure your elements\' <code>typography.fontFamily</code> names that same family.',
+            "No font was embedded. The standard PDF fonts only carry WinAnsi. On Node, pass <code>loadBundledVazirmatn()</code> to <code>options.pdf.fonts</code> and make sure your elements' <code>typography.fontFamily</code> names that same family.",
           'faq.q2': 'The PDF is produced but the fields are empty',
           'faq.a2':
             'Print <code>diagnostics</code>. A broken expression or a dataset that was not found yields <code>null</code> and rendering continues silently. If you are inside a <code>detail</code> band, remember a field name resolves against the current row; to reach the whole data you need <code>$root</code>.',
           'faq.q3': 'Installing with <code>file:packages/pdf-studio/core</code> breaks the build',
           'faq.a3':
-            'Expected. That folder\'s <code>main</code> points at <code>src/index.ts</code> and hands over uncompiled TypeScript. Run <code>npm run build:core</code> first and install from <code>packages/pdf-studio/core/dist</code>.',
+            "Expected. That folder's <code>main</code> points at <code>src/index.ts</code> and hands over uncompiled TypeScript. Run <code>npm run build:core</code> first and install from <code>packages/pdf-studio/core/dist</code>.",
           'faq.q4': 'Two renders produce different output',
           'faq.a4':
             'They should not — the output is deterministic and the tests check exactly that. When it does differ it is almost always <code>now()</code> picking up wall-clock time; inject the timestamp from outside as part of the render input.',
@@ -2276,33 +2553,33 @@ npm run designer:build
         };
 
         var FA = {};
-        var root = document.documentElement;
+        var i18nNodes = [].slice.call(document.querySelectorAll('[data-i18n]'));
 
-        // Snapshot the Persian source before the first swap, so switching back
-        // never needs a second dictionary to be maintained by hand.
-        document.querySelectorAll('[data-i18n]').forEach(function (node) {
+        // Snapshot the authored Persian before the first swap, so there is only
+        // ever one copy of it to keep correct.
+        i18nNodes.forEach(function (node) {
           FA[node.getAttribute('data-i18n')] = node.innerHTML;
         });
 
         function applyLang(lang) {
           var dict = lang === 'en' ? EN : FA;
-          document.querySelectorAll('[data-i18n]').forEach(function (node) {
+          i18nNodes.forEach(function (node) {
             var key = node.getAttribute('data-i18n');
             if (dict[key] !== undefined) node.innerHTML = dict[key];
           });
           root.setAttribute('lang', lang);
           root.setAttribute('dir', lang === 'en' ? 'ltr' : 'rtl');
-          document.querySelectorAll('[data-lang]').forEach(function (b) {
+          [].slice.call(document.querySelectorAll('[data-lang]')).forEach(function (b) {
             b.setAttribute('aria-pressed', String(b.getAttribute('data-lang') === lang));
           });
           try {
             localStorage.setItem('nps-lang', lang);
           } catch (e) {
-            /* private mode — the choice just will not persist */
+            /* private mode: the choice just will not persist */
           }
         }
 
-        document.querySelectorAll('[data-lang]').forEach(function (btn) {
+        [].slice.call(document.querySelectorAll('[data-lang]')).forEach(function (btn) {
           btn.addEventListener('click', function () {
             applyLang(btn.getAttribute('data-lang'));
           });
@@ -2320,19 +2597,17 @@ npm run designer:build
         if (savedLang === 'en') applyLang('en');
 
         /* ----------------------------- theme ----------------------------- */
-        var themeBtn = document.getElementById('themeToggle');
-        var themeIcon = document.getElementById('themeIcon');
-
-        // Everything below this point used to die together if matchMedia was
-        // missing, taking the highlighter and the tabs with it.
+        // A missing matchMedia used to take the whole script down with it,
+        // highlighter and tabs included.
         function media(query) {
           return window.matchMedia ? window.matchMedia(query) : { matches: false };
         }
 
+        var themeBtn = document.getElementById('themeToggle');
+        var themeIcon = document.getElementById('themeIcon');
+
         function currentTheme() {
-          var set = root.getAttribute('data-theme');
-          if (set) return set;
-          return media('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          return root.getAttribute('data-theme') || (media('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         }
 
         function applyTheme(theme) {
@@ -2359,8 +2634,8 @@ npm run designer:build
         });
 
         /* --------------------------- highlight --------------------------- */
-        // Deliberately tiny: strings, comments, numbers, and a fixed keyword
-        // set. Anything it cannot classify is left uncoloured rather than
+        // Deliberately tiny: strings, comments, numbers and a fixed keyword
+        // set. Anything it cannot classify stays uncoloured rather than being
         // guessed at — a wrong highlight reads worse than none.
         //
         // One pass, one alternation: at any given position the earlier branch
@@ -2390,20 +2665,20 @@ npm run designer:build
           return 'tok-key';
         }
 
-        document.querySelectorAll('.code pre code').forEach(function (block) {
+        [].slice.call(document.querySelectorAll('.code pre code')).forEach(function (block) {
           block.innerHTML = escapeHtml(block.textContent).replace(TOKEN, function (m) {
             return '<span class="' + tokenClass(m) + '">' + m + '</span>';
           });
         });
 
         /* ------------------------------ copy ------------------------------ */
-        document.querySelectorAll('[data-code]').forEach(function (wrap) {
+        [].slice.call(document.querySelectorAll('[data-code]')).forEach(function (wrap) {
           var btn = wrap.querySelector('.copy');
           var code = wrap.querySelector('pre code');
           if (!btn || !code) return;
           btn.addEventListener('click', function () {
-            var text = code.textContent;
-            var done = function () {
+            if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+            navigator.clipboard.writeText(code.textContent).then(function () {
               var was = btn.textContent;
               btn.textContent = root.getAttribute('lang') === 'en' ? 'Copied' : 'کپی شد';
               btn.setAttribute('data-copied', 'true');
@@ -2411,16 +2686,13 @@ npm run designer:build
                 btn.textContent = was;
                 btn.removeAttribute('data-copied');
               }, 1400);
-            };
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(text).then(done, function () {});
-            }
+            }, function () {});
           });
         });
 
         /* ------------------------------ tabs ------------------------------ */
-        document.querySelectorAll('[role="tablist"]').forEach(function (list) {
-          var tabs = Array.prototype.slice.call(list.querySelectorAll('[role="tab"]'));
+        [].slice.call(document.querySelectorAll('[role="tablist"]')).forEach(function (list) {
+          var tabs = [].slice.call(list.querySelectorAll('[role="tab"]'));
 
           function select(tab) {
             tabs.forEach(function (t) {
@@ -2436,37 +2708,47 @@ npm run designer:build
               select(tab);
             });
             tab.addEventListener('keydown', function (e) {
-              var next =
-                e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
-              if (next === null) return;
+              var step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+              if (!step) return;
               e.preventDefault();
-              // In RTL the arrows are mirrored, matching how the tabs read.
-              if (root.getAttribute('dir') === 'rtl') next = i + (next - i) * -1;
-              var target = tabs[(next + tabs.length) % tabs.length];
+              // Mirror the arrows under RTL so they match how the tabs read.
+              if (root.getAttribute('dir') === 'rtl') step = -step;
+              var target = tabs[(i + step + tabs.length) % tabs.length];
               target.focus();
               select(target);
             });
           });
         });
 
-        /* --------------------------- scrollspy --------------------------- */
-        var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+        /* ------------------------- ruler + scrollspy ------------------------- */
+        var progress = document.getElementById('progress');
+        var links = [].slice.call(document.querySelectorAll('.toc a'));
         var targets = links
           .map(function (a) {
             return document.querySelector(a.getAttribute('href'));
           })
           .filter(Boolean);
 
+        function paintProgress() {
+          var doc = document.documentElement;
+          var span = doc.scrollHeight - doc.clientHeight;
+          var pct = span > 0 ? (doc.scrollTop / span) * 100 : 0;
+          progress.style.height = Math.max(0, Math.min(100, pct)) + '%';
+        }
+
+        window.addEventListener('scroll', paintProgress, { passive: true });
+        paintProgress();
+
         if ('IntersectionObserver' in window && targets.length) {
-          var seen = new Map();
+          var visible = {};
           var spy = new IntersectionObserver(
             function (entries) {
               entries.forEach(function (entry) {
-                seen.set(entry.target.id, entry.isIntersecting);
+                visible[entry.target.id] = entry.isIntersecting;
               });
               var activeId = null;
               for (var i = 0; i < targets.length; i++) {
-                if (seen.get(targets[i].id)) {
+                if (visible[targets[i].id]) {
                   activeId = targets[i].id;
                   break;
                 }
@@ -2479,41 +2761,37 @@ npm run designer:build
                 }
               });
             },
-            { rootMargin: '-72px 0px -65% 0px' },
+            { rootMargin: '-64px 0px -68% 0px' },
           );
           targets.forEach(function (t) {
             spy.observe(t);
           });
         }
 
-        /* ---------------------------- mobile nav ---------------------------- */
-        var rail = document.getElementById('rail');
-        var railToggle = document.getElementById('railToggle');
-        var mq = media('(max-width: 60rem)');
+        /* --------------------------- contents nav --------------------------- */
+        var toc = document.getElementById('toc');
+        var tocToggle = document.getElementById('tocToggle');
+        var narrow = media('(max-width: 62rem)');
 
-        function syncRail() {
-          if (mq.matches) {
-            rail.hidden = railToggle.getAttribute('aria-expanded') !== 'true';
-          } else {
-            rail.hidden = false;
-          }
+        function syncToc() {
+          toc.hidden = narrow.matches && tocToggle.getAttribute('aria-expanded') !== 'true';
         }
 
-        railToggle.addEventListener('click', function () {
-          var open = railToggle.getAttribute('aria-expanded') === 'true';
-          railToggle.setAttribute('aria-expanded', String(!open));
-          syncRail();
+        tocToggle.addEventListener('click', function () {
+          var open = tocToggle.getAttribute('aria-expanded') === 'true';
+          tocToggle.setAttribute('aria-expanded', String(!open));
+          syncToc();
         });
 
-        rail.addEventListener('click', function (e) {
-          if (e.target.tagName === 'A' && mq.matches) {
-            railToggle.setAttribute('aria-expanded', 'false');
-            syncRail();
+        toc.addEventListener('click', function (e) {
+          if (e.target.tagName === 'A' && narrow.matches) {
+            tocToggle.setAttribute('aria-expanded', 'false');
+            syncToc();
           }
         });
 
-        if (mq.addEventListener) mq.addEventListener('change', syncRail);
-        syncRail();
+        if (narrow.addEventListener) narrow.addEventListener('change', syncToc);
+        syncToc();
       })();
     </script>
   </body>
