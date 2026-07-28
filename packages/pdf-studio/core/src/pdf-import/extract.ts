@@ -8,6 +8,7 @@
 import type { RgbColor } from '../model/color';
 import type {
   ExtractedPage,
+  ExtractedImage,
   ExtractedRect,
   ExtractedSegment,
   PdfjsDocumentLike,
@@ -182,14 +183,18 @@ function asRectangle(path: SubPath): { x: number; y: number; w: number; h: numbe
 /** Walk the operator list, collecting simple graphics + per-show fill colors. */
 function walkOperators(
   opList: PdfjsOperatorListLike,
-  out: { segments: ExtractedSegment[]; rects: ExtractedRect[]; warnings: string[] },
+  out: {
+    segments: ExtractedSegment[];
+    rects: ExtractedRect[];
+    images: ExtractedImage[];
+    warnings: string[];
+  },
 ): RgbColor[] {
   let state: GfxState = { ctm: IDENTITY, fill: undefined, stroke: undefined, lineWidth: 1 };
   const stack: GfxState[] = [];
   const showColors: RgbColor[] = [];
   let pending: SubPath[] = [];
   let skippedCurves = 0;
-  let skippedImages = 0;
 
   const paintPending = (fill: boolean, stroke: boolean): void => {
     for (const path of pending) {
@@ -256,11 +261,28 @@ function walkOperators(
     } else if (TEXT_SHOW_OPS.has(fn)) {
       showColors.push(state.fill ?? BLACK);
     } else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject) {
-      skippedImages++;
+      // An image XObject fills the unit square under the CTM; its bounding box
+      // is where the logo/stamp sat. The pixels are not decoded here — the
+      // placement alone keeps the slot in a cloned layout.
+      const corners = [
+        apply(state.ctm, 0, 0),
+        apply(state.ctm, 1, 0),
+        apply(state.ctm, 0, 1),
+        apply(state.ctm, 1, 1),
+      ];
+      const xs = corners.map((p) => p.x);
+      const ys = corners.map((p) => p.y);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      const width = Math.max(...xs) - x;
+      const height = Math.max(...ys) - y;
+      if (width > EPS && height > EPS) out.images.push({ x, y, width, height });
     }
   }
   if (skippedCurves > 0) out.warnings.push(`${skippedCurves} curved path(s) skipped`);
-  if (skippedImages > 0) out.warnings.push(`${skippedImages} image(s) skipped`);
+  if (out.images.length > 0) {
+    out.warnings.push(`${out.images.length} image(s) placed without their pixels`);
+  }
   return showColors;
 }
 
@@ -272,12 +294,15 @@ export async function extractPdfContent(doc: PdfjsDocumentLike): Promise<Extract
   for (let n = 1; n <= doc.numPages; n++) {
     const page = await doc.getPage(n);
     const viewport = page.getViewport({ scale: 1 });
-    const result: ExtractedPage = {
+    // `images` is optional on the public type (hand-built pages may omit it);
+    // the extractor always produces it, which `walkOperators` relies on.
+    const result: ExtractedPage & { images: ExtractedImage[] } = {
       width: viewport.width,
       height: viewport.height,
       texts: [],
       segments: [],
       rects: [],
+      images: [],
       warnings: [],
     };
 

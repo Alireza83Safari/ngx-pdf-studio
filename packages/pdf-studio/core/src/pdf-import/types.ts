@@ -78,6 +78,19 @@ export interface ExtractedRect {
   lineWidth: number;
 }
 
+/**
+ * Where an image (logo, stamp, signature) was painted, in raw PDF coordinates.
+ * Only the *placement* is recovered — decoding the XObject's pixels is a
+ * separate job — but that is enough to keep the slot in a cloned layout instead
+ * of silently dropping it and leaving a hole.
+ */
+export interface ExtractedImage {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /** Everything recovered from one PDF page. */
 export interface ExtractedPage {
   width: number;
@@ -85,6 +98,8 @@ export interface ExtractedPage {
   texts: ExtractedText[];
   segments: ExtractedSegment[];
   rects: ExtractedRect[];
-  /** Non-fatal notes: skipped curves, images, tiny marks, … */
+  /** Optional so a hand-built page (tests, tools) stays valid without it. */
+  images?: ExtractedImage[];
+  /** Non-fatal notes: skipped curves, tiny marks, … */
   warnings: string[];
 }

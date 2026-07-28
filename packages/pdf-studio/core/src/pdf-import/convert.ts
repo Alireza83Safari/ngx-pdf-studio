@@ -95,6 +95,25 @@ export function pdfContentToTemplate(
       });
     }
 
+    // Logos/stamps: keep the slot the image occupied. The pixels are not
+    // recovered, so this lands as an unbound `image` the user points at their
+    // own asset — better than the hole a silently dropped logo used to leave.
+    for (const img of page.images ?? []) {
+      elements.push({
+        id: nextId(),
+        name: 'تصویر (لوگو)',
+        type: 'image',
+        bounds: {
+          x: round(img.x),
+          y: round(page.height - img.y - img.height),
+          width: round(img.width),
+          height: round(img.height),
+        },
+        zIndex: 1,
+        fit: 'contain',
+      } as AnyElement);
+    }
+
     for (const seg of page.segments) {
       // lines have no direction — normalize so width is non-negative
       const [a, b] = seg.x1 <= seg.x2 ? [seg.x1, seg.x2] : [seg.x2, seg.x1];

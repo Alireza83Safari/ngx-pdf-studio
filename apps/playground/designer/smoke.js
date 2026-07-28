@@ -522,11 +522,39 @@ try {
     const clonedSvg = doc.querySelector('#pageSvg').innerHTML;
     if (!clonedSvg.includes('INV-1024')) fail('cloned bound field did not render its sample value');
     if (!clonedSvg.includes('widget')) fail('cloned table did not render its rows');
+    // the review offers the pipeline's payoff, not just a close button (F4.2):
+    // one click turns the verify stamp on and hands the document to the download
+    const stampBtn = doc.getElementById('cloneStampDownload');
+    if (!stampBtn) fail('clone review missing the stamp+download action');
+    doc.getElementById('verifyStamp').checked = false;
+    stampBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    if (!doc.getElementById('verifyStamp').checked)
+      fail('stamp+download did not enable the verify stamp');
+    if (doc.getElementById('cloneReview').classList.contains('show'))
+      fail('stamp+download did not close the review');
+
     doc
       .getElementById('closeCloneReview')
       .dispatchEvent(new window.Event('click', { bubbles: true }));
     if (doc.getElementById('cloneReview').classList.contains('show'))
       fail('clone review did not close');
+
+    // dropping a PDF on the canvas runs the same pipeline as the file menu
+    const dropEvent = new window.Event('drop', { bubbles: true, cancelable: true });
+    dropEvent.dataTransfer = {
+      files: [{ name: 'dropped.pdf', arrayBuffer: async () => new ArrayBuffer(0) }],
+      getData: () => '',
+    };
+    doc.getElementById('page').dispatchEvent(dropEvent);
+    for (let i = 0; i < 80; i++) {
+      await new Promise((r) => setTimeout(r, 25));
+      if (doc.getElementById('docName').value === 'dropped') break;
+    }
+    if (doc.getElementById('docName').value !== 'dropped')
+      fail('dropping a PDF on the canvas did not clone it: ' + doc.getElementById('docName').value);
+    doc
+      .getElementById('closeCloneReview')
+      .dispatchEvent(new window.Event('click', { bubbles: true }));
 
     // --- verified PDF download (F1.5) ---
     // verify is still ON from the sync block; the download must stamp the mark

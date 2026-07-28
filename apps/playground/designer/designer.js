@@ -1842,6 +1842,14 @@
 
   pageEl.addEventListener('drop', function (e) {
     e.preventDefault();
+    // A dropped PDF runs the Format Cloner — the whole point of F2 is that you
+    // should be able to throw a document at the canvas and get it back editable.
+    var dropped = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (dropped) {
+      if (/\.pdf$/i.test(dropped.name) || dropped.type === 'application/pdf') cloneFromPdf(dropped);
+      else toast('فقط PDF را می‌شود کلون کرد', true);
+      return;
+    }
     var path = e.dataTransfer.getData('text/plain');
     if (!path) return;
     if (path.indexOf('__add__:') === 0) {
@@ -3073,8 +3081,24 @@
     cloneReviewEl.classList.remove('show');
   }
   document.getElementById('closeCloneReview').addEventListener('click', closeCloneReview);
+  document.getElementById('cloneKeepEditing').addEventListener('click', closeCloneReview);
   cloneReviewEl.addEventListener('click', function (e) {
     if (e.target === cloneReviewEl) closeCloneReview();
+  });
+  /**
+   * Closes the loop the three moonshot pieces were built for but never joined:
+   * the cloned document goes straight out as a tamper-evident PDF. Drives the
+   * existing toggle and download button rather than duplicating either, so the
+   * printed code stays the one the panel and verify.html agree on (F1.5).
+   */
+  document.getElementById('cloneStampDownload').addEventListener('click', function () {
+    closeCloneReview();
+    var chk = document.getElementById('verifyStamp');
+    if (!chk.checked) {
+      chk.checked = true;
+      chk.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    document.getElementById('downloadPdf').click();
   });
 
   document.getElementById('cloneFormat').addEventListener('click', function () {
@@ -3085,10 +3109,17 @@
     document.getElementById('pdfInput').click();
   });
   var cloneBusy = false;
-  document.getElementById('pdfInput').addEventListener('change', async function (e) {
-    var file = e.target.files[0];
-    e.target.value = ''; // allow re-picking the same file later
+  /**
+   * The whole Format Cloner pipeline for one PDF: extract → classify → infer →
+   * bind → load. Shared by the file menu and by dropping a PDF on the canvas,
+   * so the two entry points cannot drift.
+   */
+  async function cloneFromPdf(file) {
     if (!file || cloneBusy) return;
+    if (!window.pdfjsLib) {
+      toast('pdfjs بارگذاری نشد — اول `npm run designer:build` را اجرا کن', true);
+      return;
+    }
     cloneBusy = true;
     var btn = document.getElementById('cloneFormat');
     setLoading(btn, true);
@@ -3121,6 +3152,11 @@
       cloneBusy = false;
       setLoading(btn, false);
     }
+  }
+  document.getElementById('pdfInput').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    e.target.value = ''; // allow re-picking the same file later
+    cloneFromPdf(file);
   });
 
   // async-button loading state (design-review 2.4): spinner + aria-busy + re-entry guard
