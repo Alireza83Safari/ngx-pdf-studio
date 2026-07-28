@@ -18,9 +18,21 @@ and the PDF), and a working in-browser visual designer with a template gallery.
 
 ## Quick start (Node)
 
+Not on npm yet — build the package and install the packed dist:
+
 ```bash
-npm install @ngx-pdf-studio/core
+npm run build:core                       # compile + prepare packages/pdf-studio/core/dist
+npm pack packages/pdf-studio/core/dist   # → ngx-pdf-studio-core-0.0.0.tgz
+
+# then, in your own project:
+npm i /path/to/ngx-pdf-studio-core-0.0.0.tgz
 ```
+
+> Install from `dist`, not from the workspace folder: the source `package.json`
+> points `main` at `src/index.ts`, so `file:packages/pdf-studio/core` hands a
+> consumer raw TypeScript. `npm run smoke:tarball` exercises exactly the flow
+> above. For Angular, run `npm run build` and install **both** tarballs (the
+> Angular package depends on core).
 
 ```js
 const { renderToFile, loadBundledVazirmatn } = require('@ngx-pdf-studio/core/node');
@@ -67,13 +79,14 @@ await renderToFile(template, { data: { customer: { name: 'علی رضایی' } }
 ## Quick start (Angular)
 
 ```ts
-import { PdfStudioRendererService } from '@ngx-pdf-studio/angular';
+import { PdfStudioRenderer } from '@ngx-pdf-studio/angular';
 
-constructor(private renderer: PdfStudioRendererService) {}
+constructor(private renderer: PdfStudioRenderer) {}
 
 async download() {
-  const { bytes } = await this.renderer.renderToPdf(template, { data });
-  // hand `bytes` to a Blob / file-saver
+  // → { bytes, blob, pageCount, diagnostics }
+  const result = await this.renderer.render({ template, data });
+  this.renderer.download(result, 'invoice.pdf'); // or use result.blob / result.bytes
 }
 ```
 

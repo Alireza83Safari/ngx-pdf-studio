@@ -49,9 +49,12 @@ import { PdfStudioRendererModule } from '@ngx-pdf-studio/angular';
 export class ReportModule {}
 ```
 
-`PdfStudioRendererService.renderToPdf(template, input, options?)` returns the
-bytes; `<pdf-studio-preview [template]="..." [data]="...">` renders the live SVG
-preview (one `<svg>` per page, same geometry as the PDF).
+`PdfStudioRenderer.render({ template, data, parameters?, options? })` resolves to
+`{ bytes, blob, pageCount, diagnostics }` — with `renderSvg`, `download`, `open`,
+and `toObjectUrl` alongside it. The service is `providedIn: 'root'`, so importing
+the module above is only needed for the preview component:
+`<pdf-studio-preview [template]="..." [data]="...">` renders the live SVG preview
+(one `<svg>` per page, same geometry as the PDF).
 
 ## 4. Bind data
 
