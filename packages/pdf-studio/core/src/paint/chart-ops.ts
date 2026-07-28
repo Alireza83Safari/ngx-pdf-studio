@@ -5,8 +5,10 @@
  * line (rect/line ops), area + pie/donut (filled path ops). Axis labels/legend
  * are a later step.
  */
+import { toPersianDigits } from '../expression/digits';
 import { CHART_LABEL_SIZE } from '../layout/chart-resolve';
 import type { LaidChart, VectorOp } from '../layout/page';
+import type { DigitSystem } from '../model/locale';
 import type { Rgb01 } from './color';
 
 /** Chart draw-ops are the shared neutral vector ops (incl. `text`, §7). */
@@ -20,6 +22,7 @@ const PALETTE: Rgb01[] = [
   { r: 0.55, g: 0.36, b: 0.96 },
 ];
 const AXIS: Rgb01 = { r: 0.8, g: 0.84, b: 0.88 };
+const GRID: Rgb01 = { r: 0.91, g: 0.93, b: 0.95 };
 const LABEL: Rgb01 = { r: 0.42, g: 0.45, b: 0.5 };
 const PAD = 8;
 const LABEL_SIZE = CHART_LABEL_SIZE;
@@ -36,6 +39,42 @@ const ENTRY_GAP = 12;
  */
 function labelWidth(text: string, measured: number | undefined): number {
   return measured !== undefined && measured > 0 ? measured : text.length * LABEL_SIZE * 0.62;
+}
+
+/** Axis and value labels follow the document's digits, like every other number. */
+function numberLabel(value: number, digits: DigitSystem | undefined): string {
+  const text = String(Math.round(value * 100) / 100);
+  return digits === 'persian' ? toPersianDigits(text) : text;
+}
+
+/**
+ * A "nice" axis step — 1, 2, 2.5 or 5 times a power of ten — so gridlines land
+ * on round numbers a reader can actually use.
+ */
+function niceStep(raw: number): number {
+  if (!(raw > 0)) return 1;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / magnitude;
+  const step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10;
+  return step * magnitude;
+}
+
+/**
+ * Ticks from 0 up to at least `max`. The plot then scales to the *top tick*
+ * rather than the raw maximum, so the tallest bar stops on a gridline instead of
+ * against the ceiling.
+ */
+export function axisTicks(max: number, target = 4): number[] {
+  if (!(max > 0)) return [0, 1];
+  const step = niceStep(max / Math.max(1, target));
+  const ticks: number[] = [];
+  // guard the loop on a count as well as the value: a denormal step must not spin
+  for (let i = 0; i <= target * 4; i++) {
+    const value = step * i;
+    ticks.push(Math.round(value * 1e6) / 1e6);
+    if (value >= max - step * 1e-9) break;
+  }
+  return ticks;
 }
 
 /**
@@ -240,9 +279,24 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
   const series = chart.series;
   const categories = Math.max(1, chart.categories.length);
   const maxValue = Math.max(1, ...series.flatMap((s) => s.values.map((v) => (v > 0 ? v : 0))));
+  // A stack is as tall as its total, so that — not the tallest single value —
+  // is what the axis has to cover.
+  const axisMax =
+    chart.kind === 'stackedColumn'
+      ? Math.max(
+          1,
+          ...Array.from({ length: categories }, (_, gi) =>
+            series.reduce((sum, s) => sum + Math.max(0, s.values[gi] ?? 0), 0),
+          ),
+        )
+      : maxValue;
+  const ticks = axisTicks(axisMax);
+  // scale to the top tick, not the raw maximum, so the tallest bar lands on a
+  // gridline instead of against the ceiling
+  const scaleMax = ticks[ticks.length - 1] || axisMax;
 
   const step = plot.w / categories;
-  const yOf = (v: number): number => baselineY - (Math.max(0, v) / maxValue) * plot.h;
+  const yOf = (v: number): number => baselineY - (Math.max(0, v) / scaleMax) * plot.h;
 
   // Legend + axis labels (§5). Horizontal bars label their rows instead of
   // the x-axis; every vertical kind centers a category label under its slot.
@@ -277,31 +331,81 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
       });
     });
   }
-  const axisMax =
-    chart.kind === 'stackedColumn'
-      ? Math.max(
-          1,
-          ...Array.from({ length: categories }, (_, gi) =>
-            series.reduce((sum, s) => sum + Math.max(0, s.values[gi] ?? 0), 0),
-          ),
-        )
-      : maxValue;
-  ops.push({
-    op: 'text',
-    x: rtl ? valueAxisX - 2 : valueAxisX + 2,
-    y: plot.y + LABEL_SIZE,
-    text: String(axisMax),
-    size: LABEL_SIZE,
-    color: LABEL,
-    ...(rtl ? { align: 'end' as const } : {}),
-  });
+  // Value axis: a gridline + label per tick. Horizontal bars scale along x, so
+  // their gridlines are vertical instead.
+  const horizontalBars = chart.kind === 'bar';
+  for (const tick of ticks) {
+    if (horizontalBars) {
+      const frac = tick / scaleMax;
+      const tx = rtl ? plot.x + plot.w - frac * plot.w : plot.x + frac * plot.w;
+      if (tick > 0) {
+        ops.push({
+          op: 'line',
+          x1: tx,
+          y1: plot.y,
+          x2: tx,
+          y2: baselineY,
+          color: GRID,
+          width: 0.5,
+        });
+      }
+      ops.push({
+        op: 'text',
+        x: tx,
+        y: baselineY + LABEL_SIZE + 1.5,
+        text: numberLabel(tick, chart.digits),
+        size: LABEL_SIZE,
+        color: LABEL,
+        align: 'middle',
+      });
+      continue;
+    }
+    const ty = yOf(tick);
+    if (tick > 0) {
+      ops.push({
+        op: 'line',
+        x1: plot.x,
+        y1: ty,
+        x2: plot.x + plot.w,
+        y2: ty,
+        color: GRID,
+        width: 0.5,
+      });
+    }
+    ops.push({
+      op: 'text',
+      x: rtl ? valueAxisX - 2 : valueAxisX + 2,
+      // hang labels under their gridline so the top one clears the legend row;
+      // zero sits above the baseline instead, clear of the category labels
+      y: tick === 0 ? ty - 1.5 : ty + LABEL_SIZE,
+      text: numberLabel(tick, chart.digits),
+      size: LABEL_SIZE,
+      color: LABEL,
+      ...(rtl ? { align: 'end' as const } : {}),
+    });
+  }
 
   const toSlot: ToSlot = (i) => slotOf(i, categories, rtl);
+
+  /** `showLabels`: print each point's value just above its mark (§5). */
+  const valueLabelOps = (values: number[]): ChartOp[] =>
+    chart.showLabels === true
+      ? values.map((v, i) => ({
+          op: 'text' as const,
+          x: centreOf(plot, step, toSlot(i)),
+          y: yOf(v) - 2,
+          text: numberLabel(v, chart.digits),
+          size: LABEL_SIZE,
+          color: LABEL,
+          align: 'middle' as const,
+        }))
+      : [];
 
   if (chart.kind === 'line') {
     series.forEach((s, si) => {
       ops.push(
         ...lineSeriesOps(s.values, PALETTE[si % PALETTE.length] as Rgb01, plot, step, yOf, toSlot),
+        ...valueLabelOps(s.values),
       );
     });
     return ops;
@@ -319,6 +423,7 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
           baselineY,
           toSlot,
         ),
+        ...valueLabelOps(s.values),
       );
     });
     return ops;
@@ -335,6 +440,7 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
           yOf,
           toSlot,
         ),
+        ...valueLabelOps(s.values),
       );
     });
     return ops;
@@ -375,6 +481,7 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
           );
           slot++;
       }
+      ops.push(...valueLabelOps(s.values));
     });
     return ops;
   }
@@ -386,15 +493,11 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
   if (chart.kind === 'stackedColumn') {
     const groupW = plot.w / groupCount;
     const barW = groupW * 0.6;
-    const stackTotals = Array.from({ length: groupCount }, (_, gi) =>
-      series.reduce((sum, s) => sum + Math.max(0, s.values[gi] ?? 0), 0),
-    );
-    const stackMax = Math.max(1, ...stackTotals);
     const cursorTop = new Array<number>(groupCount).fill(baselineY);
     series.forEach((s, si) => {
       const color = PALETTE[si % PALETTE.length] as Rgb01;
       s.values.forEach((v, gi) => {
-        const h = (Math.max(0, v) / stackMax) * plot.h;
+        const h = (Math.max(0, v) / scaleMax) * plot.h;
         const top = (cursorTop[gi] ?? baselineY) - h;
         ops.push({
           op: 'rect',
@@ -416,11 +519,22 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
     series.forEach((s, si) => {
       const color = PALETTE[si % PALETTE.length] as Rgb01;
       s.values.forEach((v, gi) => {
-        const len = (Math.max(0, v) / maxValue) * plot.w;
+        const len = (Math.max(0, v) / scaleMax) * plot.w;
         const y = plot.y + groupH * gi + groupH * 0.1 + barH * si;
         // horizontal bars grow away from the reading-start edge
         const x = rtl ? plot.x + plot.w - len : plot.x;
         ops.push({ op: 'rect', x, y, w: len, h: barH, fill: color });
+        if (chart.showLabels === true) {
+          ops.push({
+            op: 'text',
+            x: rtl ? x - 2 : x + len + 2,
+            y: y + barH / 2 + LABEL_SIZE * 0.35,
+            text: numberLabel(v, chart.digits),
+            size: LABEL_SIZE,
+            color: LABEL,
+            ...(rtl ? { align: 'end' as const } : {}),
+          });
+        }
       });
     });
   } else {
@@ -438,6 +552,7 @@ export function chartOps(chart: LaidChart, width: number, height: number): Chart
           yOf,
           toSlot,
         ),
+        ...valueLabelOps(s.values),
       );
     });
   }
@@ -513,6 +628,20 @@ function pieOps(chart: LaidChart, width: number, height: number): ChartOp[] {
       d: slicePath(cx, cy, r, ri, a0, a1),
       fill: PALETTE[i % PALETTE.length] as Rgb01,
     });
+    // `showLabels`: each slice's share, centred on the slice (§5)
+    if (chart.showLabels === true) {
+      const mid = (a0 + a1) / 2;
+      const at = pointOn(cx, cy, ri > 0 ? (r + ri) / 2 : r * 0.62, mid);
+      ops.push({
+        op: 'text',
+        x: at.x,
+        y: at.y + LABEL_SIZE * 0.35,
+        text: numberLabel(Math.round((v / total) * 100), chart.digits) + '%',
+        size: LABEL_SIZE,
+        color: { r: 1, g: 1, b: 1 },
+        align: 'middle',
+      });
+    }
     a0 = a1;
   });
   return ops;

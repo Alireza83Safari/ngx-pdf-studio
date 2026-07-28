@@ -9,6 +9,7 @@ import type { ResolvedDirection } from '../binding/effective-locale';
 import type { Color } from '../model/color';
 import type { ElementType, IconName } from '../model/element-base';
 import type { AnyElement, ChartKind, ImageFit } from '../model/elements';
+import type { DigitSystem } from '../model/locale';
 import type { ImageMime } from '../model/resource';
 import type { BoxStyle, HorizontalAlign, Typography } from '../model/style';
 import type { Rect, Size } from '../model/units';
@@ -92,6 +93,10 @@ export interface LaidChart {
   showLegend: boolean;
   /** Resolved direction: categories run right-to-left and the axis flips (§7). */
   rtl?: boolean;
+  /** Print each data point's value (and each slice's share) on the chart (§5). */
+  showLabels?: boolean;
+  /** Document digit system, so axis and value labels match the rest of the page. */
+  digits?: DigitSystem;
   /**
    * Label widths measured with the document's real font at layout time. The
    * painters have no metrics of their own, and the old character-count estimate

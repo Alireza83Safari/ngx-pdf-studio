@@ -69,7 +69,9 @@ export function resolveChart(
     categories,
     series,
     showLegend: el.showLegend ?? false,
+    showLabels: el.showLabels ?? false,
     rtl: direction === 'rtl',
+    digits,
     seriesNameWidths: series.map((s) => (s.name ? widthOf(s.name) : 0)),
     categoryWidths: categories.map(widthOf),
   };

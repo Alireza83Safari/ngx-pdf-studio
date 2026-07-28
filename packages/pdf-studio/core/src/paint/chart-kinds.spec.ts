@@ -20,8 +20,12 @@ const base = {
 const bars = (ops: ReturnType<typeof chartOps>) => ops.filter((o) => o.op === 'rect');
 const lines = (ops: ReturnType<typeof chartOps>) => ops.filter((o) => o.op === 'line');
 const paths = (ops: ReturnType<typeof chartOps>) => ops.filter((o) => o.op === 'path');
-/** The two axis rules are emitted for every cartesian chart; ignore them. */
-const AXIS_RULES = 2;
+/**
+ * Series segments only. Axis rules (0.75) and gridlines (0.5) are drawn as lines
+ * too, so counting every line would conflate the data with the furniture.
+ */
+const seriesLines = (ops: ReturnType<typeof chartOps>) =>
+  ops.filter((o) => o.op === 'line' && o.width === 1.5);
 
 describe('combo charts honour each series kind (§5)', () => {
   const combo: LaidChart = {
@@ -37,8 +41,8 @@ describe('combo charts honour each series kind (§5)', () => {
     const ops = chartOps(combo, 300, 150);
     // 3 bars for the column series…
     expect(bars(ops)).toHaveLength(3);
-    // …and 2 segments (3 points) for the line series, on top of the 2 axis rules
-    expect(lines(ops)).toHaveLength(AXIS_RULES + 2);
+    // …and 2 segments joining the line series' 3 points
+    expect(seriesLines(ops)).toHaveLength(2);
   });
 
   it('gives the columns the full category slot when only one series is a column', () => {
@@ -52,17 +56,17 @@ describe('combo charts honour each series kind (§5)', () => {
   it('shares one scale across mixed series, so the tallest value tops the plot', () => {
     const ops = chartOps(combo, 300, 150);
     const tallest = Math.min(...bars(ops).map((o) => (o.op === 'rect' ? o.y : Infinity)));
-    // Sales' 40 is the overall max, so its bar reaches the top of the plot area
-    const plotTop = Math.min(
-      ...lines(ops).map((o) => (o.op === 'line' ? Math.min(o.y1, o.y2) : 0)),
+    // Sales' 40 is the overall max, so its bar tops the Target line's 30
+    const lineTop = Math.min(
+      ...seriesLines(ops).map((o) => (o.op === 'line' ? Math.min(o.y1, o.y2) : 0)),
     );
-    expect(tallest).toBeLessThanOrEqual(plotTop + 0.01);
+    expect(tallest).toBeLessThanOrEqual(lineTop + 0.01);
   });
 
   it('defaults a series with no kind to a column', () => {
     const ops = chartOps({ ...combo, series: [{ values: [1, 2, 3] }] }, 300, 150);
     expect(bars(ops)).toHaveLength(3);
-    expect(lines(ops)).toHaveLength(AXIS_RULES);
+    expect(seriesLines(ops)).toHaveLength(0);
   });
 
   it('supports an area series inside a combo', () => {
