@@ -35,21 +35,22 @@ Bare identifiers resolve in this order (§9):
 
 ## Functions (whitelisted)
 
-| Function                                  | Notes                                                               |
-| ----------------------------------------- | ------------------------------------------------------------------- |
-| `sum(list, expr?)`                        | `sum(items, qty * price)` — `expr` evaluated per row (lazy).        |
-| `avg(list, expr?)` / `min` / `max`        | Same shape as `sum`.                                                |
-| `count(list)`                             | Array length (also `len(list)`).                                    |
-| `first(list)` / `last(list)`              | First/last element.                                                 |
-| `slice(list, start, end?)`                | Running totals: `sum(slice($root.items, 0, $index + 1), amount)`.   |
-| `abs(n)` / `round(n, digits?)`            | Numeric helpers.                                                    |
-| `concat(a, b, …)`                         | String concatenation (or use `+`).                                  |
-| `upper(s)` / `lower(s)`                   | Case mapping.                                                       |
-| `if(cond, then, else)`                    | Function form of the conditional.                                   |
-| `now()`                                   | Injected render timestamp (deterministic in tests).                 |
-| `toPersianDigits(s)` / `toLatinDigits(s)` | Digit transliteration.                                              |
-| `formatNumber(n, opts?)`                  | Locale-aware grouping/decimals; `opts.digits: 'persian' \| 'latn'`. |
-| `formatCurrency(n, opts?)`                | Currency formatting on top of `formatNumber`.                       |
+| Function                                  | Notes                                                                                                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sum(list, expr?)`                        | `sum(items, qty * price)` — `expr` evaluated per row (lazy).                                                                                                  |
+| `avg(list, expr?)` / `min` / `max`        | Same shape as `sum`.                                                                                                                                          |
+| `count(list)`                             | Array length (also `len(list)`).                                                                                                                              |
+| `first(list)` / `last(list)`              | First/last element.                                                                                                                                           |
+| `slice(list, start, end?)`                | Running totals: `sum(slice($root.items, 0, $index + 1), amount)`.                                                                                             |
+| `abs(n)` / `round(n, digits?)`            | Numeric helpers.                                                                                                                                              |
+| `concat(a, b, …)`                         | String concatenation (or use `+`).                                                                                                                            |
+| `upper(s)` / `lower(s)`                   | Case mapping.                                                                                                                                                 |
+| `if(cond, then, else)`                    | Function form of the conditional.                                                                                                                             |
+| `now()`                                   | Injected render timestamp (deterministic in tests).                                                                                                           |
+| `toWords(n, currency?)`                   | Persian words: `toWords(4850000, 'rial')` → «چهار میلیون و هشتصد و پنجاه هزار ریال». Second arg is `'rial'`, `'toman'`, any suffix string, or `{ currency }`. |
+| `toPersianDigits(s)` / `toLatinDigits(s)` | Digit transliteration.                                                                                                                                        |
+| `formatNumber(n, opts?)`                  | Locale-aware grouping/decimals; `opts.digits: 'persian' \| 'latn'`.                                                                                           |
+| `formatCurrency(n, opts?)`                | Currency formatting on top of `formatNumber`.                                                                                                                 |
 
 Custom functions can be registered on the function registry without forking (§12).
 

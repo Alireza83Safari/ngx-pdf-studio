@@ -117,7 +117,7 @@ npm run designer:build
 
 - **Template model** — fully typed, zod-validated, lossless round-trip, schema migration.
 - **Sandboxed expressions** — no `eval`; lexer → Pratt parser → evaluator, whitelisted
-  functions (`sum`, `avg`, `format`, `slice`, …), scope chain (`$index`, `$page`,
+  functions (`sum`, `avg`, `slice`, `toWords`, …), scope chain (`$index`, `$page`,
   `$group`, `$vars`, `$root`, `$parameters`), non-fatal diagnostics. See
   [docs/expression-language.md](docs/expression-language.md).
 - **Pagination** — pure `(template, data) → Page[]`: repeating page header/footer,
