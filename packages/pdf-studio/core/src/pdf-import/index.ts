@@ -29,6 +29,13 @@ export {
   type AnalyzedTable,
 } from './infer';
 export { cloneFormat, type CloneFormatOptions, type CloneFormatResult } from './clone';
+export {
+  imageToPage,
+  cloneFormatImage,
+  IMAGE_EXTRACT_CONTRACT,
+  type ImageImportOptions,
+  type CloneFormatImageOptions,
+} from './image-import';
 export type {
   ExtractedPage,
   ExtractedRect,

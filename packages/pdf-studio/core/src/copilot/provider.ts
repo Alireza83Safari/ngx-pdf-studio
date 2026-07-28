@@ -5,9 +5,23 @@
  * vendors or pointing at a local model never touches the pipeline.
  */
 
+/** An image to send alongside a message, for vision-capable providers (F4.1). */
+export interface VisionImage {
+  /** Base64 payload **without** the `data:` prefix. */
+  base64: string;
+  /** e.g. `image/png`, `image/jpeg`, `image/webp`. */
+  mime: string;
+}
+
 export interface CopilotMessage {
   role: 'user' | 'assistant';
   content: string;
+  /**
+   * Optional image for this turn. Each provider translates it to its own wire
+   * shape; a provider that cannot see images simply answers from the text, so
+   * callers must be able to degrade (as {@link classifyPageWithAi} already does).
+   */
+  image?: VisionImage;
 }
 
 export interface CopilotProvider {
@@ -25,6 +39,44 @@ export interface ClaudeProviderOptions {
   baseUrl?: string;
   /** Injectable fetch for tests and non-standard runtimes. */
   fetchImpl?: typeof fetch;
+}
+
+/**
+ * Anthropic Messages API message. An image rides as an `image` content block
+ * placed *before* the text, which is the documented ordering for image and
+ * document inputs.
+ */
+function toAnthropicMessage(m: CopilotMessage): unknown {
+  if (!m.image) return { role: m.role, content: m.content };
+  return {
+    role: m.role,
+    content: [
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: m.image.mime, data: m.image.base64 },
+      },
+      { type: 'text', text: m.content },
+    ],
+  };
+}
+
+/**
+ * OpenAI-compatible chat message. Vision uses `image_url` parts carrying a
+ * `data:` URI — the shape Groq, OpenRouter, Ollama and the Gemini-compatible
+ * endpoint all share.
+ */
+function toOpenAIMessage(m: CopilotMessage): unknown {
+  if (!m.image) return { role: m.role, content: m.content };
+  return {
+    role: m.role,
+    content: [
+      { type: 'text', text: m.content },
+      {
+        type: 'image_url',
+        image_url: { url: `data:${m.image.mime};base64,${m.image.base64}` },
+      },
+    ],
+  };
 }
 
 /** Anthropic Messages API provider (browser-direct or Node ≥18). */
@@ -58,7 +110,7 @@ export class ClaudeProvider implements CopilotProvider {
         model: this.opts.model,
         max_tokens: this.opts.maxTokens,
         system,
-        messages,
+        messages: messages.map(toAnthropicMessage),
       }),
     });
     if (!res.ok) {
@@ -148,7 +200,7 @@ export class OpenAICompatibleProvider implements CopilotProvider {
         model: this.opts.model,
         ...(this.opts.maxTokens !== undefined ? { max_tokens: this.opts.maxTokens } : {}),
         // OpenAI shape carries the system prompt as the first message
-        messages: [{ role: 'system', content: system }, ...messages],
+        messages: [{ role: 'system', content: system }, ...messages.map(toOpenAIMessage)],
       }),
     });
   }
