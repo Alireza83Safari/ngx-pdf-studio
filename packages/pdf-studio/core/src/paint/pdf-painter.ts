@@ -60,7 +60,13 @@ import { chartOps } from './chart-ops';
 import { colorToRgb01 } from './color';
 import { qrRects } from './qr-geometry';
 import { FontProvider, type FontInput } from './font-provider';
-import { resolveBoxStyle, resolveTextStyle, type ResolvedTextStyle } from './paint-style';
+import {
+  dashPattern,
+  resolveBorderEdges,
+  resolveBoxStyle,
+  resolveTextStyle,
+  type ResolvedTextStyle,
+} from './paint-style';
 
 const EPOCH = new Date(0);
 
@@ -407,18 +413,56 @@ function paintIcon(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): v
 
 function paintBox(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): void {
   const style = resolveBoxStyle(el);
-  const side = style.border?.all ?? style.border?.top;
+  const edges = resolveBorderEdges(style.border);
   const { x, y, width, height } = el.bounds;
-  if (style.fill || side) {
+  const uniform = edges.uniform;
+  if (style.fill || uniform) {
+    const dash = uniform ? dashPattern(uniform) : undefined;
     page.drawRectangle({
       x,
       y: flipY(layoutPage, y, height),
       width,
       height,
       ...(style.fill ? { color: toPdfColor(style.fill) } : {}),
-      ...(side ? { borderColor: toPdfColor(side.color), borderWidth: side.width } : {}),
+      ...(uniform ? { borderColor: toPdfColor(uniform.color), borderWidth: uniform.width } : {}),
+      ...(dash ? { borderDashArray: dash } : {}),
       opacity: style.opacity,
       borderOpacity: style.opacity,
+    });
+  }
+  // Individually declared sides are stroked as their own lines, matching the
+  // SVG painter — a rectangle can only carry one uniform stroke.
+  const top = flipY(layoutPage, y, 0);
+  const bottom = flipY(layoutPage, y + height, 0);
+  for (const { side, stroke } of edges.sides) {
+    const [start, end] =
+      side === 'top'
+        ? [
+            { x, y: top },
+            { x: x + width, y: top },
+          ]
+        : side === 'bottom'
+          ? [
+              { x, y: bottom },
+              { x: x + width, y: bottom },
+            ]
+          : side === 'left'
+            ? [
+                { x, y: top },
+                { x, y: bottom },
+              ]
+            : [
+                { x: x + width, y: top },
+                { x: x + width, y: bottom },
+              ];
+    const dash = dashPattern(stroke);
+    page.drawLine({
+      start,
+      end,
+      thickness: stroke.width,
+      color: toPdfColor(stroke.color),
+      opacity: style.opacity,
+      ...(dash ? { dashArray: dash } : {}),
     });
   }
   // Data bar above the fill, below content (§11A-D); grows from start edge.
@@ -437,8 +481,9 @@ function paintBox(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): vo
 
 function paintEllipse(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): void {
   const style = resolveBoxStyle(el);
-  const side = style.border?.all;
+  const side = style.border?.all; // an ellipse has no sides to declare individually
   const { x, y, width, height } = el.bounds;
+  const dash = side ? dashPattern(side) : undefined;
   page.drawEllipse({
     x: x + width / 2,
     y: layoutPage.size.height - (y + height / 2),
@@ -446,6 +491,7 @@ function paintEllipse(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage)
     yScale: height / 2,
     ...(style.fill ? { color: toPdfColor(style.fill) } : {}),
     ...(side ? { borderColor: toPdfColor(side.color), borderWidth: side.width } : {}),
+    ...(dash ? { borderDashArray: dash } : {}),
   });
 }
 
@@ -653,11 +699,13 @@ function paintQr(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): voi
 function paintLine(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): void {
   const stroke = el.source.type === 'line' ? el.source.stroke : undefined;
   const { x, y, width, height } = el.bounds;
+  const dash = stroke ? dashPattern(stroke) : undefined;
   page.drawLine({
     start: { x, y: layoutPage.size.height - y },
     end: { x: x + width, y: layoutPage.size.height - (y + height) },
     thickness: stroke?.width ?? 1,
     color: stroke ? toPdfColor(stroke.color) : rgb(0, 0, 0),
+    ...(dash ? { dashArray: dash } : {}),
   });
 }
 

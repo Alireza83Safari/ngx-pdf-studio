@@ -9,7 +9,8 @@ import type { LaidOutElement, LayoutPage, PaginatedDocument, VectorOp } from '..
 import { chartOps } from './chart-ops';
 import { colorToCss } from './color';
 import { qrRects } from './qr-geometry';
-import { resolveBoxStyle, resolveTextStyle } from './paint-style';
+import { dashPattern, resolveBorderEdges, resolveBoxStyle, resolveTextStyle } from './paint-style';
+import type { BorderSide } from '../model/style';
 
 const rgb01ToCss = (c: { r: number; g: number; b: number }): string =>
   `rgb(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)})`;
@@ -269,11 +270,17 @@ function barcodeMarkup(el: LaidOutElement): string {
   return rects;
 }
 
+/** `stroke-dasharray` for a stroke style, or '' when solid. */
+function dashAttr(stroke: BorderSide): string {
+  const dash = dashPattern(stroke);
+  return dash ? `stroke-dasharray="${dash.map(r2).join(' ')}"` : '';
+}
+
 function boxMarkup(el: LaidOutElement): string {
   const { fill, border, opacity, radius } = resolveBoxStyle(el);
-  const side = border?.all ?? border?.top;
+  const edges = resolveBorderEdges(border);
   const bar = dataBarMarkup(el);
-  if (!fill && !side) return bar;
+  if (!fill && !edges.uniform && edges.sides.length === 0) return bar;
   const { x, y, width, height } = el.bounds;
   const attrs = [
     `x="${r2(x)}"`,
@@ -281,13 +288,34 @@ function boxMarkup(el: LaidOutElement): string {
     `width="${r2(width)}"`,
     `height="${r2(height)}"`,
     fill ? `fill="${colorToCss(fill)}"` : `fill="none"`,
-    side ? `stroke="${colorToCss(side.color)}" stroke-width="${r2(side.width)}"` : '',
+    edges.uniform
+      ? `stroke="${colorToCss(edges.uniform.color)}" stroke-width="${r2(edges.uniform.width)}"`
+      : '',
+    edges.uniform ? dashAttr(edges.uniform) : '',
     radius !== undefined ? `rx="${r2(radius)}"` : '',
     opacity < 1 ? `opacity="${opacity}"` : '',
   ]
     .filter(Boolean)
     .join(' ');
-  return `<rect ${attrs} />` + bar;
+  // Individually declared sides are stroked as their own lines; a rectangle can
+  // only carry one uniform stroke.
+  const sides = edges.sides
+    .map(({ side, stroke }) => {
+      const [x1, y1, x2, y2] =
+        side === 'top'
+          ? [x, y, x + width, y]
+          : side === 'bottom'
+            ? [x, y + height, x + width, y + height]
+            : side === 'left'
+              ? [x, y, x, y + height]
+              : [x + width, y, x + width, y + height];
+      return (
+        `<line x1="${r2(x1)}" y1="${r2(y1)}" x2="${r2(x2)}" y2="${r2(y2)}" ` +
+        `stroke="${colorToCss(stroke.color)}" stroke-width="${r2(stroke.width)}" ${dashAttr(stroke)} />`
+      );
+    })
+    .join('');
+  return `<rect ${attrs} />` + bar + sides;
 }
 
 /** Proportional data bar drawn above the box fill, below content (§11A-D). */
@@ -303,7 +331,7 @@ function dataBarMarkup(el: LaidOutElement): string {
 function ellipseMarkup(el: LaidOutElement): string {
   const { fill, border } = resolveBoxStyle(el);
   const { x, y, width, height } = el.bounds;
-  const side = border?.all;
+  const side = border?.all; // an ellipse has no sides to declare individually
   const attrs = [
     `cx="${r2(x + width / 2)}"`,
     `cy="${r2(y + height / 2)}"`,
@@ -311,6 +339,7 @@ function ellipseMarkup(el: LaidOutElement): string {
     `ry="${r2(height / 2)}"`,
     fill ? `fill="${colorToCss(fill)}"` : `fill="none"`,
     side ? `stroke="${colorToCss(side.color)}" stroke-width="${r2(side.width)}"` : '',
+    side ? dashAttr(side) : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -323,9 +352,10 @@ function lineMarkup(el: LaidOutElement): string {
   const { x, y, width, height } = el.bounds;
   const color = stroke ? colorToCss(stroke.color) : 'rgb(0, 0, 0)';
   const w = stroke ? stroke.width : 1;
+  const dash = stroke ? dashAttr(stroke) : '';
   return (
     `<line x1="${r2(x)}" y1="${r2(y)}" x2="${r2(x + width)}" y2="${r2(y + height)}" ` +
-    `stroke="${color}" stroke-width="${r2(w)}" />`
+    `stroke="${color}" stroke-width="${r2(w)}" ${dash}/>`
   );
 }
 

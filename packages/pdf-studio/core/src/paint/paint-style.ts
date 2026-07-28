@@ -7,7 +7,7 @@
  */
 import type { ResolvedDirection } from '../binding/effective-locale';
 import type { Color } from '../model/color';
-import type { BorderSet, Fill } from '../model/style';
+import type { BorderSet, BorderSide, Fill } from '../model/style';
 import type { LaidOutElement } from '../layout/page';
 
 export const DEFAULT_FONT_SIZE = 12;
@@ -65,6 +65,49 @@ export function resolveTextStyle(el: LaidOutElement): ResolvedTextStyle {
     align: physicalAlign(t.align, el.direction),
     lineHeight: fontSize * (t.lineHeight ?? DEFAULT_LINE_HEIGHT),
   };
+}
+
+export type BoxSide = 'top' | 'right' | 'bottom' | 'left';
+const BOX_SIDES: readonly BoxSide[] = ['top', 'right', 'bottom', 'left'];
+
+export interface ResolvedBorderEdges {
+  /**
+   * Set when every edge is the same stroke, i.e. only `all` was given. The
+   * painters then draw one stroked rectangle, which is cheaper and is the only
+   * form that can carry a corner radius.
+   */
+  uniform?: BorderSide;
+  /** Otherwise the individual edges to stroke, in top/right/bottom/left order. */
+  sides: { side: BoxSide; stroke: BorderSide }[];
+}
+
+/**
+ * Resolve a {@link BorderSet} to the edges to actually stroke (§5). Per the
+ * model, each side falls back to `all`; a set with *only* `all` collapses to a
+ * single rectangle. Before this, both painters read `all ?? top` and drew one
+ * rectangle, so a border declared on just one or two sides vanished.
+ */
+export function resolveBorderEdges(border: BorderSet | undefined): ResolvedBorderEdges {
+  if (!border) return { sides: [] };
+  const overridden = BOX_SIDES.some((side) => border[side] !== undefined);
+  if (!overridden) return border.all ? { uniform: border.all, sides: [] } : { sides: [] };
+  const sides: { side: BoxSide; stroke: BorderSide }[] = [];
+  for (const side of BOX_SIDES) {
+    const stroke = border[side] ?? border.all;
+    if (stroke) sides.push({ side, stroke });
+  }
+  return { sides };
+}
+
+/**
+ * Dash pattern in points for a stroke, or `undefined` for a solid line. Scaled
+ * off the stroke width so a hairline and a thick rule both read as dashed.
+ */
+export function dashPattern(stroke: BorderSide): number[] | undefined {
+  const w = Math.max(0.5, stroke.width);
+  if (stroke.style === 'dashed') return [w * 3, w * 2];
+  if (stroke.style === 'dotted') return [w, w * 2];
+  return undefined;
 }
 
 export function resolveBoxStyle(el: LaidOutElement): ResolvedBoxStyle {
