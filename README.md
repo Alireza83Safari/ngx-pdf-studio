@@ -185,6 +185,11 @@ Releases are cut by tagging `v*` — CI rebuilds, re-runs every gate, and publis
 `packages/pdf-studio/core/dist` with npm provenance
 (see `.github/workflows/release.yml`).
 
+No release has been cut yet (`version: 0.0.0`), which is why
+[Quick start](#quick-start-node) walks through packing the dist by hand. Once the
+first tag lands, collapse that back to a plain
+`npm install @ngx-pdf-studio/core`.
+
 ## License
 
 MIT (see [LICENSE](LICENSE)). The bundled Vazirmatn font is OFL-licensed

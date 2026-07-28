@@ -49,12 +49,32 @@ import { PdfStudioRendererModule } from '@ngx-pdf-studio/angular';
 export class ReportModule {}
 ```
 
-`PdfStudioRenderer.render({ template, data, parameters?, options? })` resolves to
-`{ bytes, blob, pageCount, diagnostics }` — with `renderSvg`, `download`, `open`,
-and `toObjectUrl` alongside it. The service is `providedIn: 'root'`, so importing
-the module above is only needed for the preview component:
-`<pdf-studio-preview [template]="..." [data]="...">` renders the live SVG preview
-(one `<svg>` per page, same geometry as the PDF).
+The service is `providedIn: 'root'`, so the module above is only needed for the
+preview component — injecting the renderer needs no import:
+
+```ts
+import { PdfStudioRenderer } from '@ngx-pdf-studio/angular';
+
+constructor(private renderer: PdfStudioRenderer) {}
+
+async save() {
+  // → { bytes, blob, pageCount, diagnostics }
+  const result = await this.renderer.render({ template, data });
+  this.renderer.download(result, 'report.pdf'); // or open() / toObjectUrl()
+}
+
+// Preview without producing a PDF: one SVG string per page, and synchronous
+// — same layout tree as render(), so what you see is what you get.
+preview(): string[] {
+  return this.renderer.renderSvg({ template, data }).pages;
+}
+```
+
+Both methods take the same request — `{ template, data?, parameters?, options? }`,
+where `options` is the engine's `RenderOptions` (fonts, PDF metadata, …).
+
+Or let the component do it: `<pdf-studio-preview [template]="..." [data]="...">`
+renders that same SVG (one `<svg>` per page, same geometry as the PDF).
 
 ## 4. Bind data
 
