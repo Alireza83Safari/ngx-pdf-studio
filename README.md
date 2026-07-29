@@ -4,9 +4,10 @@ A best-in-class Angular PDF **designer** and **generation engine** — a
 JasperReports / Stimulsoft-class report tool, rebuilt natively for TypeScript
 with first-class **RTL / Persian** support.
 
-**289 tests green** across the engine and the Angular package. Byte-deterministic
-PDF output, WYSIWYG by construction (one layout tree feeds both the SVG preview
-and the PDF), and a working in-browser visual designer with a template gallery.
+**656 tests green** across the engine and the Angular package, at 93% statement
+coverage behind a CI gate. Byte-deterministic PDF output, WYSIWYG by construction
+(one layout tree feeds both the SVG preview and the PDF), and a working
+in-browser visual designer with a template gallery.
 
 ## Packages
 
@@ -146,6 +147,8 @@ npm run designer:build
 - [Expression language reference](docs/expression-language.md)
 - [RTL / Persian guide](docs/rtl-persian.md)
 - [Architecture decision records](docs/adr/)
+- [Changelog](CHANGELOG.md)
+- [Security policy & threat model](SECURITY.md)
 
 ## Repository layout
 
@@ -182,9 +185,11 @@ npm run demo           # playground: Persian invoice → PDF + HTML preview
 node apps/playground/designer/smoke.js   # designer jsdom smoke test
 ```
 
-Releases are cut by tagging `v*` — CI rebuilds, re-runs every gate, and publishes
-`packages/pdf-studio/core/dist` with npm provenance
-(see `.github/workflows/release.yml`).
+Releases are cut by tagging `v*`. CI rebuilds, re-runs every gate, stamps both
+packages with the tag's version, and publishes them with npm provenance — core
+first, then the Angular bindings, which depend on it at `^<version>` (see
+`.github/workflows/release.yml`). Publishing requires the repo secret
+`NPM_TOKEN`.
 
 No release has been cut yet (`version: 0.0.0`), which is why
 [Quick start](#quick-start-node) walks through packing the dist by hand. Once the
