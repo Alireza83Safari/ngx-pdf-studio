@@ -167,8 +167,12 @@ describe('end-to-end Persian + mixed-language rendering (§11)', () => {
       { pdf: { fonts } },
     );
     expect(Buffer.from(a.bytes).equals(Buffer.from(b.bytes))).toBe(true);
-    // 60s, not 30: this renders the bilingual fixture twice with real font
-    // embedding, and under parallel worker contention 30s flakes. It is
-    // measuring determinism, not speed.
-  }, 60000);
+    // 180s, not 60: this renders the bilingual fixture twice with real font
+    // subsetting, and it runs alongside `golden-i18n.spec.ts` doing the same —
+    // the two heaviest suites contending for the same cores. Observed 60s
+    // overruns on a loaded developer machine (103-115s), so the cap is set well
+    // clear of the worst case rather than at it. This measures determinism, not
+    // speed: a slow pass is correct, a timeout is a false failure that would
+    // abort a release.
+  }, 180000);
 });

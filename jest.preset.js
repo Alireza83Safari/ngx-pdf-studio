@@ -18,10 +18,6 @@ module.exports = {
     '!src/**/*.d.ts',
     // Test-only helpers (golden harness) — not shipped, not part of the gate.
     '!src/**/testing/**',
-    // Exercised only with real font bytes (fontkit-measurer.spec.ts skips when no
-    // system font is present), so it is excluded to keep the coverage gate
-    // environment-independent. Revisit once a Vazirmatn font is bundled (Phase 3).
-    '!src/**/fontkit-measurer.ts',
   ],
   coverageReporters: ['text', 'lcov'],
 };
