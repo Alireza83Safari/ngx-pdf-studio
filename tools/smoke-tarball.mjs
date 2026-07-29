@@ -18,9 +18,19 @@ if (!existsSync(join(dist, 'index.js'))) {
   process.exit(1);
 }
 
+// npm ships as `npm.cmd` on Windows, and since the CVE-2024-27980 fix Node
+// refuses to spawn a `.cmd` without a shell — so Windows needs `shell: true`,
+// which in turn means quoting arguments that contain whitespace (temp paths
+// under a user profile routinely do). POSIX keeps the plain, unshelled call.
+const isWindows = process.platform === 'win32';
+const NPM = isWindows ? 'npm.cmd' : 'npm';
+const npmArgs = (args) => (isWindows ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args);
+const npmOpts = isWindows ? { shell: true } : {};
+const npm = (args, opts = {}) => execFileSync(NPM, npmArgs(args), { ...npmOpts, ...opts });
+
 const work = mkdtempSync(join(tmpdir(), 'pdf-studio-smoke-'));
 try {
-  const packOut = execFileSync('npm', ['pack', dist, '--pack-destination', work], {
+  const packOut = npm(['pack', dist, '--pack-destination', work], {
     encoding: 'utf8',
   });
   const tarball = join(work, packOut.trim().split('\n').pop());
@@ -29,7 +39,7 @@ try {
     join(work, 'package.json'),
     JSON.stringify({ name: 'smoke-consumer', private: true, version: '0.0.0' }),
   );
-  execFileSync('npm', ['install', tarball, '--no-audit', '--no-fund'], { cwd: work });
+  npm(['install', tarball, '--no-audit', '--no-fund'], { cwd: work });
 
   writeFileSync(
     join(work, 'consume.js'),

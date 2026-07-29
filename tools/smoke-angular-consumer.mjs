@@ -42,12 +42,24 @@ const TS_FOR_ANGULAR = {
 const major = /^\d+/.exec(version)?.[0];
 const tsVersion = (major && TS_FOR_ANGULAR[major]) || 'latest';
 
+// npm ships as `npm.cmd` on Windows, and since the CVE-2024-27980 fix Node
+// refuses to spawn a `.cmd` without a shell — so Windows needs `shell: true`,
+// which in turn means quoting arguments that contain whitespace (temp paths
+// under a user profile routinely do). POSIX keeps the plain, unshelled call.
+const isWindows = process.platform === 'win32';
+const NPM = isWindows ? 'npm.cmd' : 'npm';
+const npmArgs = (args) => (isWindows ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args);
+const npmOpts = isWindows ? { shell: true } : {};
+
 const work = mkdtempSync(join(tmpdir(), 'ngx-pdf-studio-ng-'));
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { cwd: work, stdio: 'inherit', ...opts });
 try {
   const pack = (dir) =>
-    execFileSync('npm', ['pack', dir, '--pack-destination', work], { encoding: 'utf8' })
+    execFileSync(NPM, npmArgs(['pack', dir, '--pack-destination', work]), {
+      encoding: 'utf8',
+      ...npmOpts,
+    })
       .trim()
       .split('\n')
       .pop();
@@ -58,20 +70,24 @@ try {
     join(work, 'package.json'),
     JSON.stringify({ name: 'ng-consumer', private: true, version: '0.0.0' }),
   );
-  run('npm', [
-    'install',
-    '--no-audit',
-    '--no-fund',
-    coreTar,
-    ngTar,
-    `@angular/core@${version}`,
-    `@angular/common@${version}`,
-    `@angular/platform-browser@${version}`,
-    'rxjs@^7.4.0',
-    'zone.js',
-    'tslib',
-    `typescript@${tsVersion}`,
-  ]);
+  run(
+    NPM,
+    npmArgs([
+      'install',
+      '--no-audit',
+      '--no-fund',
+      coreTar,
+      ngTar,
+      `@angular/core@${version}`,
+      `@angular/common@${version}`,
+      `@angular/platform-browser@${version}`,
+      'rxjs@^7.4.0',
+      'zone.js',
+      'tslib',
+      `typescript@${tsVersion}`,
+    ]),
+    npmOpts,
+  );
 
   writeFileSync(
     join(work, 'consumer.ts'),
@@ -120,7 +136,7 @@ export const preview: typeof PdfStudioPreviewComponent = PdfStudioPreviewCompone
       include: ['consumer.ts'],
     }),
   );
-  run('npx', ['tsc', '-p', 'tsconfig.json']);
+  run(isWindows ? 'npx.cmd' : 'npx', ['tsc', '-p', 'tsconfig.json'], npmOpts);
   console.log(`angular consumer type-compat OK against @angular/core@${version} (ts ${tsVersion})`);
 } finally {
   rmSync(work, { recursive: true, force: true });

@@ -1,0 +1,24 @@
+# Normalize every text file to LF in the repository and in the working tree.
+#
+# Prettier is configured with its default `endOfLine: "lf"`, and CI runs
+# `prettier --check`. Without this file a Windows clone (`core.autocrlf=true`)
+# checks out CRLF, so `npm run format:check` fails locally on files that are
+# perfectly fine in CI — which trains contributors to ignore the format gate.
+* text=auto eol=lf
+
+# Fonts and other binaries must never be line-ending converted: a single byte
+# rewritten inside a TTF corrupts it, and the PDF output is byte-compared.
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+
+# Generated; keep them out of diffs and language stats.
+package-lock.json linguist-generated=true -diff
+*.snap linguist-generated=true
