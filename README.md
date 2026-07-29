@@ -177,6 +177,7 @@ npm run lint           # eslint
 npm run typecheck      # tsc
 npm run build          # core dist (CJS + d.ts + fonts) + Angular APF package
 npm run smoke:tarball  # pack the dist & render a PDF from a pristine install
+npm run smoke:docs     # run docs/index.html in jsdom (translations, links, code samples)
 npm run demo           # playground: Persian invoice → PDF + HTML preview
 node apps/playground/designer/smoke.js   # designer jsdom smoke test
 ```

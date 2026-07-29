@@ -9,6 +9,10 @@ map of everything under `docs/`. Start at the top and follow what you need.
 
 ## Start here
 
+- [index.html](index.html) — the **documentation page**: a self-contained, bilingual
+  (فارسی/English) walkthrough covering install, quick start, the band model, expressions,
+  RTL, Angular, `DocumentStore` and the API tables. Open it straight from disk; it loads
+  nothing over the network. Guarded by `npm run smoke:docs`.
 - [getting-started.md](getting-started.md) — zero-to-PDF in Node and in Angular, plus the
   core mental model (`createRenderContext → paginate → paint`).
 
