@@ -65,4 +65,31 @@ describe('PdfStudioPreviewComponent (§7, §12)', () => {
     expect(host.textContent).toContain('Preview!');
     expect(component.pages.length).toBe(1);
   });
+
+  // The component exists to guarantee preview == PDF (§7). A template reading
+  // `$parameters` broke that promise, because the input was never forwarded.
+  it('forwards report parameters to the expression scope', () => {
+    component.template = {
+      ...template,
+      bands: [
+        {
+          ...template.bands[0]!,
+          elements: [
+            {
+              id: 'p',
+              type: 'dataField',
+              bounds: { x: 0, y: 0, width: 200, height: 20 },
+              zIndex: 1,
+              value: { source: '$parameters.company' },
+            },
+          ],
+        },
+      ],
+    };
+    component.parameters = { company: 'Acme Ltd' };
+    component.ngOnChanges();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Acme Ltd');
+  });
 });

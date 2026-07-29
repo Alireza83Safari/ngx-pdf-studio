@@ -35,6 +35,12 @@ import { PdfStudioRenderer } from './pdf-studio-renderer.service';
 export class PdfStudioPreviewComponent implements OnChanges {
   @Input() template?: PdfTemplate;
   @Input() data?: Record<string, unknown>;
+  /**
+   * Report parameters (`$parameters` in expressions). Without these a template
+   * that reads a parameter previews differently from the PDF the same template
+   * produces — the one thing this component exists to rule out (§7).
+   */
+  @Input() parameters?: Record<string, unknown>;
 
   pages: SafeHtml[] = [];
   diagnostics: ExpressionDiagnostic[] = [];
@@ -62,6 +68,7 @@ export class PdfStudioPreviewComponent implements OnChanges {
     const result = this.renderer.renderSvg({
       template: this.template,
       ...(this.data ? { data: this.data } : {}),
+      ...(this.parameters ? { parameters: this.parameters } : {}),
     });
     this.pages = result.pages.map((svg) => this.sanitizer.bypassSecurityTrustHtml(svg));
     this.diagnostics = result.diagnostics;
