@@ -15,6 +15,20 @@ entries below into a released section.
 
 ### Added
 
+- `@ngx-pdf-studio/core` is now a **dual-format package**. It shipped CommonJS
+  only, which no bundler can statically analyse: every Angular application
+  consuming it got "CommonJS or AMD dependencies can cause optimization
+  bailouts" and shipped engine code it could have tree-shaken away. The same
+  sources are now also emitted as real ES modules under `dist/esm/`, selected by
+  the `import` condition, with declarations per condition so `node16` resolution
+  reads ESM types for the ESM entry. Cost: 379 kB → 411 kB packed, and a
+  consumer only ever ships one of the two.
+
+  `@ngx-pdf-studio/core/node` stays CommonJS on purpose — it resolves the
+  bundled fonts with `__dirname`, which does not exist in an ES module. It is
+  the server-side entry, so there is no bundle to optimize, and Node reads its
+  named exports from CommonJS fine.
+
 - Release readiness: `repository`, `homepage`, `bugs` and `author` metadata on
   both packages. `npm publish --provenance` requires `repository.url`, so the
   release workflow could not have succeeded without it.
@@ -23,6 +37,11 @@ entries below into a released section.
   dependency to `^<version>` and copies `LICENSE`/`README.md` into the dist).
 - The release workflow type-checks a pristine Angular consumer against the
   freshly stamped tarballs before publishing.
+- `smoke:tarball` now exercises both halves of the published package: `require`
+  of the Node subpath renders a Persian PDF, and `import` of the main entry
+  renders SVG. It asserts the specifier *resolves into* `esm/`, since importing
+  named exports alone would pass against a CommonJS entry too and the bailout
+  would come back unnoticed.
 - `.gitattributes` normalizing text to LF, so `format:check` behaves the same on
   Windows as in CI.
 - This changelog and a security policy.

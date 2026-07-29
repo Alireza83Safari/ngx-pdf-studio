@@ -171,6 +171,12 @@ The published library targets **Angular 12 → latest, inclusive**. The distribu
 code avoids Signals, block control flow (`@if`/`@for`), `inject()`, and
 standalone-only delivery. The pure-TS `core` package has no Angular dependency.
 
+`core` is a **dual-format package**: `import` resolves to ES modules, `require`
+to CommonJS. That is what keeps the Angular CLI from reporting a *"CommonJS or
+AMD dependencies can cause optimization bailouts"* warning and lets it
+tree-shake the engine. The `core/node` subpath is CommonJS only — it is
+server-side, and Node imports its named exports fine either way.
+
 ## Development
 
 ```bash

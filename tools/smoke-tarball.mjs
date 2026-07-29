@@ -1,9 +1,10 @@
 /**
  * Consumer tarball smoke test (§14A): pack the built core dist exactly as npm
- * would publish it, install the tarball into a pristine temp project, and
- * render a Persian PDF through the installed package — proving the published
- * artifact works standalone (fonts inside, CJS entry, subpath export).
- * Run `npm run build:core` first.
+ * would publish it, install the tarball into a pristine temp project, and use
+ * it both ways — `require` the Node subpath to render a Persian PDF, then
+ * `import` the main entry to render SVG. Proves the published artifact works
+ * standalone: fonts inside, subpath export, and both halves of the dual
+ * CommonJS/ESM package resolvable. Run `npm run build:core` first.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -68,7 +69,47 @@ const template = {
   );
   execFileSync('node', ['consume.js'], { cwd: work, stdio: 'inherit' });
   const size = readFileSync(join(work, 'out.pdf')).length;
-  console.log(`tarball smoke test passed (${size} bytes)`);
+
+  // The other half of the dual package. `import { … }` alone would prove
+  // nothing — Node happily reads named exports off a CommonJS module — so this
+  // also asserts the specifier *resolves into* `esm/`. If the `import`
+  // condition ever regresses to the CJS entry, the Angular bailout comes back
+  // silently, and only this check would notice.
+  writeFileSync(
+    join(work, 'consume.mjs'),
+    `
+import { renderToSvg, validateTemplate } from '@ngx-pdf-studio/core';
+
+const resolved = import.meta.resolve('@ngx-pdf-studio/core');
+if (!/[/\\\\]esm[/\\\\]/.test(resolved)) {
+  throw new Error('import condition did not resolve to the ESM build: ' + resolved);
+}
+
+const template = {
+  schemaVersion: '1.0.0',
+  metadata: { name: 'esm-smoke' },
+  page: { size: 'A4', orientation: 'portrait', margins: { top: 20, right: 20, bottom: 20, left: 20 },
+    direction: 'rtl', locale: { language: 'fa', digits: 'persian', calendar: 'jalali' }, unit: 'pt' },
+  styles: [], datasets: [], parameters: [],
+  bands: [{ id: 'b', type: 'reportHeader', height: { mode: 'fixed', value: 40 }, elements: [
+    { id: 't', type: 'staticText', bounds: { x: 0, y: 0, width: 300, height: 20 }, zIndex: 1,
+      text: 'فاکتور ۱۲۳ — esm' }
+  ]}],
+  resources: { fonts: [], images: [] },
+};
+
+const checked = validateTemplate(template);
+if (!checked.success) {
+  throw new Error('template did not validate through the ESM entry: ' + JSON.stringify(checked.issues));
+}
+const r = renderToSvg(template, {});
+if (r.pageCount !== 1 || !r.pages[0].startsWith('<svg')) throw new Error('unexpected SVG result');
+console.log('esm smoke OK — resolved', resolved.slice(resolved.indexOf('@ngx-pdf-studio')));
+`,
+  );
+  execFileSync('node', ['consume.mjs'], { cwd: work, stdio: 'inherit' });
+
+  console.log(`tarball smoke test passed (${size} bytes, CJS + ESM entries)`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

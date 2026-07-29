@@ -1,0 +1,33 @@
+{
+  // Second emit of the same sources as real ES modules, for the `import`
+  // condition of the published package (ADR-0005). Bundlers that resolve a
+  // CommonJS entry cannot statically analyse it, so an Angular application
+  // consuming the CJS build gets "CommonJS or AMD dependencies can cause
+  // optimization bailouts" and keeps code it could have shaken out.
+  //
+  // `src/node/**` is deliberately excluded: it resolves the bundled fonts with
+  // `__dirname`, which does not exist in an ES module. That entry stays
+  // CommonJS-only, which costs nothing — it is server-side, so there is no
+  // bundle to optimize, and Node imports CommonJS named exports fine.
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "module": "ES2020",
+    "outDir": "dist/esm",
+    // `tsc -b` state belongs to the CommonJS build; this one is a plain,
+    // non-incremental `tsc -p` pass over the same inputs.
+    "composite": false,
+    "incremental": false,
+    "declaration": true,
+    // No sources are published, so a second set of maps would resolve to
+    // nothing — they would only add weight to the tarball.
+    "sourceMap": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/testing/**",
+    "src/**/__fixtures__/**",
+    "src/node/**"
+  ]
+}
