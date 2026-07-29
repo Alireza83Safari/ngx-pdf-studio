@@ -1,6 +1,10 @@
 # Release (§14A): tag `vX.Y.Z` → re-run every gate, build, smoke-test the
-# tarball, then publish the core dist to npm with provenance. Requires the
+# tarballs, then publish both packages to npm with provenance. Requires the
 # repo secret NPM_TOKEN (an npm automation token with publish rights).
+#
+# Provenance is generated from this workflow's OIDC identity and requires each
+# package.json to carry a `repository.url` matching this repo — without it the
+# publish step fails outright.
 name: Release
 
 on:
@@ -26,14 +30,27 @@ jobs:
       - run: npx tsc -p packages/pdf-studio/core/tsconfig.lib.json --noEmit
       - run: npx jest --coverage
       - run: npm audit --omit=dev --audit-level=high -w @ngx-pdf-studio/core
+      # Both packages are cut from the same tag and share a version line: the
+      # Angular bindings compile against a specific core API, so shipping them
+      # out of lockstep is what `prepare-angular-dist.mjs` pins against.
       - name: Stamp version from tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           npm version "$VERSION" --no-git-tag-version --workspace @ngx-pdf-studio/core
+          npm version "$VERSION" --no-git-tag-version --workspace @ngx-pdf-studio/angular
       - run: npm run build:core
       - run: npm run build:angular
       - run: npm run smoke:tarball
+      # Type-check a pristine consumer against the freshly stamped tarballs
+      # before anything reaches the registry — a publish cannot be taken back.
+      - run: node tools/smoke-angular-consumer.mjs latest
       - name: Publish @ngx-pdf-studio/core
         run: npm publish packages/pdf-studio/core/dist --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Second: the bindings depend on core at `^<version>`, so core must already
+      # be resolvable on the registry when a consumer installs this one.
+      - name: Publish @ngx-pdf-studio/angular
+        run: npm publish dist/packages/pdf-studio/angular --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -5,6 +5,14 @@
   "description": "Monorepo for @ngx-pdf-studio — a best-in-class Angular PDF designer & generation library.",
   "license": "MIT",
   "author": "ngx-pdf-studio contributors",
+  "homepage": "https://github.com/Alireza83Safari/ngx-pdf-studio#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alireza83Safari/ngx-pdf-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Alireza83Safari/ngx-pdf-studio/issues"
+  },
   "workspaces": [
     "packages/pdf-studio/*"
   ],
@@ -19,7 +27,7 @@
     "designer:build": "node apps/playground/designer/build.mjs",
     "build:core": "tsc -b packages/pdf-studio/core/tsconfig.lib.json && node tools/prepare-core-dist.mjs",
     "smoke:tarball": "node tools/smoke-tarball.mjs",
-    "build:angular": "ng-packagr -p packages/pdf-studio/angular/ng-package.json -c packages/pdf-studio/angular/tsconfig.lib.json",
+    "build:angular": "ng-packagr -p packages/pdf-studio/angular/ng-package.json -c packages/pdf-studio/angular/tsconfig.lib.json && node tools/prepare-angular-dist.mjs",
     "build": "npm run build:core && npm run build:angular",
     "designer:smoke": "npm run designer:build && node apps/playground/designer/smoke.js",
     "smoke:angular": "node tools/smoke-angular-consumer.mjs",

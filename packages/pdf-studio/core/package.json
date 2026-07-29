@@ -3,6 +3,16 @@
   "version": "0.0.0",
   "description": "Framework-agnostic engine for ngx-pdf-studio: template model, expression engine, layout/pagination, binding, and PDF painter. Runs in the browser and Node with byte-identical output.",
   "license": "MIT",
+  "author": "ngx-pdf-studio contributors",
+  "homepage": "https://github.com/Alireza83Safari/ngx-pdf-studio#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alireza83Safari/ngx-pdf-studio.git",
+    "directory": "packages/pdf-studio/core"
+  },
+  "bugs": {
+    "url": "https://github.com/Alireza83Safari/ngx-pdf-studio/issues"
+  },
   "keywords": [
     "pdf",
     "report",

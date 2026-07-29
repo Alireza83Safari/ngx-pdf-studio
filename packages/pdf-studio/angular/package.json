@@ -3,6 +3,16 @@
   "version": "0.0.0",
   "description": "Angular bindings for ngx-pdf-studio: render service + preview component (and, later, the visual designer). Supports Angular 12 → latest.",
   "license": "MIT",
+  "author": "ngx-pdf-studio contributors",
+  "homepage": "https://github.com/Alireza83Safari/ngx-pdf-studio#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alireza83Safari/ngx-pdf-studio.git",
+    "directory": "packages/pdf-studio/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/Alireza83Safari/ngx-pdf-studio/issues"
+  },
   "keywords": [
     "pdf",
     "angular",
