@@ -1568,6 +1568,116 @@ try {
     if (!/^2026/.test(String(dated)))
       fail('gregorian + latin digits did not reach the rendered date: ' + dated);
 
+    // --- eight resize grips + rotation (designer-ux ۱.۸) ---
+    // 1:1 first: pointer deltas are divided by the zoom, and an earlier section
+    // left it at 95%, which would make every expected number fractional
+    doc.getElementById('zoomReset').dispatchEvent(clickEv());
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    store.dispatch(P.patchPageSetup({ margins: { top: 0, right: 0, bottom: 0, left: 0 } }));
+    store.dispatch(
+      P.addElement(band0().id, {
+        id: 'grip',
+        type: 'rectangle',
+        bounds: { x: 100, y: 100, width: 100, height: 50 },
+        zIndex: 1,
+        box: { fill: { color: { space: 'rgb', r: 0.5, g: 0.5, b: 0.5 } } },
+      }),
+    );
+    const gripNode = () => doc.querySelector('.el[data-id="grip"]');
+    gripNode().dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+
+    const dirs = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    for (const d of dirs) {
+      if (!gripNode().querySelector('.handle.h-' + d)) fail('missing resize grip: ' + d);
+    }
+    if (!gripNode().querySelector('.rot-handle')) fail('missing rotation grip');
+
+    const boundsOfGrip = () => P.findElement(store.getState(), 'grip').element.bounds;
+    /** Drag one grip by a screen delta; Alt suppresses snapping so the maths is exact. */
+    const dragGrip = (dir, dx, dy, opts) => {
+      const h = gripNode().querySelector('.handle.h-' + dir);
+      h.dispatchEvent(
+        new window.MouseEvent('mousedown', { bubbles: true, clientX: 0, clientY: 0 }),
+      );
+      window.dispatchEvent(
+        new window.MouseEvent('mousemove', {
+          bubbles: true,
+          clientX: dx,
+          clientY: dy,
+          altKey: true,
+          ...(opts || {}),
+        }),
+      );
+      window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    };
+
+    // the south-east grip is the old behaviour: only width/height grow
+    dragGrip('se', 20, 10);
+    let gb = boundsOfGrip();
+    if (gb.x !== 100 || gb.y !== 100) fail('se grip moved the origin: ' + JSON.stringify(gb));
+    if (Math.round(gb.width) !== 120 || Math.round(gb.height) !== 60)
+      fail('se grip did not resize: ' + JSON.stringify(gb));
+    store.undo();
+
+    // the north-west grip must move the origin and shrink, not move the box
+    dragGrip('nw', 20, 10);
+    gb = boundsOfGrip();
+    if (Math.round(gb.x) !== 120 || Math.round(gb.y) !== 110)
+      fail('nw grip did not drag the top-left corner: ' + JSON.stringify(gb));
+    if (Math.round(gb.width) !== 80 || Math.round(gb.height) !== 40)
+      fail('nw grip did not shrink the box: ' + JSON.stringify(gb));
+    store.undo();
+
+    // an edge grip drives one axis only
+    dragGrip('e', 30, 30);
+    gb = boundsOfGrip();
+    if (Math.round(gb.width) !== 130) fail('east grip did not widen: ' + JSON.stringify(gb));
+    if (Math.round(gb.height) !== 50)
+      fail('east grip changed the height too: ' + JSON.stringify(gb));
+    store.undo();
+
+    dragGrip('n', 30, 20);
+    gb = boundsOfGrip();
+    if (Math.round(gb.y) !== 120 || Math.round(gb.height) !== 30)
+      fail('north grip did not drag the top edge: ' + JSON.stringify(gb));
+    if (Math.round(gb.x) !== 100 || Math.round(gb.width) !== 100)
+      fail('north grip touched the horizontal axis: ' + JSON.stringify(gb));
+    store.undo();
+
+    // a grip can never invert the box through its opposite edge
+    dragGrip('e', -500, 0);
+    gb = boundsOfGrip();
+    if (gb.width < 8) fail('the box collapsed past its minimum: ' + JSON.stringify(gb));
+    if (gb.width + gb.x < gb.x) fail('the box inverted');
+    store.undo();
+
+    // Shift keeps the proportions (100×50 → 2:1)
+    dragGrip('se', 60, 0, { shiftKey: true });
+    gb = boundsOfGrip();
+    if (Math.abs(gb.width / gb.height - 2) > 0.01)
+      fail('shift did not preserve the aspect ratio: ' + JSON.stringify(gb));
+    store.undo();
+
+    // rotation: drag the grip a quarter turn around the centre
+    const rot = gripNode().querySelector('.rot-handle');
+    rot.dispatchEvent(
+      new window.MouseEvent('mousedown', { bubbles: true, clientX: 150, clientY: 0 }),
+    );
+    window.dispatchEvent(
+      new window.MouseEvent('mousemove', { bubbles: true, clientX: 400, clientY: 125 }),
+    );
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    const rotated = P.findElement(store.getState(), 'grip').element.rotation;
+    if (!rotated) fail('dragging the rotation grip did not rotate anything');
+    if (Math.abs(rotated - 90) > 1) fail('a quarter turn should be ~90°, got ' + rotated);
+    // the overlay must follow, or the selection box sits where nothing is painted
+    if (!/rotate\(/.test(gripNode().style.transform))
+      fail('the overlay does not mirror the rotation');
+    store.undo();
+    if (P.findElement(store.getState(), 'grip').element.rotation) fail('rotation is not undoable');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

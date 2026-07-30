@@ -1263,13 +1263,25 @@
           node.classList.add('is-empty');
         }
       }
+      // The engine rotates around the element's centre, so the overlay has to
+      // as well — otherwise a rotated element is painted one way and its
+      // selection box sits somewhere else (designer-ux 1.8).
+      if (el.rotation) node.style.transform = 'rotate(' + el.rotation + 'deg)';
       pageEl.appendChild(node);
-      // a locked element offers no resize handle — the affordance would lie
+      // a locked element offers no handles — the affordance would lie
       if (selected.length === 1 && isSelected(el.id) && !el.locked) {
-        var handle = document.createElement('div');
-        handle.className = 'handle';
-        handle.dataset.resize = el.id;
-        node.appendChild(handle);
+        RESIZE_DIRS.forEach(function (dir) {
+          var handle = document.createElement('div');
+          handle.className = 'handle h-' + dir;
+          handle.dataset.resize = el.id;
+          handle.dataset.dir = dir;
+          node.appendChild(handle);
+        });
+        var rot = document.createElement('div');
+        rot.className = 'rot-handle';
+        rot.dataset.rotate = el.id;
+        rot.title = 'چرخش — Shift برای پله‌های ۱۵ درجه';
+        node.appendChild(rot);
       }
     });
     document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
@@ -1946,16 +1958,62 @@
   }
 
   // --- drag & resize -------------------------------------------------------
+  /**
+   * The eight grips, and which edges each one moves. `x`/`y` mean "this handle
+   * drags the left/top edge", `w`/`h` mean "it drags the right/bottom edge" —
+   * so a corner does both and an edge handle does one.
+   */
+  var RESIZE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+  var RESIZE_EDGES = {
+    nw: { left: true, top: true },
+    n: { top: true },
+    ne: { right: true, top: true },
+    e: { right: true },
+    se: { right: true, bottom: true },
+    s: { bottom: true },
+    sw: { left: true, bottom: true },
+    w: { left: true },
+  };
+  var MIN_SIZE = 8;
+  /**
+   * Angle in degrees from an element's centre to the pointer. Screen y grows
+   * downward, so `atan2` already increases clockwise — which is the direction
+   * the model calls positive.
+   */
+  function pointerAngle(e, bounds) {
+    var rect = pageEl.getBoundingClientRect();
+    var m = store.getState().page.margins;
+    var cx = rect.left + (m.left + bounds.x + bounds.width / 2) * zoom;
+    var cy = rect.top + (m.top + bounds.y + bounds.height / 2) * zoom;
+    return (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI;
+  }
   var drag = null;
   pageEl.addEventListener('mousedown', function (e) {
     var resizeId = e.target.dataset && e.target.dataset.resize;
+    var rotateId = e.target.dataset && e.target.dataset.rotate;
     var elNode = e.target.closest ? e.target.closest('.el') : null;
+    if (rotateId) {
+      var rloc = P.findElement(store.getState(), rotateId);
+      if (isLocked(rotateId)) return lockedNudge();
+      if (!rloc) return;
+      drag = {
+        mode: 'rotate',
+        id: rotateId,
+        start: pointerAngle(e, rloc.element.bounds),
+        rotation: rloc.element.rotation || 0,
+        gkey: 'rot' + ++dragSeq,
+      };
+      e.preventDefault();
+      return;
+    }
     if (resizeId) {
       var loc = P.findElement(store.getState(), resizeId);
       if (isLocked(resizeId)) return lockedNudge();
+      if (!loc) return;
       drag = {
         mode: 'resize',
         id: resizeId,
+        dir: e.target.dataset.dir || 'se',
         sx: e.clientX,
         sy: e.clientY,
         b: Object.assign({}, loc.element.bounds),
@@ -2066,21 +2124,82 @@
       return;
     }
     var t = store.getState();
+    if (drag.mode === 'rotate') {
+      var rloc = P.findElement(t, drag.id);
+      if (!rloc) return;
+      var deg = drag.rotation + (pointerAngle(e, rloc.element.bounds) - drag.start);
+      // Shift steps in 15°, matching the inspector's own step
+      if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+      deg = Math.round(deg * 10) / 10;
+      // normalise so the inspector never shows 720°
+      deg = ((deg % 360) + 360) % 360;
+      store.dispatch(P.composite([P.patchElement(drag.id, { rotation: deg })], drag.gkey));
+      return;
+    }
     var dx = (e.clientX - drag.sx) / zoom;
     var dy = (e.clientY - drag.sy) / zoom;
     if (drag.mode === 'resize') {
       var edges = snapEdges(t, [drag.id]);
-      var rx = snapValue(drag.b.x + Math.max(8, drag.b.width + dx), edges.xs, e.altKey);
-      var ry = snapValue(drag.b.y + Math.max(8, drag.b.height + dy), edges.ys, e.altKey);
-      showGuides(t, rx.guide, ry.guide);
+      // not `moves` — the move branch below already owns that name, and `var`
+      // is function-scoped
+      var pulls = RESIZE_EDGES[drag.dir] || RESIZE_EDGES.se;
+      var b = drag.b;
+      // Each grip drags only the edges it sits on; the opposite edges stay put,
+      // which is what makes a top/left handle grow the box upward/leftward
+      // instead of moving it.
+      var left = b.x;
+      var top = b.y;
+      var right = b.x + b.width;
+      var bottom = b.y + b.height;
+      var gx = null;
+      var gy = null;
+      if (pulls.left) {
+        var sl = snapValue(b.x + dx, edges.xs, e.altKey);
+        left = Math.min(sl.v, right - MIN_SIZE);
+        gx = sl.guide;
+      }
+      if (pulls.right) {
+        var sr = snapValue(right + dx, edges.xs, e.altKey);
+        right = Math.max(sr.v, left + MIN_SIZE);
+        gx = sr.guide;
+      }
+      if (pulls.top) {
+        var st = snapValue(b.y + dy, edges.ys, e.altKey);
+        top = Math.min(st.v, bottom - MIN_SIZE);
+        gy = st.guide;
+      }
+      if (pulls.bottom) {
+        var sb = snapValue(bottom + dy, edges.ys, e.altKey);
+        bottom = Math.max(sb.v, top + MIN_SIZE);
+        gy = sb.guide;
+      }
+      var w = right - left;
+      var h = bottom - top;
+      // Shift keeps the original proportions. The dominant axis wins so the box
+      // follows the pointer rather than fighting it, and an edge handle (which
+      // only drives one axis) derives the other.
+      if (e.shiftKey && b.width > 0 && b.height > 0) {
+        var ratio = b.width / b.height;
+        var drivesX = pulls.left || pulls.right;
+        var drivesY = pulls.top || pulls.bottom;
+        if (drivesX && drivesY) {
+          if (w / ratio > h) h = w / ratio;
+          else w = h * ratio;
+        } else if (drivesX) h = w / ratio;
+        else if (drivesY) w = h * ratio;
+        // re-anchor to whichever edges are NOT being dragged
+        if (pulls.left) left = right - w;
+        if (pulls.top) top = bottom - h;
+      }
+      showGuides(t, gx, gy);
       store.dispatch(
         P.setElementBounds(
           drag.id,
           {
-            x: drag.b.x,
-            y: drag.b.y,
-            width: Math.max(8, rx.v - drag.b.x),
-            height: Math.max(8, ry.v - drag.b.y),
+            x: left,
+            y: top,
+            width: Math.max(MIN_SIZE, w),
+            height: Math.max(MIN_SIZE, h),
           },
           true,
         ),

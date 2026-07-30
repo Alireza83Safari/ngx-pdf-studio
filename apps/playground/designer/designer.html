@@ -664,17 +664,82 @@
         overflow: hidden;
         white-space: nowrap;
       }
+      /* eight grips + a rotation grip (designer-ux 1.8). Physical corners, not
+         logical ones: these follow the pointer, so `left`/`top` stay literal
+         even in the RTL editor. */
       .el .handle {
         position: absolute;
-        inset-inline-end: -5px;
-        bottom: -5px;
         width: 9px;
         height: 9px;
         background: #fff;
-        border: 1.5px solid var(--accent);
+        border: 1.5px solid var(--paper-accent);
         border-radius: 3px;
-        cursor: nwse-resize;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      }
+      .el .handle.h-nw {
+        left: -5px;
+        top: -5px;
+        cursor: nwse-resize;
+      }
+      .el .handle.h-n {
+        left: calc(50% - 4.5px);
+        top: -5px;
+        cursor: ns-resize;
+      }
+      .el .handle.h-ne {
+        right: -5px;
+        top: -5px;
+        cursor: nesw-resize;
+      }
+      .el .handle.h-e {
+        right: -5px;
+        top: calc(50% - 4.5px);
+        cursor: ew-resize;
+      }
+      .el .handle.h-se {
+        right: -5px;
+        bottom: -5px;
+        cursor: nwse-resize;
+      }
+      .el .handle.h-s {
+        left: calc(50% - 4.5px);
+        bottom: -5px;
+        cursor: ns-resize;
+      }
+      .el .handle.h-sw {
+        left: -5px;
+        bottom: -5px;
+        cursor: nesw-resize;
+      }
+      .el .handle.h-w {
+        left: -5px;
+        top: calc(50% - 4.5px);
+        cursor: ew-resize;
+      }
+      /* sits above the top edge, on a short stem */
+      .el .rot-handle {
+        position: absolute;
+        left: calc(50% - 6px);
+        top: -26px;
+        width: 12px;
+        height: 12px;
+        border: 1.5px solid var(--paper-accent);
+        border-radius: var(--r-pill);
+        background: #fff;
+        cursor: grab;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      }
+      .el .rot-handle::before {
+        content: '';
+        position: absolute;
+        left: calc(50% - 0.5px);
+        top: 11px;
+        width: 1px;
+        height: 10px;
+        background: var(--paper-accent);
+      }
+      .el .rot-handle:active {
+        cursor: grabbing;
       }
       #canvasHint {
         position: absolute;
