@@ -556,7 +556,41 @@ function layoutBandImpl(
     }
   }
 
-  return { elements, height: bandHeight(band, maxBottom) };
+  const height = bandHeight(band, maxBottom);
+  // A `fixed` band keeps its declared height no matter how tall its content is
+  // (and an `auto` band is clamped by `max`), so anything below that line is
+  // still painted — on top of whichever band follows. That used to happen in
+  // silence; report it instead of drawing a document nobody asked for.
+  // Background/watermark bands are exempt: they reserve no flow height by
+  // contract and are meant to span the page, so "overflow" means nothing there.
+  if (!isPageWideBand(band) && maxBottom > height + EPSILON) {
+    warnOnce(
+      leafDeps.ctx,
+      `Band '${band.id}' is ${round1(height)}pt tall but its content reaches ` +
+        `${round1(maxBottom)}pt — the overflow is painted over whatever follows it.`,
+    );
+  }
+  return { elements, height };
+}
+
+/** Bands painted across the page rather than flowed into the band stack. */
+function isPageWideBand(band: Band): boolean {
+  return band.type === 'background' || band.type === 'watermark';
+}
+
+/**
+ * Push a diagnostic at most once. Bands are laid out per row and the whole
+ * document is paginated twice when it carries a ToC, so an un-deduplicated
+ * band warning would arrive hundreds of times for one authoring mistake.
+ */
+function warnOnce(ctx: RenderContext, message: string): void {
+  if (ctx.diagnostics.some((d) => d.message === message)) return;
+  ctx.diagnostics.push({ severity: 'warning', message });
+}
+
+/** One decimal place, so the message stays stable across float noise. */
+function round1(v: number): number {
+  return Math.round(v * 10) / 10;
 }
 
 /**

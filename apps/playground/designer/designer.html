@@ -462,6 +462,48 @@
         border: 1px dashed rgba(120, 130, 150, 0.38);
         pointer-events: none;
       }
+      /* band extent (designer-ux 0.1) — sits under the element overlays (z 20)
+         so it never steals a click, and above the engine's SVG so the boundary
+         reads against painted content. */
+      #bandRest,
+      #bandBox {
+        position: absolute;
+        pointer-events: none;
+        z-index: 12;
+      }
+      /* the page past the band's own strip: not this band's to draw on */
+      #bandRest {
+        background: repeating-linear-gradient(
+          -45deg,
+          rgba(120, 130, 150, 0.075) 0 5px,
+          transparent 5px 10px
+        );
+      }
+      #bandBox {
+        border-bottom: 1.5px solid color-mix(in srgb, var(--accent) 62%, transparent);
+      }
+      #bandBoxLabel {
+        position: absolute;
+        inset-inline-start: 0;
+        top: 100%;
+        margin-top: 3px;
+        padding: 1px var(--sp-2);
+        border-radius: var(--r-sm);
+        background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+        color: var(--accent);
+        font-size: var(--fs-2xs);
+        font-weight: 600;
+        white-space: nowrap;
+        direction: ltr;
+      }
+      /* content reaches past the band edge → it will collide with the next band */
+      #bandBox.is-overflow {
+        border-bottom-color: var(--danger);
+      }
+      #bandBox.is-overflow #bandBoxLabel {
+        background: color-mix(in srgb, var(--danger) 15%, var(--surface));
+        color: var(--danger);
+      }
       #guideV,
       #guideH {
         position: absolute;
@@ -510,6 +552,15 @@
       }
       .el.is-locked.selected {
         border-style: dashed;
+      }
+      /* reaches past the band edge → it lands on top of the next band (0.1) */
+      .el.is-overflow {
+        border-color: var(--danger);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent);
+        background: color-mix(in srgb, var(--danger) 7%, transparent);
+      }
+      .el.is-overflow.selected {
+        box-shadow: 0 0 0 1px var(--danger);
       }
       /* an element that paints nothing: make it findable + explain itself */
       .el.is-empty {
@@ -1336,6 +1387,22 @@
       .statusbar .sbtn:hover {
         background: var(--accent-weak);
         color: var(--accent);
+      }
+      /* band-overflow warning (designer-ux 0.1) — a real action, not a label:
+         clicking it grows the band to fit, so it reads as a button */
+      .statusbar .sbtn.s-warn {
+        gap: var(--sp-1);
+        padding: 0 var(--sp-3);
+        background: color-mix(in srgb, var(--danger) 12%, transparent);
+        color: var(--danger);
+        font-weight: 600;
+      }
+      .statusbar .sbtn.s-warn:hover {
+        background: color-mix(in srgb, var(--danger) 20%, transparent);
+        color: var(--danger);
+      }
+      .statusbar .sbtn.s-warn svg {
+        flex: none;
       }
       #zoomLabel {
         min-width: 44px;
@@ -2972,6 +3039,12 @@
         <div id="page">
           <div id="pageSvg"></div>
           <div id="margins"></div>
+          <!-- the strip this band actually owns. Everything past #bandBox's
+               bottom edge is still painted into the PDF, but on top of whichever
+               band follows — so the rest of the page is dimmed and the edge is
+               labelled with the band height (designer-ux 0.1). -->
+          <div id="bandRest" aria-hidden="true"></div>
+          <div id="bandBox" aria-hidden="true"><span id="bandBoxLabel"></span></div>
           <div id="guideV"></div>
           <div id="guideH"></div>
           <div id="marquee"></div>
@@ -3176,6 +3249,13 @@
       <span id="pageInfo" data-tip="اندازه و جهت کاغذ سند">A4 · عمودی</span>
       <span class="sdot"></span>
       <span id="selInfo" data-tip="وضعیت انتخاب فعلی روی بوم">چیزی انتخاب نشده</span>
+      <!-- shown only when the active band paints past its own height (0.1) -->
+      <button
+        id="overflowInfo"
+        class="sbtn s-warn"
+        hidden
+        data-tip="محتوا از مرز باند بیرون زده و روی باند بعدی چاپ می‌شود — کلیک کن تا ارتفاع باند با محتوا جور شود"
+      ></button>
       <span class="spacer"></span>
       <span>Ctrl+K = همهٔ فرمان‌ها</span>
     </footer>

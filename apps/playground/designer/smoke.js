@@ -917,6 +917,72 @@ try {
     if (!/@media \(max-width: 900px\)[\s\S]{0,1200}position: fixed/.test(css))
       fail('the tablet breakpoint does not float the inspector');
 
+    // --- band extent + overflow warning (designer-ux ۰.۱) ---
+    // jsdom has no layout engine, so the hatch/boundary *look* needs a browser.
+    // What is real here: the geometry the designer writes into the style
+    // attributes, the overflow classes, the engine diagnostic, and the one-click fix.
+    const bandBox = doc.getElementById('bandBox');
+    const bandRest = doc.getElementById('bandRest');
+    const overflowBtn = doc.getElementById('overflowInfo');
+    const bandLabel = doc.getElementById('bandBoxLabel');
+    if (!bandBox || !bandRest || !overflowBtn || !bandLabel) fail('band-extent chrome missing');
+
+    // start from a known band: the first one, emptied, fixed at 60pt
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    const band0 = () => store.getState().bands[0];
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    store.dispatch(P.patchBand(band0().id, { height: { mode: 'fixed', value: 60 } }));
+    const mkText = (id, y) => ({
+      id,
+      type: 'staticText',
+      bounds: { x: 0, y, width: 120, height: 14 },
+      zIndex: 1,
+      text: id,
+      typography: { fontFamily: 'Vazirmatn', fontSize: 10 },
+    });
+    store.dispatch(P.addElement(band0().id, mkText('ov-in', 4)));
+
+    if (!overflowBtn.hidden) fail('overflow warning shown while the content fits');
+    if (bandBox.classList.contains('is-overflow')) fail('band box flagged while content fits');
+    // the band box must cover the band's strip, not the whole sheet
+    const zoomNow = parseFloat(doc.getElementById('zoomLabel').textContent) / 100;
+    if (Math.abs(parseFloat(bandBox.style.height) - 60 * zoomNow) > 1)
+      fail('band box height is not the band height: ' + bandBox.style.height);
+    if (!/^\d+pt$/.test(bandLabel.textContent))
+      fail('band label is not a Latin-digit pt readout: ' + bandLabel.textContent);
+    if (bandRest.style.display === 'none') fail('the rest of the sheet is not hatched');
+
+    // now push an element past the band edge — the silent bug from the review
+    store.dispatch(P.addElement(band0().id, mkText('ov-out', 200)));
+    if (overflowBtn.hidden) fail('band overflow went unreported');
+    if (!/سرریز باند/.test(overflowBtn.textContent)) fail('overflow button has no message');
+    if (!/\d+pt/.test(overflowBtn.textContent))
+      fail('overflow amount missing: ' + overflowBtn.textContent);
+    if (!bandBox.classList.contains('is-overflow')) fail('band boundary not marked as overflowing');
+    const overlayFor = (id) => doc.querySelector('.el[data-id="' + id + '"]');
+    if (!overlayFor('ov-out') || !overlayFor('ov-out').classList.contains('is-overflow'))
+      fail('the overflowing element is not flagged on the canvas');
+    if (overlayFor('ov-in').classList.contains('is-overflow'))
+      fail('an element inside the band was wrongly flagged');
+
+    // the engine must say so too — that is what protects renderToFile() users
+    const engDiag = P.layoutDocument(store.getState(), { data: {} }).diagnostics;
+    if (!engDiag.some((d) => /the overflow is painted over/.test(d.message)))
+      fail('the engine did not diagnose the band overflow');
+
+    // one click grows the band to fit, as a single undoable step
+    overflowBtn.dispatchEvent(clickEv());
+    const grown = band0().height;
+    if (grown.mode !== 'fixed' || grown.value < 214)
+      fail('fix-it did not grow the band: ' + JSON.stringify(grown));
+    if (!overflowBtn.hidden) fail('overflow warning survived the fix');
+    if (overlayFor('ov-out').classList.contains('is-overflow'))
+      fail('element still flagged after the band grew');
+    store.undo();
+    if (band0().height.value !== 60)
+      fail('fix-it is not one undo step: ' + JSON.stringify(band0().height));
+    if (overflowBtn.hidden) fail('undo did not bring the warning back');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

@@ -75,6 +75,123 @@ describe('pagination engine — additional bands & sources', () => {
     expect(ctx.diagnostics.some((d) => /not yet supported/.test(d.message))).toBe(true);
   });
 
+  describe('band overflow (designer-ux 0.1)', () => {
+    const at = (id: string, y: number): Band['elements'][number] => ({
+      ...text(id, id),
+      bounds: { x: 0, y, width: 100, height: 16 },
+    });
+    const overflow = (ctx: ReturnType<typeof createRenderContext>) =>
+      ctx.diagnostics.filter((d) => /the overflow is painted over/.test(d.message));
+
+    it('warns when a fixed band paints below its own height', () => {
+      const ctx = createRenderContext({ data: {} });
+      paginate(
+        template([
+          { id: 'rh', type: 'reportHeader', height: { mode: 'fixed', value: 60 }, elements: [] },
+          {
+            id: 'rf',
+            type: 'reportFooter',
+            height: { mode: 'fixed', value: 60 },
+            elements: [at('spill', 200)],
+          },
+        ]),
+        ctx,
+      );
+      const [warning] = overflow(ctx);
+      expect(warning?.severity).toBe('warning');
+      // 60pt band, content bottom at 200 + 16
+      expect(warning?.message).toContain("Band 'rf' is 60pt tall");
+      expect(warning?.message).toContain('reaches 216pt');
+    });
+
+    it('stays silent when the content fits', () => {
+      const ctx = createRenderContext({ data: {} });
+      paginate(
+        template([
+          {
+            id: 'rh',
+            type: 'reportHeader',
+            height: { mode: 'fixed', value: 60 },
+            elements: [at('ok', 40)],
+          },
+        ]),
+        ctx,
+      );
+      expect(overflow(ctx)).toEqual([]);
+    });
+
+    it('stays silent for an auto band, which grows to fit instead', () => {
+      const ctx = createRenderContext({ data: {} });
+      paginate(
+        template([
+          {
+            id: 'rh',
+            type: 'reportHeader',
+            height: { mode: 'auto' },
+            elements: [at('tall', 300)],
+          },
+        ]),
+        ctx,
+      );
+      expect(overflow(ctx)).toEqual([]);
+    });
+
+    it('warns for an auto band whose max clamps the content away', () => {
+      const ctx = createRenderContext({ data: {} });
+      paginate(
+        template([
+          {
+            id: 'rh',
+            type: 'reportHeader',
+            height: { mode: 'auto', max: 50 },
+            elements: [at('tall', 300)],
+          },
+        ]),
+        ctx,
+      );
+      expect(overflow(ctx)).toHaveLength(1);
+    });
+
+    it('exempts watermark and background bands, which span the page by design', () => {
+      const ctx = createRenderContext({ data: {} });
+      paginate(
+        template([
+          {
+            id: 'wm',
+            type: 'watermark',
+            height: { mode: 'fixed', value: 0 },
+            elements: [at('mark', 300)],
+          },
+          {
+            id: 'bg',
+            type: 'background',
+            height: { mode: 'fixed', value: 0 },
+            elements: [at('back', 500)],
+          },
+        ]),
+        ctx,
+      );
+      expect(overflow(ctx)).toEqual([]);
+    });
+
+    it('reports one warning per band however many rows repeat it', () => {
+      const ctx = createRenderContext({ data: { rows: [{ n: 1 }, { n: 2 }, { n: 3 }] } });
+      paginate(
+        template([
+          {
+            id: 'd',
+            type: 'detail',
+            height: { mode: 'fixed', value: 20 },
+            dataset: 'rows',
+            elements: [at('spill', 90)],
+          },
+        ]),
+        ctx,
+      );
+      expect(overflow(ctx)).toHaveLength(1);
+    });
+  });
+
   it('warns when a detail band references an undeclared dataset', () => {
     const ctx = createRenderContext({ data: { rows: [{ n: 1 }] } });
     paginate(

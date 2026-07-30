@@ -850,6 +850,10 @@
   var pageEl = document.getElementById('page');
   var pageSvgEl = document.getElementById('pageSvg');
   var marginsEl = document.getElementById('margins');
+  var bandBoxEl = document.getElementById('bandBox');
+  var bandBoxLabelEl = document.getElementById('bandBoxLabel');
+  var bandRestEl = document.getElementById('bandRest');
+  var overflowInfoEl = document.getElementById('overflowInfo');
   var guideV = document.getElementById('guideV');
   var guideH = document.getElementById('guideH');
 
@@ -911,6 +915,42 @@
   }
   function isRowBand(band) {
     return band.type === 'detail' || band.type === 'groupHeader' || band.type === 'groupFooter';
+  }
+  /**
+   * The strip a band actually owns, mirroring the engine's own `bandHeight()`:
+   * a `fixed` band is exactly its declared value however tall its content is;
+   * an `auto` band grows to its content, clamped by min/max. Anything painted
+   * past this line still reaches the PDF — on top of the following band.
+   */
+  function resolveBandHeight(band, contentBottom) {
+    var h = band.height || { mode: 'auto' };
+    if (h.mode === 'fixed') return h.value;
+    var min = h.min == null ? 0 : h.min;
+    var max = h.max == null ? Infinity : h.max;
+    return Math.min(max, Math.max(min, contentBottom));
+  }
+  /** Background/watermark bands span the page by contract — overflow means nothing. */
+  function isPageWideBand(band) {
+    return band.type === 'background' || band.type === 'watermark';
+  }
+  /** Where the active band's painted content ends, in band-relative pt. */
+  function bandContentBottom(t) {
+    try {
+      var doc = P.layoutDocument(displayTemplate(activeBandTemplate(t)), {
+        data: activeBandData(t),
+      });
+      return laidContentBottom(doc.pages[0], t.page.margins);
+    } catch (e) {
+      return 0;
+    }
+  }
+  /** Deepest painted edge on a laid page, measured from the top margin. */
+  function laidContentBottom(page, m) {
+    var bottom = 0;
+    ((page && page.elements) || []).forEach(function (le) {
+      if (le && le.bounds) bottom = Math.max(bottom, le.bounds.y + le.bounds.height - m.top);
+    });
+    return bottom;
   }
   function resolveDatasetArray(t, dsName) {
     if (!dsName) return null;
@@ -1005,6 +1045,28 @@
     } catch (e) {
       /* ignore */
     }
+    // Band extent + overflow (designer-ux 0.1). The canvas paints only the
+    // active band, so without this a 60pt band looks like it owns the whole
+    // sheet and content spilling past its height silently lands on top of the
+    // band that follows. `laidBottom` keys off the painted pieces, so a text
+    // element that wrapped to six lines counts at its real height, not its
+    // declared one.
+    var laidBottom = {};
+    var contentBottom = 0;
+    try {
+      (doc && doc.pages && doc.pages[0] ? doc.pages[0].elements : []).forEach(function (le) {
+        if (!le || le.id == null || !le.bounds) return;
+        var bottom = le.bounds.y + le.bounds.height - m.top;
+        contentBottom = Math.max(contentBottom, bottom);
+        laidBottom[le.id] = Math.max(laidBottom[le.id] || 0, bottom);
+      });
+    } catch (e) {
+      /* ignore */
+    }
+    var pageWide = isPageWideBand(band);
+    var bandH = resolveBandHeight(band, contentBottom);
+    var overflowBy = pageWide ? 0 : Math.max(0, contentBottom - bandH);
+    renderBandExtent(m, size, bandH, overflowBy, pageWide);
     // Which elements get overlays: normally the band's own, but after
     // double-clicking a group we "enter" it and expose its children instead, so
     // they can be selected and dragged directly on the canvas (Figma-style).
@@ -1044,6 +1106,12 @@
       node.style.height = Math.max(4, b.height * zoom) + 'px';
       // an element that paints nothing is invisible on the canvas — give it a
       // dashed outline + a hint so it's findable and its purpose is clear
+      // reaches past the band edge → it will be painted over the next band (0.1)
+      if (!pageWide) {
+        var elBottom = laidBottom[el.id];
+        if (elBottom == null) elBottom = offY + b.y + b.height;
+        if (elBottom > bandH + 0.01) node.classList.add('is-overflow');
+      }
       var textual = el.type === 'staticText' || el.type === 'dataField' || el.type === 'pageField';
       if (textual) {
         var shown = renderedText[el.id];
@@ -1075,6 +1143,72 @@
     document.getElementById('canvasHint').classList.toggle('show', band.elements.length === 0);
     renderQuickbar(t, m);
   }
+
+  /**
+   * Draw the active band's own strip on the canvas and hatch the rest of the
+   * sheet, so the band stops looking like it owns the whole page (0.1).
+   */
+  function renderBandExtent(m, size, bandH, overflowBy, pageWide) {
+    if (pageWide) {
+      // painted across the page by contract — a boundary would be a lie
+      bandBoxEl.style.display = 'none';
+      bandRestEl.style.display = 'none';
+      setOverflowInfo(0);
+      return;
+    }
+    var left = m.left * zoom;
+    var top = m.top * zoom;
+    var height = Math.max(0, bandH) * zoom;
+    bandBoxEl.style.display = '';
+    bandBoxEl.style.left = left + 'px';
+    bandBoxEl.style.top = top + 'px';
+    bandBoxEl.style.width = Math.max(0, size.width - m.left - m.right) * zoom + 'px';
+    bandBoxEl.style.height = height + 'px';
+    bandBoxEl.classList.toggle('is-overflow', overflowBy > 0);
+    bandBoxLabelEl.textContent = Math.round(bandH) + 'pt';
+    var restTop = top + height;
+    var restH = size.height * zoom - restTop;
+    bandRestEl.style.display = restH > 1 ? '' : 'none';
+    bandRestEl.style.left = '0px';
+    bandRestEl.style.top = restTop + 'px';
+    bandRestEl.style.width = size.width * zoom + 'px';
+    bandRestEl.style.height = Math.max(0, restH) + 'px';
+    setOverflowInfo(overflowBy);
+  }
+  var WARN_ICON =
+    '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M10 3.6 2.8 16.4h14.4L10 3.6Z"/><path d="M10 8.6v3"/><path d="M10 14h.01"/></svg>';
+  /** Sub-pt spill is float noise from text metrics, not an authoring mistake. */
+  function setOverflowInfo(overflowBy) {
+    if (!(overflowBy > 0.5)) {
+      overflowInfoEl.hidden = true;
+      return;
+    }
+    overflowInfoEl.hidden = false;
+    overflowInfoEl.innerHTML = WARN_ICON;
+    overflowInfoEl.appendChild(
+      document.createTextNode('سرریز باند ' + Math.round(overflowBy) + 'pt'),
+    );
+  }
+  // one click = grow the band to its content, as a single undoable command
+  overflowInfoEl.addEventListener('click', function () {
+    var t = store.getState();
+    var band = getActiveBand(t);
+    if (isPageWideBand(band)) return;
+    var next = Math.ceil(bandContentBottom(t));
+    if (!(next > 0)) return;
+    store.dispatch(patchBandAt(activeBand, { height: { mode: 'fixed', value: next } }));
+    toast('ارتفاع باند به ' + next + 'pt رسید', {
+      type: 'success',
+      action: {
+        label: 'واگرد',
+        onClick: function () {
+          store.undo();
+        },
+      },
+    });
+  });
 
   /** Floating quick actions above the selection's bounding box (§8A). */
   var quickbarEl = document.getElementById('quickbar');

@@ -15,6 +15,17 @@ entries below into a released section.
 
 ### Added
 
+- Pagination now reports a **band overflow** as a diagnostic. A `fixed` band
+  keeps its declared height however tall its content is (and an `auto` band is
+  clamped by `max`), so anything positioned below that line was still painted —
+  on top of whichever band followed it, in complete silence. A report header 60pt
+  tall with an element at `y: 200` put that element 140pt _below_ the content of
+  the band after it, and `diagnostics` came back empty. The engine now emits one
+  `warning` per offending band naming both heights, so `renderToFile` and
+  `renderBatch` callers see the authoring mistake instead of shipping a scrambled
+  document. `background` and `watermark` bands are exempt: they reserve no flow
+  height by contract and are meant to span the page.
+
 - `@ngx-pdf-studio/core` is now a **dual-format package**. It shipped CommonJS
   only, which no bundler can statically analyse: every Angular application
   consuming it got "CommonJS or AMD dependencies can cause optimization
