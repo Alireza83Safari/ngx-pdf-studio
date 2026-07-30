@@ -111,6 +111,14 @@ entries below into a released section.
 
 ### Fixed
 
+- **`decoration: 'underline'` rendered in SVG and vanished in the PDF.**
+  `resolveTextStyle` has always resolved it and the SVG painter has always drawn
+  it, but the word `underline` did not appear anywhere in `pdf-painter.ts`, so an
+  underlined element previewed decorated and printed plain — for both plain text
+  and rich-text runs. It survived because its only test asserted the SVG side.
+  Both painters now draw the rule, and `underline-parity.spec.ts` pins them
+  together. Undecorated text is byte-identical to before.
+
 - `PdfStudioRenderer.download()` revoked the object URL in the same tick as
   `click()`, which cancels the download outright in Firefox and Safari. It is
   now released on a later task.

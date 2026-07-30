@@ -2876,17 +2876,48 @@
           rgbToHex(ty.color || rgb(15, 23, 42)) +
           '">',
       );
-      looks += field(
-        'ضخیم',
-        '<input type="checkbox" data-prop="bold"' +
-          (ty.fontWeight === 'bold' ? ' checked' : '') +
-          '>',
-      );
+      // Style toggles share one row: three independent switches, each cheap.
+      looks +=
+        '<div class="row"><label>سبک</label><div class="tog-group">' +
+        '<label class="tog" title="ضخیم"><input type="checkbox" data-prop="bold"' +
+        (ty.fontWeight === 'bold' ? ' checked' : '') +
+        '><b>ض</b></label>' +
+        '<label class="tog" title="کج (ایتالیک)"><input type="checkbox" data-prop="italic"' +
+        (ty.fontStyle === 'italic' ? ' checked' : '') +
+        '><i>ک</i></label>' +
+        '<label class="tog" title="زیرخط"><input type="checkbox" data-prop="underline"' +
+        (ty.decoration === 'underline' ? ' checked' : '') +
+        '><u>ز</u></label>' +
+        '</div></div>';
       looks += field(
         'چینش',
-        '<select data-prop="align">' +
-          opts(['start', 'center', 'end'], ty.align || 'start') +
+        '<select title="تراز افقی متن. «دوطرفه» خطوط را با کشیدهٔ فارسی می‌کشد" data-prop="align">' +
+          '<option value="start"' +
+          ((ty.align || 'start') === 'start' ? ' selected' : '') +
+          '>ابتدا</option>' +
+          '<option value="center"' +
+          (ty.align === 'center' ? ' selected' : '') +
+          '>وسط</option>' +
+          '<option value="end"' +
+          (ty.align === 'end' ? ' selected' : '') +
+          '>انتها</option>' +
+          '<option value="justify"' +
+          (ty.align === 'justify' ? ' selected' : '') +
+          '>دوطرفه (کشیده)</option>' +
           '</select>',
+      );
+      if (ty.align === 'justify') {
+        looks +=
+          '<p class="tinyhint">تراز دوطرفه با درجِ کشیده (ـ) کار می‌کند، پس روی متنِ ' +
+          '<b>فارسی/عربیِ چندخطی</b> دیده می‌شود؛ خطِ آخر و متنِ لاتین دست‌نخورده می‌مانند.</p>';
+      }
+      looks += field(
+        'فاصلهٔ خطوط',
+        '<input type="number" min="0.8" max="4" step="0.1" ' +
+          'title="ضریبِ اندازهٔ فونت — ۱٫۲ پیش‌فرض. فقط روی متنِ چندخطی دیده می‌شود" ' +
+          'data-prop="lineHeight" value="' +
+          (ty.lineHeight == null ? '' : ty.lineHeight) +
+          '" placeholder="1.2">',
       );
     }
     if (looks) {
@@ -3226,17 +3257,42 @@
         border: { all: Object.assign({}, prev, { color: hexToRgb(v) }) },
       });
     });
-    var boldInp = inspectorEl.querySelector('[data-prop="bold"]');
-    if (boldInp)
-      boldInp.addEventListener('change', function () {
-        // bold fans out to the whole selection like the other appearance controls
+    bindProp(
+      'lineHeight',
+      function (e, v) {
+        var n = Number(v);
+        var t = Object.assign({}, e.typography);
+        // blank means "inherit the engine default" — store nothing rather than 0
+        if (v.trim() === '' || !Number.isFinite(n) || n <= 0) delete t.lineHeight;
+        else t.lineHeight = n;
+        e.typography = t;
+      },
+      true,
+    );
+    /**
+     * Checkbox typography toggles. `bindProp` reads `.value`, which is the string
+     * "on" for a checkbox, so these need their own wiring. All three fan out to
+     * the whole selection like the other appearance controls.
+     */
+    function bindToggle(prop, mut) {
+      var inp = inspectorEl.querySelector('[data-prop="' + prop + '"]');
+      if (!inp) return;
+      inp.addEventListener('change', function () {
         updateSelected(function (e) {
-          e.typography = Object.assign({}, e.typography, {
-            fontWeight: boldInp.checked ? 'bold' : 'normal',
-          });
+          e.typography = Object.assign({}, e.typography, mut(inp.checked));
           return e;
         });
       });
+    }
+    bindToggle('bold', function (on) {
+      return { fontWeight: on ? 'bold' : 'normal' };
+    });
+    bindToggle('italic', function (on) {
+      return { fontStyle: on ? 'italic' : 'normal' };
+    });
+    bindToggle('underline', function (on) {
+      return { decoration: on ? 'underline' : 'none' };
+    });
     inspectorEl.querySelectorAll('[data-align]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         alignSelected(btn.dataset.align);
@@ -3301,7 +3357,9 @@
     if (del) del.addEventListener('click', deleteSelected);
     function bindProp(prop, mut, bulk) {
       var inp = inspectorEl.querySelector('[data-prop="' + prop + '"]');
-      if (!inp || prop === 'bold') return;
+      // checkboxes report `.value === 'on'` regardless of state; they go through
+      // `bindToggle` instead, so `bindProp` is never called with one
+      if (!inp) return;
       inp.addEventListener('change', function () {
         var apply = function (e) {
           mut(e, inp.value);

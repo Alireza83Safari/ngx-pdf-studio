@@ -1015,15 +1015,17 @@
       .row:last-child {
         margin-bottom: 0;
       }
-      .row label {
+      /* `>` on purpose: a row often contains nested labels (`.chk` wrapping a
+         checkbox and its sentence, `.tog` wrapping a style switch), and a
+         descendant selector sized every one of them to the 56px caption column
+         — which folded the lock sentence onto five lines. Only the row's own
+         leading caption gets the fixed column. */
+      .row > label {
         flex: 0 0 56px;
         font-size: var(--fs-xs);
         color: var(--muted);
       }
-      /* A checkbox row holds TWO labels: the field's leading label and `.chk`,
-         which wraps the box and its sentence. The rule above matched both and
-         squeezed `.chk` into the 56px caption column, folding "جابه‌جایی، تغییر
-         اندازه و حذف را قفل کن" onto five lines. `.chk` takes the rest instead. */
+      /* `.chk` IS a direct child, so it still needs to opt out explicitly */
       .row > label.chk {
         flex: 1 1 auto;
         min-width: 0;
@@ -1426,6 +1428,57 @@
         margin: 0;
         flex: none;
         accent-color: var(--accent);
+      }
+      /* three independent typography switches sharing one row (designer-ux 1.1):
+         bold / italic / underline. Each is a label wrapping a hidden checkbox, so
+         the whole tile is the hit target and the state stays a real form control. */
+      .tog-group {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        gap: var(--sp-1);
+      }
+      .tog {
+        flex: 1;
+        min-width: 0;
+        height: var(--h-md);
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        background: var(--field);
+        color: var(--muted);
+        font-size: var(--fs-sm);
+        cursor: pointer;
+        user-select: none;
+        transition:
+          background var(--dur-fast),
+          border-color var(--dur-fast),
+          color var(--dur-fast);
+      }
+      /* later than `.row input[type='checkbox']` on purpose — same specificity,
+         so source order is what takes the native box out of the flow */
+      .tog input[type='checkbox'] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        margin: 0;
+        pointer-events: none;
+      }
+      .tog:hover {
+        border-color: var(--border-strong);
+        color: var(--ink);
+      }
+      .tog:has(input:checked) {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+      }
+      /* the box is visually hidden, so the ring has to come from the tile */
+      .tog:focus-within {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
       }
       .layers-empty {
         color: var(--faint);

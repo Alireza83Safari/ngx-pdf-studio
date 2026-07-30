@@ -735,7 +735,8 @@ async function paintText(
     const runs = getVisualRuns(line).map((run) => drawText(run));
     const widths = runs.map((run) => safeWidth(font, run, style.fontSize));
     const total = widths.reduce((a, b) => a + b, 0);
-    let x = lineStartX(el.bounds.x, el.bounds.width, style.align, total);
+    const lineX = lineStartX(el.bounds.x, el.bounds.width, style.align, total);
+    let x = lineX;
 
     runs.forEach((run, idx) => {
       try {
@@ -750,7 +751,28 @@ async function paintText(
       }
       x += widths[idx] as number;
     });
+
+    // `resolveTextStyle` has always resolved `underline`, and the SVG painter has
+    // always drawn it — this side never did, so a decorated element previewed
+    // underlined and printed plain. The two painters have to agree (§7).
+    if (style.underline && total > 0) {
+      drawUnderline(page, lineX, baselineY, total, style.fontSize, color);
+    }
   }
+}
+
+/** A decoration rule under one run of text, in PDF (bottom-up) coordinates. */
+function drawUnderline(
+  page: PDFPage,
+  x: number,
+  baselineY: number,
+  width: number,
+  fontSize: number,
+  color: ReturnType<typeof toPdfColor>,
+): void {
+  const thickness = Math.max(0.4, fontSize / 16);
+  const y = baselineY - fontSize * 0.12;
+  page.drawLine({ start: { x, y }, end: { x: x + width, y }, thickness, color });
 }
 
 /**
@@ -881,6 +903,11 @@ async function paintRichText(
             severity: 'warning',
             message: `Could not render rich-text run '${truncate(run.text)}': ${err instanceof Error ? err.message : String(err)}`,
           });
+        }
+        // same divergence as plain text: the SVG painter underlines runs, this
+        // one did not
+        if (run.underline && run.width > 0) {
+          drawUnderline(page, x, baselineY, run.width, run.fontSize, black);
         }
         x += run.width;
       }

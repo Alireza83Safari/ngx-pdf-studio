@@ -1218,6 +1218,73 @@ try {
     sampleBox.dispatchEvent(new window.Event('input', { bubbles: true }));
     await settle();
 
+    // --- typography panel (designer-ux ۱.۱) ---
+    // Only properties both painters actually render are exposed; italic,
+    // underline, line-height and kashida justification were all measured first.
+    // the diagnostics section above jumped to another band; come back first, or
+    // the element gets no overlay to select
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    store.dispatch(P.patchBand(band0().id, { height: { mode: 'fixed', value: 300 } }));
+    store.dispatch(
+      P.addElement(band0().id, {
+        id: 'typo',
+        type: 'staticText',
+        bounds: { x: 0, y: 0, width: 150, height: 120 },
+        zIndex: 1,
+        text: 'این یک متن آزمایشی فارسی است که باید در عرض کم به چند خط بشکند',
+        typography: { fontFamily: 'Vazirmatn', fontSize: 12 },
+      }),
+    );
+    doc
+      .querySelector('.el[data-id="typo"]')
+      .dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+
+    const typoOf = () => P.findElement(store.getState(), 'typo').element.typography || {};
+    const flipTypo = (prop) => {
+      const inp = doc.querySelector('#inspector [data-prop="' + prop + '"]');
+      if (!inp) fail('typography control missing: ' + prop);
+      inp.checked = !inp.checked;
+      inp.dispatchEvent(new window.Event('change', { bubbles: true }));
+    };
+
+    flipTypo('italic');
+    if (typoOf().fontStyle !== 'italic') fail('italic toggle did not write fontStyle');
+    flipTypo('underline');
+    if (typoOf().decoration !== 'underline') fail('underline toggle did not write decoration');
+    flipTypo('bold');
+    if (typoOf().fontWeight !== 'bold') fail('bold toggle regressed');
+
+    // line height: blank must clear rather than store 0
+    const lh = doc.querySelector('#inspector [data-prop="lineHeight"]');
+    if (!lh) fail('line-height control missing');
+    lh.value = '2';
+    lh.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (typoOf().lineHeight !== 2) fail('line height did not apply: ' + typoOf().lineHeight);
+    lh.value = '';
+    lh.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if ('lineHeight' in typoOf())
+      fail('clearing line height stored a value instead of removing it');
+
+    // justify is the headline: it must reach the engine AND insert kashida
+    const alignSel = doc.querySelector('#inspector [data-prop="align"]');
+    if (!alignSel) fail('align control missing');
+    if (!Array.from(alignSel.options).some((o) => o.value === 'justify'))
+      fail('align control offers no justify — the kashida feature stays unreachable');
+    alignSel.value = 'justify';
+    alignSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (typoOf().align !== 'justify') fail('justify did not apply');
+    const laid = P.layoutDocument(store.getState(), { data: {} }).pages[0].elements.find(
+      (e) => e.id === 'typo',
+    );
+    const tatweel = (laid.lines || []).join('').match(/ـ/g) || [];
+    if (!tatweel.length) fail('justify produced no kashida — the control would be decorative');
+    // and the inspector explains where it does and does not show up
+    if (!/کشیده/.test(doc.getElementById('inspector').textContent))
+      fail('no hint explaining that justify needs multi-line Persian text');
+    store.undo();
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,
