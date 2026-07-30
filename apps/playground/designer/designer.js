@@ -939,6 +939,33 @@
   function isPageWideBand(band) {
     return band.type === 'background' || band.type === 'watermark';
   }
+  /**
+   * Element types the engine auto-grows past their declared box: it measures the
+   * text, wraps it, and paints every line. That is deliberate engine behaviour,
+   * not a bug — but it breaks the designer's WYSIWYG promise, because the box
+   * you drew (and the handles on it) stop matching what lands on the paper.
+   */
+  var TEXT_AUTOGROW = {
+    staticText: true,
+    dataField: true,
+    richText: true,
+    pageField: true,
+  };
+  /** The height the engine actually paints an element at, in pt (0 if unknown). */
+  function paintedHeightOf(t, id) {
+    try {
+      var doc = P.layoutDocument(displayTemplate(activeBandTemplate(t)), {
+        data: activeBandData(t),
+      });
+      var h = 0;
+      ((doc.pages[0] && doc.pages[0].elements) || []).forEach(function (le) {
+        if (le && le.id === id && le.bounds) h = Math.max(h, le.bounds.height);
+      });
+      return h;
+    } catch (e) {
+      return 0;
+    }
+  }
   /** Where the active band's painted content ends, in band-relative pt. */
   function bandContentBottom(t) {
     try {
@@ -1123,6 +1150,20 @@
         var elBottom = laidBottom[el.id];
         if (elBottom == null) elBottom = offY + b.y + b.height;
         if (elBottom > bandH + 0.01) node.classList.add('is-overflow');
+      }
+      // text auto-grew past the box that was drawn (0.4). The overlay keeps the
+      // *editable* bounds — that is what drag/resize writes back — so the spill
+      // is drawn as a ghost below it instead of stretching the box and lying
+      // about which rectangle the handles control.
+      if (TEXT_AUTOGROW[el.type] && laidBottom[el.id] != null) {
+        var spill = laidBottom[el.id] - (offY + b.y) - b.height;
+        if (spill > 0.5) {
+          node.classList.add('is-clipped');
+          var ghost = document.createElement('div');
+          ghost.className = 'el-clip-ghost';
+          ghost.style.height = spill * zoom + 'px';
+          node.appendChild(ghost);
+        }
       }
       var textual = el.type === 'staticText' || el.type === 'dataField' || el.type === 'pageField';
       if (textual) {
@@ -2344,6 +2385,24 @@
         (el.rotation || 0) +
         '" step="15">',
     );
+    // the box you drew vs. what the engine paints (0.4) — offer the fit here,
+    // next to the height field it corrects
+    if (TEXT_AUTOGROW[el.type]) {
+      var paintedH = paintedHeightOf(t, el.id);
+      if (paintedH > b.height + 0.5) {
+        html +=
+          '<p class="warn-row">' +
+          WARN_ICON +
+          '<span>متن از جعبه بیرون زده — روی کاغذ ' +
+          Math.round(paintedH) +
+          'pt جا می‌گیرد، نه ' +
+          Math.round(b.height) +
+          'pt.</span>' +
+          '<button type="button" data-fit-h="' +
+          Math.ceil(paintedH) +
+          '" title="قدِ جعبه را با متن جور کن">جا کن</button></p>';
+      }
+    }
     html +=
       '<div class="btnrow">' +
       '<button data-z="front" title="نمایش روی الِمان‌های دیگر">⬆ بیار جلو</button>' +
@@ -3024,6 +3083,22 @@
         if (cmds.length) store.dispatch(P.composite(cmds));
       });
     });
+    // grow the box to the height the engine actually paints the text at (0.4)
+    var fitBtn = inspectorEl.querySelector('[data-fit-h]');
+    if (fitBtn)
+      fitBtn.addEventListener('click', function () {
+        var loc = P.findElement(store.getState(), el.id);
+        if (!loc) return;
+        var cur = loc.element.bounds;
+        store.dispatch(
+          P.setElementBounds(el.id, {
+            x: cur.x,
+            y: cur.y,
+            width: cur.width,
+            height: Number(fitBtn.dataset.fitH),
+          }),
+        );
+      });
     var nameInp = inspectorEl.querySelector('[data-prop="name"]');
     if (nameInp)
       nameInp.addEventListener('change', function () {

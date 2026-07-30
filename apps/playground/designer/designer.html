@@ -19,7 +19,13 @@
         --accent: #2f6bf0;
         --accent-ink: #ffffff;
         --accent-weak: rgba(47, 107, 240, 0.11);
-        --danger: #d64545;
+        /* #d64545 was only 4.38:1 on white — under AA for the small text it is
+           used at, and it predates designer-ux. #c62f2f is 5.46:1, and still
+           clears 4.5:1 on a faint tint of itself. */
+        --danger: #c62f2f;
+        /* amber, for "this still renders but not how you drew it" (designer-ux 0.4).
+           Distinct from --danger, which means the output is actually wrong. */
+        --warn: #b45309;
         --ok: #1f9d61;
         --field: #f5f6f8;
         --shadow-page:
@@ -29,6 +35,14 @@
         --shadow-bar: 0 4px 18px -6px rgba(15, 20, 30, 0.28);
         --dot: rgba(27, 31, 39, 0.11);
         --guide: #f43f5e;
+
+        /* ---- canvas indicator ink (designer-ux 0.1/0.4) — theme-independent ----
+           #page is #fff in BOTH themes, so anything drawn on the paper must be
+           picked against white. The dark theme's own --warn is only 2.1:1 there
+           and all but vanishes; these do not get a dark override on purpose. */
+        --paper-accent: #2f6bf0;
+        --paper-danger: #c62f2f;
+        --paper-warn: #b45309;
 
         /* ---- type scale (design-review 3.1) — theme-independent ---- */
         --fs-2xs: 11px;
@@ -89,6 +103,7 @@
         --accent-ink: #0d1117;
         --accent-weak: rgba(91, 148, 246, 0.16);
         --danger: #e06c5f;
+        --warn: #e0a955;
         --ok: #3fbf82;
         --field: #161920;
         --shadow-page:
@@ -453,7 +468,8 @@
         padding: var(--sp-3) var(--sp-4);
         border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
         border-radius: var(--r-lg);
-        background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+        /* 8% ceiling, same reason as the status-bar warning */
+        background: color-mix(in srgb, var(--danger) 8%, var(--surface));
         box-shadow: var(--shadow-pop);
         color: var(--danger);
         font-size: var(--fs-xs);
@@ -479,7 +495,9 @@
         overflow-x: auto;
         padding: var(--sp-1) var(--sp-2);
         border-radius: var(--r-sm);
-        background: color-mix(in srgb, var(--danger) 12%, transparent);
+        /* opaque surface, not another tint: a tint inside the bar's own 8% wash
+           compounds to ~16% and drops the text to 4.3:1 */
+        background: var(--surface);
         font-size: var(--fs-2xs);
         white-space: pre-wrap;
         word-break: break-word;
@@ -527,8 +545,11 @@
         );
       }
       #bandBox {
-        border-bottom: 1.5px solid color-mix(in srgb, var(--accent) 62%, transparent);
+        border-bottom: 1.5px solid var(--paper-accent);
       }
+      /* a filled chip, not tinted text: accent-on-accent-tint cannot reach 4.5:1
+         in the light theme (3% tint is the ceiling), whereas white on the paper
+         accent is 4.7:1 — and it sits on the sheet, so it stays theme-independent */
       #bandBoxLabel {
         position: absolute;
         inset-inline-start: 0;
@@ -536,8 +557,8 @@
         margin-top: 3px;
         padding: 1px var(--sp-2);
         border-radius: var(--r-sm);
-        background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-        color: var(--accent);
+        background: var(--paper-accent);
+        color: #fff;
         font-size: var(--fs-2xs);
         font-weight: 600;
         white-space: nowrap;
@@ -545,11 +566,11 @@
       }
       /* content reaches past the band edge → it will collide with the next band */
       #bandBox.is-overflow {
-        border-bottom-color: var(--danger);
+        border-bottom-color: var(--paper-danger);
       }
       #bandBox.is-overflow #bandBoxLabel {
-        background: color-mix(in srgb, var(--danger) 15%, var(--surface));
-        color: var(--danger);
+        background: var(--paper-danger);
+        color: #fff;
       }
       #guideV,
       #guideH {
@@ -600,14 +621,29 @@
       .el.is-locked.selected {
         border-style: dashed;
       }
+      /* text auto-grew past the box that was drawn (0.4). The box keeps the
+         editable bounds; the ghost shows how far the paint actually reaches. */
+      .el.is-clipped {
+        border-bottom-style: dashed;
+        border-bottom-color: var(--paper-warn);
+      }
+      .el-clip-ghost {
+        position: absolute;
+        inset-inline: -1px;
+        top: 100%;
+        border: 1px dashed var(--paper-warn);
+        border-top: 0;
+        background: color-mix(in srgb, var(--paper-warn) 9%, transparent);
+        pointer-events: none;
+      }
       /* reaches past the band edge → it lands on top of the next band (0.1) */
       .el.is-overflow {
-        border-color: var(--danger);
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent);
-        background: color-mix(in srgb, var(--danger) 7%, transparent);
+        border-color: var(--paper-danger);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--paper-danger) 45%, transparent);
+        background: color-mix(in srgb, var(--paper-danger) 7%, transparent);
       }
       .el.is-overflow.selected {
-        box-shadow: 0 0 0 1px var(--danger);
+        box-shadow: 0 0 0 1px var(--paper-danger);
       }
       /* an element that paints nothing: make it findable + explain itself */
       .el.is-empty {
@@ -711,8 +747,10 @@
         background: var(--accent-weak);
         color: var(--accent);
       }
+      /* 8%, not 12%: this predates designer-ux and sat at 4.4:1 in dark. 8% is the
+         ceiling that keeps --danger readable on a wash of itself in both themes. */
       #quickbar button.danger:hover {
-        background: color-mix(in srgb, var(--danger) 12%, transparent);
+        background: color-mix(in srgb, var(--danger) 8%, transparent);
         color: var(--danger);
       }
       #quickbar .qsep {
@@ -834,6 +872,46 @@
         padding: var(--sp-0) var(--sp-1);
         direction: ltr;
         unicode-bidi: isolate;
+      }
+      /* inspector warning with an inline fix (designer-ux 0.4) */
+      .warn-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--sp-2);
+        margin: var(--sp-3) 0 0;
+        padding: var(--sp-2) var(--sp-3);
+        border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+        border-radius: var(--r-md);
+        /* 6%, not 10%: --warn on a 10% wash of itself is 4.38:1 in the light
+           theme, which is under AA for this 11px text */
+        background: color-mix(in srgb, var(--warn) 6%, transparent);
+        color: var(--warn);
+        font-size: var(--fs-2xs);
+        line-height: 1.7;
+      }
+      .warn-row > svg {
+        flex: none;
+        margin-top: 3px;
+      }
+      .warn-row > span {
+        flex: 1;
+        min-width: 0;
+      }
+      .warn-row button {
+        flex: none;
+        height: var(--h-sm);
+        padding: 0 var(--sp-3);
+        border: 1px solid color-mix(in srgb, var(--warn) 50%, transparent);
+        border-radius: var(--r-sm);
+        background: var(--surface);
+        color: var(--warn);
+        font-size: var(--fs-2xs);
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .warn-row button:hover {
+        background: var(--warn);
+        color: var(--accent-ink);
       }
       .verify-code {
         flex: 1;
@@ -1169,7 +1247,9 @@
       }
       #deleteEl:hover {
         border-color: var(--danger) !important;
-        background: color-mix(in srgb, var(--danger) 10%, transparent) !important;
+        /* 6%, not 10% — same pre-existing AA gap as the quickbar's danger hover.
+           6 rather than 8 because this button's base is --field, not --surface. */
+        background: color-mix(in srgb, var(--danger) 6%, transparent) !important;
       }
 
       /* layers */
@@ -1440,13 +1520,15 @@
       .statusbar .sbtn.s-warn {
         gap: var(--sp-1);
         padding: 0 var(--sp-3);
-        background: color-mix(in srgb, var(--danger) 12%, transparent);
+        /* 8% is the ceiling that keeps --danger at 4.5:1 on its own tint in both
+           themes; a stronger wash would sink this 12px label under AA */
+        background: color-mix(in srgb, var(--danger) 8%, transparent);
         color: var(--danger);
         font-weight: 600;
       }
       .statusbar .sbtn.s-warn:hover {
-        background: color-mix(in srgb, var(--danger) 20%, transparent);
-        color: var(--danger);
+        background: var(--danger);
+        color: var(--accent-ink);
       }
       .statusbar .sbtn.s-warn svg {
         flex: none;

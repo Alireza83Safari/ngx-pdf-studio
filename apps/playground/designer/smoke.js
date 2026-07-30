@@ -1017,6 +1017,56 @@ try {
     if (!canvasErr.hidden) fail('canvas error bar survived the fix');
     if (!doc.querySelector('#pageSvg svg')) fail('canvas did not come back after undo');
 
+    // --- text that outgrows its box (designer-ux ۰.۴) ---
+    // The engine measures, wraps and paints every line, so a long string in a
+    // short box lands outside it. The overlay must keep the *editable* bounds
+    // (drag/resize write those back) and show the spill separately.
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    store.dispatch(P.patchBand(band0().id, { height: { mode: 'fixed', value: 400 } }));
+    store.dispatch(
+      P.addElement(band0().id, {
+        id: 'tight',
+        type: 'staticText',
+        bounds: { x: 0, y: 0, width: 80, height: 14 },
+        zIndex: 1,
+        text: 'این یک متن خیلی خیلی طولانی است که قطعا در این جعبهٔ کوچک جا نمی‌شود',
+        typography: { fontFamily: 'Vazirmatn', fontSize: 11 },
+      }),
+    );
+    const tightNode = () => doc.querySelector('.el[data-id="tight"]');
+    if (!tightNode()) fail('the long-text element got no overlay');
+    if (!tightNode().classList.contains('is-clipped'))
+      fail('text spilling out of its box is not flagged');
+    const ghost = tightNode().querySelector('.el-clip-ghost');
+    if (!ghost) fail('no ghost showing how far the text actually paints');
+    if (!(parseFloat(ghost.style.height) > 0)) fail('ghost has no height: ' + ghost.style.height);
+    // the overlay itself must NOT have been stretched — the handles control the box
+    if (Math.abs(parseFloat(tightNode().style.height) - 14 * zoomNow) > 1)
+      fail('the overlay was stretched instead of ghosting: ' + tightNode().style.height);
+
+    // selecting it surfaces the fix in the inspector
+    tightNode().dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    const fitBtn = doc.querySelector('#inspector [data-fit-h]');
+    if (!fitBtn) fail('no fit-to-text button for a clipped element');
+    const warnRow = doc.querySelector('#inspector .warn-row');
+    if (!warnRow || !/بیرون زده/.test(warnRow.textContent))
+      fail('inspector does not explain the spill');
+    const wanted = Number(fitBtn.dataset.fitH);
+    if (!(wanted > 14)) fail('fit target is not taller than the box: ' + wanted);
+
+    // one click fits the box to the text, undoably, and the flag clears
+    fitBtn.dispatchEvent(clickEv());
+    const fitted = P.findElement(store.getState(), 'tight').element.bounds;
+    if (fitted.height !== wanted) fail('fit did not set the height: ' + JSON.stringify(fitted));
+    if (fitted.width !== 80) fail('fit changed the width too: ' + JSON.stringify(fitted));
+    if (tightNode().classList.contains('is-clipped')) fail('still flagged after fitting');
+    if (doc.querySelector('#inspector [data-fit-h]')) fail('fit button survived the fix');
+    store.undo();
+    if (P.findElement(store.getState(), 'tight').element.bounds.height !== 14)
+      fail('fit is not one undo step');
+    if (!tightNode().classList.contains('is-clipped')) fail('undo did not restore the flag');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,
