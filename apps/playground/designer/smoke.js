@@ -1417,6 +1417,74 @@ try {
     if (band0().elements.some((e) => e.type === 'image')) fail('undo left the image element');
     if (resources().length !== 0) fail('undo left the image bytes behind: ' + resources().length);
 
+    // --- font manager (designer-ux ۱.۴) ---
+    const fontList = doc.getElementById('fontList');
+    if (!fontList) fail('font list missing');
+    if (!/Vazirmatn/.test(fontList.textContent))
+      fail('the empty font list does not name the bundled family');
+
+    // upload a font: the family becomes selectable and the bytes ride along
+    const TTF = readFileSync(
+      join(dir, '../../../packages/pdf-studio/pdf/fonts/vazirmatn/Vazirmatn-Regular.ttf'),
+    );
+    window.prompt = () => 'IRANSans';
+    const fontInput = doc.getElementById('fontInput');
+    Object.defineProperty(fontInput, 'files', {
+      value: [new window.File([TTF], 'IRANSans-Regular.ttf', { type: 'font/ttf' })],
+      configurable: true,
+    });
+    fontInput.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 200));
+
+    const fonts = () => store.getState().resources.fonts;
+    if (fonts().length !== 1) fail('the font was not added: ' + fonts().length);
+    if (fonts()[0].family !== 'IRANSans') fail('wrong family recorded: ' + fonts()[0].family);
+    if (!fonts()[0].data || fonts()[0].data.length < 100) fail('the font carries no bytes');
+    if (!/IRANSans/.test(fontList.textContent)) fail('the font list does not show it');
+
+    // the canvas needs an @font-face or it previews a fallback while the PDF
+    // prints the real face — the divergence this designer exists to avoid
+    const faceStyle = doc.getElementById('templateFontFaces');
+    if (!faceStyle) fail('no @font-face block was injected for the embedded font');
+    if (!/@font-face/.test(faceStyle.textContent) || !/IRANSans/.test(faceStyle.textContent))
+      fail('the @font-face block does not declare the uploaded family');
+
+    // and it is selectable on a text element
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    store.dispatch(
+      P.addElement(band0().id, {
+        id: 'fonted',
+        type: 'staticText',
+        bounds: { x: 0, y: 0, width: 200, height: 20 },
+        zIndex: 1,
+        text: 'نمونه',
+        typography: { fontFamily: 'Vazirmatn', fontSize: 12 },
+      }),
+    );
+    doc
+      .querySelector('.el[data-id="fonted"]')
+      .dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    const famSel = doc.querySelector('#inspector [data-prop="fontFamily"]');
+    if (!famSel) fail('no font-family control on a text element');
+    if (!Array.from(famSel.options).some((o) => o.value === 'IRANSans'))
+      fail('the uploaded family is not offered in the inspector');
+    famSel.value = 'IRANSans';
+    famSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (P.findElement(store.getState(), 'fonted').element.typography.fontFamily !== 'IRANSans')
+      fail('picking the family did not write it to the element');
+
+    // the whole point: the template alone must print with that font
+    const fontedPdf = await P.renderToPdf(store.getState(), { data: {} });
+    if (fontedPdf.diagnostics.some((d) => /with the selected font/.test(d.message)))
+      fail('the embedded font did not reach the PDF — text fell back and failed to encode');
+
+    // removing it is undoable
+    doc.querySelector('#fontList .st-del').dispatchEvent(clickEv());
+    if (fonts().length !== 0) fail('removing the font did nothing');
+    store.undo();
+    if (fonts().length !== 1) fail('undo did not restore the font');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

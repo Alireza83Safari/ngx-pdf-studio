@@ -10,7 +10,8 @@ import type { FontStyle, FontWeight } from '../model/style';
 
 export interface FontInput {
   family: string;
-  bytes: Uint8Array;
+  /** Raw font bytes, or the same bytes base64-encoded (as a template carries them). */
+  bytes: Uint8Array | ArrayBuffer | string;
   weight?: FontWeight;
   style?: FontStyle;
 }
@@ -30,15 +31,22 @@ export class FontProvider {
 
   private constructor(private readonly doc: PDFDocument) {}
 
-  /** Embed every supplied custom font (subset) and prepare the provider. */
+  /**
+   * Embed every supplied custom font (subset) and prepare the provider.
+   *
+   * Inputs are collapsed by family+variant *before* embedding: a template that
+   * carries a font and a caller that supplies the same one would otherwise
+   * embed the bytes twice and only ever use the second. Later entries win, so
+   * the caller's copy overrides the template's.
+   */
   static async create(doc: PDFDocument, fonts: FontInput[] = []): Promise<FontProvider> {
     const provider = new FontProvider(doc);
+    const byVariant = new Map<string, FontInput>();
     for (const font of fonts) {
-      const embedded = await doc.embedFont(font.bytes, { subset: true });
-      provider.custom.set(
-        variantKey(font.family, isBold(font.weight), font.style === 'italic'),
-        embedded,
-      );
+      byVariant.set(variantKey(font.family, isBold(font.weight), font.style === 'italic'), font);
+    }
+    for (const [key, font] of byVariant) {
+      provider.custom.set(key, await doc.embedFont(font.bytes, { subset: true }));
       provider.customFamilies.add(font.family.toLowerCase());
     }
     return provider;

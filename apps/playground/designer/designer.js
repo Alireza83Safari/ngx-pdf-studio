@@ -2881,6 +2881,24 @@
       el.type === 'pageField'
     ) {
       looks += field(
+        'فونت',
+        '<select title="فونت‌های جاسازی‌شده در همین قالب — از تبِ لایه‌ها اضافه کن" data-prop="fontFamily">' +
+          availableFamilies(t)
+            .map(function (fam) {
+              return (
+                '<option value="' +
+                esc(fam) +
+                '"' +
+                ((ty.fontFamily || BUNDLED_FAMILY) === fam ? ' selected' : '') +
+                '>' +
+                esc(fam) +
+                '</option>'
+              );
+            })
+            .join('') +
+          '</select>',
+      );
+      looks += field(
         'اندازه',
         '<input type="number" data-prop="fontSize" value="' + (ty.fontSize || 12) + '">',
       );
@@ -3335,6 +3353,13 @@
     bindProp('rotation', function (e, v) {
       e.rotation = Number(v) || 0;
     });
+    bindProp(
+      'fontFamily',
+      function (e, v) {
+        e.typography = Object.assign({}, e.typography, { fontFamily: v });
+      },
+      true,
+    );
     bindProp(
       'fontSize',
       function (e, v) {
@@ -3796,6 +3821,61 @@
    */
   var IMAGE_TYPES = { 'image/png': true, 'image/jpeg': true };
   var MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+  var MAX_FONT_BYTES = 6 * 1024 * 1024;
+  /** The family the bundled Vazirmatn registers under; always offered. */
+  var BUNDLED_FAMILY = 'Vazirmatn';
+
+  /** Families the document can use: the bundled one plus whatever it carries. */
+  function availableFamilies(t) {
+    var out = [BUNDLED_FAMILY];
+    (t.resources.fonts || []).forEach(function (f) {
+      if (out.indexOf(f.family) === -1) out.push(f.family);
+    });
+    return out;
+  }
+
+  /**
+   * Mirror the template's fonts into the page as `@font-face` rules.
+   *
+   * The canvas is the engine's own SVG, which names families and leaves the
+   * browser to find them — so without this an uploaded font would print
+   * correctly and preview as a fallback face, which is exactly the WYSIWYG
+   * divergence this designer exists to avoid.
+   */
+  var fontFaceEl = null;
+  var fontFaceKey = '';
+  function syncFontFaces(t) {
+    var fonts = (t.resources.fonts || []).filter(function (f) {
+      return f.data;
+    });
+    var key = fonts
+      .map(function (f) {
+        return f.id + ':' + f.family + ':' + f.data.length;
+      })
+      .join('|');
+    if (key === fontFaceKey) return; // re-rendering does not re-parse the bytes
+    fontFaceKey = key;
+    if (!fontFaceEl) {
+      fontFaceEl = document.createElement('style');
+      fontFaceEl.id = 'templateFontFaces';
+      document.head.appendChild(fontFaceEl);
+    }
+    fontFaceEl.textContent = fonts
+      .map(function (f) {
+        return (
+          "@font-face{font-family:'" +
+          String(f.family).replace(/['\\]/g, '') +
+          "';font-weight:" +
+          (f.weight === 'bold' ? 'bold' : 'normal') +
+          ';font-style:' +
+          (f.style === 'italic' ? 'italic' : 'normal') +
+          ';src:url(data:font/ttf;base64,' +
+          f.data +
+          ');}'
+        );
+      })
+      .join('\n');
+  }
 
   /**
    * Read a picture into the template as an embedded resource and place an
@@ -3917,6 +3997,104 @@
       toast('تصویر جاسازی شد', { type: 'success' });
     });
   });
+
+  // --- font manager (designer-ux 1.4) ---------------------------------------
+  var fontListEl = document.getElementById('fontList');
+  var fontInputEl = document.getElementById('fontInput');
+
+  function renderFontList() {
+    var t = store.getState();
+    var fonts = t.resources.fonts || [];
+    if (!fonts.length) {
+      fontListEl.innerHTML =
+        '<p class="tinyhint">فقط <b>' + BUNDLED_FAMILY + '</b>ِ باندل‌شده در دسترس است.</p>';
+      return;
+    }
+    fontListEl.innerHTML = '';
+    fonts.forEach(function (f) {
+      var row = document.createElement('div');
+      row.className = 'st-row';
+      var name = document.createElement('span');
+      name.className = 'st-name';
+      name.textContent = f.family + (f.weight === 'bold' ? ' · ضخیم' : '');
+      // show each face in itself — the point of embedding it
+      name.style.fontFamily = "'" + f.family + "'";
+      if (f.weight === 'bold') name.style.fontWeight = 'bold';
+      row.appendChild(name);
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'st-del';
+      del.title = 'حذفِ فونت از قالب';
+      del.textContent = '✕';
+      del.addEventListener('click', function () {
+        store.dispatch(P.removeFontResource(f.id));
+        toast('فونت حذف شد', {
+          type: 'success',
+          action: {
+            label: 'واگرد',
+            onClick: function () {
+              store.undo();
+            },
+          },
+        });
+      });
+      row.appendChild(del);
+      fontListEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('addFont').addEventListener('click', function () {
+    fontInputEl.value = '';
+    fontInputEl.click();
+  });
+  fontInputEl.addEventListener('change', function () {
+    var file = fontInputEl.files && fontInputEl.files[0];
+    if (file) importFontFile(file);
+  });
+
+  /**
+   * Read a TTF/OTF into `resources.fonts`. The family name is taken from the
+   * file name and confirmed by the author, because the real name lives inside
+   * the font's `name` table and parsing that here would mean shipping a font
+   * parser into the page for a string the author already knows.
+   */
+  function importFontFile(file) {
+    if (!/\.(ttf|otf)$/i.test(file.name)) {
+      toast('فقط TTF و OTF پشتیبانی می‌شوند', true);
+      return;
+    }
+    if (file.size > MAX_FONT_BYTES) {
+      toast('فونت بزرگ‌تر از ۶ مگابایت است', true);
+      return;
+    }
+    var suggested = file.name.replace(/\.(ttf|otf)$/i, '').replace(/[-_]/g, ' ');
+    var family = window.prompt('نامِ خانوادهٔ فونت (همین نام در «فونت» انتخاب می‌شود):', suggested);
+    if (family === null) return;
+    family = String(family).trim();
+    if (!family) return toast('نامِ فونت خالی بود', true);
+    var reader = new FileReader();
+    reader.onerror = function () {
+      toast('خواندن فونت ناموفق بود', true);
+    };
+    reader.onload = function () {
+      var dataUri = String(reader.result || '');
+      var comma = dataUri.indexOf(',');
+      if (comma < 0) return toast('فونت خوانده نشد', true);
+      var bold = /bold/i.test(file.name);
+      store.dispatch(
+        P.ensureFontResource({
+          id: 'font-' + uid++,
+          family: family,
+          data: dataUri.slice(comma + 1),
+          // a "…-Bold.ttf" is almost always the bold face; the author can still
+          // upload it under its own family name if that guess is wrong
+          ...(bold ? { weight: 'bold' } : {}),
+        }),
+      );
+      toast('فونت «' + family + '» جاسازی شد', { type: 'success' });
+    };
+    reader.readAsDataURL(file);
+  }
 
   async function cloneFromPdf(file) {
     if (!file || cloneBusy) return;
@@ -5612,9 +5790,13 @@
     if (document.activeElement !== docNameEl) {
       docNameEl.value = store.getState().metadata.name || 'سند بی‌نام';
     }
+    // before the canvas: the SVG names families and the browser has to already
+    // know them, or the preview falls back while the PDF prints correctly (1.4)
+    syncFontFaces(store.getState());
     renderCanvas();
     renderLayers();
     renderStyleList();
+    renderFontList();
     renderStatus();
     renderPreview();
     scheduleDiagnostics();

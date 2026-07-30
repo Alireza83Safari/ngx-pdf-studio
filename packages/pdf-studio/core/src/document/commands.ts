@@ -18,7 +18,7 @@ import type { AnyElement, ContainerElement, TableCell } from '../model/elements'
 import type { DatasetDef } from '../model/dataset';
 import type { TemplateMetadata } from '../model/metadata';
 import type { PageSetup } from '../model/page';
-import type { ImageResource } from '../model/resource';
+import type { FontResource, ImageResource } from '../model/resource';
 import type { NamedStyle } from '../model/style';
 import type { Rect } from '../model/units';
 import type { PdfTemplate, TemplateSection } from '../model/template';
@@ -723,6 +723,56 @@ export function ensureImageResource(image: ImageResource): Command {
         }),
         invert: () => ensureImageResource(image),
       };
+    },
+  };
+}
+
+/**
+ * Add a font to `resources.fonts` if that id is free, so the template carries
+ * its own typeface and renders the same wherever it is opened. Idempotent, like
+ * {@link ensureImageResource}.
+ *
+ * Fonts are *not* pruned automatically the way images are: typography refers to
+ * a font by **family name**, not by resource id, so an unreferenced font is
+ * usually one the author is about to use rather than garbage.
+ */
+export function ensureFontResource(font: FontResource): Command {
+  const needed = (state: PdfTemplate): boolean =>
+    !state.resources.fonts.some((f) => f.id === font.id);
+  return {
+    type: 'ensureFontResource',
+    apply: (state) =>
+      needed(state)
+        ? { ...state, resources: { ...state.resources, fonts: [...state.resources.fonts, font] } }
+        : state,
+    invert: (state) => {
+      if (!needed(state)) return NO_OP;
+      return {
+        type: 'removeFontResource',
+        apply: (s) => ({
+          ...s,
+          resources: { ...s.resources, fonts: s.resources.fonts.filter((f) => f.id !== font.id) },
+        }),
+        invert: () => ensureFontResource(font),
+      };
+    },
+  };
+}
+
+/** Remove a font from the bundle by id. */
+export function removeFontResource(fontId: string): Command {
+  return {
+    type: 'removeFontResource',
+    apply: (state) => ({
+      ...state,
+      resources: {
+        ...state.resources,
+        fonts: state.resources.fonts.filter((f) => f.id !== fontId),
+      },
+    }),
+    invert: (state) => {
+      const gone = state.resources.fonts.find((f) => f.id === fontId);
+      return gone ? ensureFontResource(gone) : NO_OP;
     },
   };
 }

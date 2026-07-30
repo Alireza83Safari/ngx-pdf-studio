@@ -41,6 +41,8 @@ export {
   ensureDataset,
   ensureImageResource,
   pruneImageResources,
+  ensureFontResource,
+  removeFontResource,
   replaceTemplate,
   // style library
   addStyle,

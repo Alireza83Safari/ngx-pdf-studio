@@ -10,6 +10,7 @@ import type { ExpressionDiagnostic } from './expression/errors';
 import { withLogicalBounds } from './layout/logical-bounds';
 import { paginate, type PaginateOptions } from './layout/paginate';
 import type { PaginatedDocument } from './layout/page';
+import type { FontInput } from './paint/font-provider';
 import { paintToPdf, type PdfPaintOptions } from './paint/pdf-painter';
 import { paintToSvg } from './paint/svg-painter';
 import type { PdfTemplate } from './model/template';
@@ -76,6 +77,44 @@ export function layoutDocument(
   return paginate(withLogicalBounds(stamped), createRenderContext(input), options.paginate);
 }
 
+/**
+ * Fold the template's own `resources.fonts` into the painter's font list.
+ *
+ * The resource bundle exists so a template is "self-contained and portable"
+ * (§4), but nothing read it: a font declared there was ignored and the text fell
+ * back to a Standard-14 face, which cannot encode Persian at all. Only fonts
+ * handed to `options.pdf.fonts` ever reached the document.
+ *
+ * Caller-supplied fonts come last so they win the family key — an application
+ * with the real bytes on disk can still override what a template carries.
+ */
+function withTemplateFonts(
+  template: PdfTemplate,
+  options: PdfPaintOptions | undefined,
+  diagnostics: ExpressionDiagnostic[],
+): PdfPaintOptions | undefined {
+  const declared: FontInput[] = [];
+  for (const font of template.resources.fonts) {
+    if (font.data) {
+      declared.push({
+        family: font.family,
+        bytes: font.data,
+        ...(font.weight !== undefined ? { weight: font.weight } : {}),
+        ...(font.style !== undefined ? { style: font.style } : {}),
+      });
+    } else if (font.url) {
+      diagnostics.push({
+        severity: 'warning',
+        message:
+          `Font '${font.family}' is declared by URL, which is not fetched at render time; ` +
+          `embed its bytes in the template or pass them in options.pdf.fonts`,
+      });
+    }
+  }
+  if (declared.length === 0) return options;
+  return { ...options, fonts: [...declared, ...(options?.fonts ?? [])] };
+}
+
 /** Render to a real PDF (`Uint8Array`). */
 export async function renderToPdf(
   template: PdfTemplate,
@@ -83,7 +122,7 @@ export async function renderToPdf(
   options: RenderOptions = {},
 ): Promise<PdfRenderResult> {
   const doc = layoutDocument(template, input, options);
-  const bytes = await paintToPdf(doc, options.pdf);
+  const bytes = await paintToPdf(doc, withTemplateFonts(template, options.pdf, doc.diagnostics));
   return { bytes, pageCount: doc.pageCount, diagnostics: doc.diagnostics };
 }
 

@@ -13,8 +13,10 @@ import {
   addElement,
   composite,
   ensureDataset,
+  ensureFontResource,
   ensureImageResource,
   ensureStyles,
+  removeFontResource,
   modifyElement,
   pruneImageResources,
   moveBand,
@@ -148,6 +150,39 @@ describe('image resources (designer-ux 1.3)', () => {
   it('prunes nothing, reversibly, when every image is in use', () => {
     const t = template();
     expect(pruneImageResources().invert(t)).toEqual(expect.objectContaining({ type: 'noop' }));
+  });
+});
+
+describe('font resources (designer-ux 1.4)', () => {
+  const font = { id: 'f1', family: 'IRANSans', data: 'AAEAAAA=' };
+
+  it('adds a font and undo removes it', () => {
+    expectReversible(template(), ensureFontResource(font));
+  });
+
+  it('is idempotent on the same id', () => {
+    const once = ensureFontResource(font).apply(template());
+    expect(ensureFontResource(font).apply(once)).toBe(once);
+  });
+
+  it('removes a font and undo restores it with its bytes', () => {
+    const withFont = ensureFontResource(font).apply(template());
+    expectReversible(withFont, removeFontResource('f1'));
+  });
+
+  it('removing an id that is not there is a no-op to undo', () => {
+    expect(removeFontResource('nope').invert(template()).type).toBe('noop');
+  });
+
+  it('keeps weight and style variants of one family apart', () => {
+    const bold = { id: 'f2', family: 'IRANSans', weight: 'bold' as const, data: 'AAEAAAA=' };
+    const both = ensureFontResource(bold).apply(ensureFontResource(font).apply(template()));
+    expect(both.resources.fonts).toHaveLength(2);
+    expect(
+      removeFontResource('f1')
+        .apply(both)
+        .resources.fonts.map((f) => f.id),
+    ).toEqual(['f2']);
   });
 });
 

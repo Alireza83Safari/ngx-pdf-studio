@@ -15,6 +15,22 @@ entries below into a released section.
 
 ### Added
 
+- **`resources.fonts` is finally read.** The resource bundle exists so a
+  template is self-contained and portable (§4), but nothing consumed it: a font
+  declared there was ignored, text fell back to a Standard-14 face, and Persian
+  failed to encode entirely — a template carrying its own typeface still lost
+  its text under `renderToFile`. `renderToPdf` now folds the template's fonts
+  into the painter's list, with caller-supplied fonts taking precedence so an
+  application holding the real bytes can still override. A font declared by
+  `url` warns rather than silently dropping the text. `FontProvider` also
+  de-duplicates by family+variant _before_ embedding, so a template and a caller
+  naming the same face no longer embed two copies of it.
+
+- `ensureFontResource` / `removeFontResource` commands. Fonts are deliberately
+  not pruned the way images are: typography refers to a font by family name
+  rather than resource id, so an unreferenced font is usually one the author is
+  about to use.
+
 - Two commands for embedded images: **`ensureImageResource`** adds an image to
   `resources.images` if that id is free (idempotent, like `ensureStyles`, so an
   editor can pair it with `addElement` in one `composite` and dropping a logo is
