@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <title>بازبینیِ اینسپکتور — PDF Studio Designer</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #e6e9ef;
+        --muted: #98a1b2;
+        --bg: #0d1117;
+        --surface: #161b22;
+        --border: #2a323d;
+        --ok: #3fb950;
+        --bad: #f85149;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        padding: 20px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p.lede {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 18px;
+        line-height: 1.8;
+        max-width: 78ch;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-bottom: 22px;
+        min-width: 620px;
+      }
+      th,
+      td {
+        text-align: right;
+        padding: 7px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 12px;
+      }
+      td.num {
+        font-family: ui-monospace, monospace;
+        direction: ltr;
+        text-align: left;
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .bad {
+        color: var(--bad);
+      }
+      .frames {
+        display: flex;
+        gap: 16px;
+        overflow-x: auto;
+        padding-bottom: 12px;
+      }
+      figure {
+        margin: 0;
+        flex: none;
+      }
+      figcaption {
+        font-size: 12px;
+        color: var(--muted);
+        padding: 6px 2px;
+      }
+      iframe {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        display: block;
+      }
+      code {
+        font-family: ui-monospace, monospace;
+        background: var(--surface);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>بازبینیِ چیدمانِ اینسپکتور</h1>
+    <p class="lede">
+      این صفحه <b>اندازه می‌گیرد</b>، نه اینکه فقط نشان بدهد. دیزاینر را در چند عرض بار می‌کند،
+      یک المان را انتخاب می‌کند و بعد پهنای واقعیِ سلول‌های گرید <code>x/y/w/h</code>، پهنای
+      ردیفِ «قفل»، و سرریزِ افقیِ خودِ پنل را می‌خواند. پس‌شرط‌ها: دو سلولِ گرید باید
+      <b>هم‌عرض</b> باشند، ردیفِ قفل باید <b>پهن‌تر از ستونِ ۵۶پیکسلیِ عنوان</b> باشد، و پنل
+      نباید سرریزِ افقی داشته باشد.
+    </p>
+
+    <table id="report">
+      <thead>
+        <tr>
+          <th>عرضِ نما</th>
+          <th>سلولِ ۱ (x)</th>
+          <th>سلولِ ۲ (y)</th>
+          <th>اختلاف</th>
+          <th>ردیفِ «قفل»</th>
+          <th>سرریزِ پنل</th>
+          <th>حکم</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="frames"></div>
+
+    <script>
+      const WIDTHS = [1280, 900, 768, 420, 375];
+      const framesEl = document.querySelector('.frames');
+      const tbody = document.querySelector('#report tbody');
+
+      for (const w of WIDTHS) {
+        const fig = document.createElement('figure');
+        const frame = document.createElement('iframe');
+        frame.src = 'designer.html';
+        frame.width = w;
+        frame.height = 720;
+        frame.dataset.w = w;
+        fig.append(frame);
+        const cap = document.createElement('figcaption');
+        cap.textContent = w + 'px';
+        fig.append(cap);
+        framesEl.append(fig);
+      }
+
+      const cell = (text, cls) => {
+        const td = document.createElement('td');
+        td.textContent = text;
+        if (cls) td.className = cls;
+        return td;
+      };
+
+      /** Drive one frame into the state we want to measure, then read it. */
+      function probe(frame) {
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        const click = (el) => el && el.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+
+        // the drawer layouts start closed
+        const toggle = doc.getElementById('togglePanel');
+        if (toggle && !doc.body.dataset.panel) click(toggle);
+        click(doc.querySelector('.tab[data-tab="design"]'));
+
+        // select something so the placement grid and the lock row exist
+        const overlay = doc.querySelector('.el');
+        if (!overlay) throw new Error('no element on the canvas to select');
+        overlay.dispatchEvent(new win.MouseEvent('mousedown', { bubbles: true }));
+        win.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true }));
+
+        const grid = doc.querySelector('#inspector .grid2');
+        if (!grid) throw new Error('placement grid not rendered');
+        const cells = grid.querySelectorAll('.row');
+        const chk = doc.querySelector('#inspector .chk');
+        if (!chk) throw new Error('lock row not rendered');
+        const pane = doc.querySelector('#inspectorPanel .tabpane.active');
+
+        return {
+          c1: Math.round(cells[0].getBoundingClientRect().width),
+          c2: Math.round(cells[1].getBoundingClientRect().width),
+          chk: Math.round(chk.getBoundingClientRect().width),
+          overflow: pane ? pane.scrollWidth - pane.clientWidth : 0,
+        };
+      }
+
+      addEventListener('load', () => {
+        // one frame at a time: each boots the whole engine bundle
+        for (const frame of document.querySelectorAll('iframe')) {
+          const tr = document.createElement('tr');
+          tr.append(cell(frame.dataset.w + 'px'));
+          try {
+            const r = probe(frame);
+            const diff = Math.abs(r.c1 - r.c2);
+            const equal = diff <= 1;
+            const roomy = r.chk > 56;
+            const tight = r.overflow <= 1;
+            const pass = equal && roomy && tight;
+            tr.append(cell(r.c1 + 'px', 'num'));
+            tr.append(cell(r.c2 + 'px', 'num'));
+            tr.append(cell(diff + 'px', 'num ' + (equal ? 'ok' : 'bad')));
+            tr.append(cell(r.chk + 'px', 'num ' + (roomy ? 'ok' : 'bad')));
+            tr.append(cell(r.overflow + 'px', 'num ' + (tight ? 'ok' : 'bad')));
+            tr.append(cell(pass ? 'قبول ✓' : 'رد ✕', pass ? 'ok' : 'bad'));
+          } catch (e) {
+            tr.append(cell('—'), cell('—'), cell('—'), cell('—'), cell('—'));
+            tr.append(cell(String(e.message || e), 'bad'));
+          }
+          tbody.append(tr);
+        }
+      });
+    </script>
+  </body>
+</html>

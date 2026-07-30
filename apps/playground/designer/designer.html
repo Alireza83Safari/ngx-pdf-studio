@@ -1020,6 +1020,14 @@
         font-size: var(--fs-xs);
         color: var(--muted);
       }
+      /* A checkbox row holds TWO labels: the field's leading label and `.chk`,
+         which wraps the box and its sentence. The rule above matched both and
+         squeezed `.chk` into the 56px caption column, folding "جابه‌جایی، تغییر
+         اندازه و حذف را قفل کن" onto five lines. `.chk` takes the rest instead. */
+      .row > label.chk {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
       .row input,
       .row select,
       aside textarea {
@@ -1157,7 +1165,13 @@
       }
       .grid2 {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        /* minmax(0, …), not a bare 1fr: `1fr` means `minmax(auto, 1fr)`, so each
+           track keeps its item's min-content as a floor. Once the panel is
+           narrower than the two rows want, the tracks stop being equal and one
+           field ends up several times wider than its neighbour (x/y and w/h were
+           landing at roughly 3:1 in the drawer). A 0 minimum makes them strictly
+           equal at every width. */
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: var(--sp-3) var(--sp-4);
         margin-bottom: var(--sp-4);
       }
@@ -2717,6 +2731,26 @@
         }
         .tpl-foot-hint {
           display: none;
+        }
+        /* the inspector's own gutters cost 32px of an already-narrow drawer, which
+           is most of a number field. Give the fields the room back. */
+        .sec {
+          padding-inline: var(--sp-4);
+        }
+        /* a 56px caption column plus two of them per grid row leaves nothing for
+           the inputs, so captions stack above their field here */
+        .row {
+          flex-wrap: wrap;
+        }
+        .row > label:not(.chk) {
+          flex-basis: 100%;
+        }
+        /* …except in the x/y/w/h grid, where the caption is a single character */
+        .grid2 .row {
+          flex-wrap: nowrap;
+        }
+        .grid2 .row label {
+          flex-basis: 12px;
         }
       }
 

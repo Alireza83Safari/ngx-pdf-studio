@@ -917,6 +917,21 @@ try {
     if (!/@media \(max-width: 900px\)[\s\S]{0,1200}position: fixed/.test(css))
       fail('the tablet breakpoint does not float the inspector');
 
+    // --- inspector layout regressions ---
+    // jsdom has no layout engine, so the widths themselves are measured by
+    // `inspector-check.html`. What is guardable here is that the two rules those
+    // measurements depend on have not been reverted.
+    if (!/\.grid2[\s\S]{0,600}grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/.test(css))
+      fail('the placement grid is back on a bare 1fr, whose auto minimum unequalises the tracks');
+    if (!/\.row\s*>\s*label\.chk\s*\{[^}]*flex:\s*1 1 auto/.test(css))
+      fail('.chk is back to inheriting the 56px caption column and will wrap its sentence');
+    // the lock row really is a label inside a .row — the shape that caused it
+    const chkNode = doc.querySelector('#inspector .chk');
+    if (!chkNode) fail('lock row missing');
+    if (chkNode.tagName !== 'LABEL')
+      fail('.chk is no longer a label — recheck the CSS guard above');
+    if (!chkNode.closest('.row')) fail('.chk is not inside a .row — recheck the CSS guard above');
+
     // --- band extent + overflow warning (designer-ux ۰.۱) ---
     // jsdom has no layout engine, so the hatch/boundary *look* needs a browser.
     // What is real here: the geometry the designer writes into the style
