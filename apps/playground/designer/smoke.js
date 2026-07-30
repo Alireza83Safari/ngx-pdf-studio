@@ -1364,6 +1364,59 @@ try {
     if (Buffer.from(withRadius.bytes).equals(Buffer.from(noRadius.bytes)))
       fail('corner radius made no difference to the PDF');
 
+    // --- embedded image upload (designer-ux ۱.۳) ---
+    // Only PNG/JPEG go in, because those are the two the PDF painter can embed
+    // (SVG resolves in the SVG painter and fails in the PDF one — measured).
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    const PNG_1x1 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const fakeFile = (name, type) => {
+      // jsdom's File is fine; FileReader is what needs the bytes
+      const f = new window.File([Buffer.from(PNG_1x1, 'base64')], name, { type });
+      return f;
+    };
+    const dropOn = (file) => {
+      const ev = new window.Event('drop', { bubbles: true, cancelable: true });
+      ev.dataTransfer = { files: [file], getData: () => '' };
+      doc.getElementById('page').dispatchEvent(ev);
+    };
+
+    // an SVG is refused with a reason instead of silently failing at print time
+    const beforeSvg = band0().elements.length;
+    dropOn(fakeFile('logo.svg', 'image/svg+xml'));
+    await new Promise((r) => setTimeout(r, 400));
+    if (band0().elements.length !== beforeSvg) fail('an SVG drop created an element anyway');
+
+    // a PNG becomes an embedded resource plus an element, in one undo step
+    dropOn(fakeFile('logo.png', 'image/png'));
+    // the importer waits up to 250ms for an intrinsic-size probe that jsdom
+    // never resolves, then proceeds without it
+    await new Promise((r) => setTimeout(r, 400));
+    const imgEl = band0().elements.filter((e) => e.type === 'image')[0];
+    if (!imgEl) fail('dropping a PNG did not add an image element');
+    if (!imgEl.resourceId) fail('the image element has no resourceId — it is not embedded');
+    const resources = () => store.getState().resources.images;
+    const res = resources().filter((r) => r.id === imgEl.resourceId)[0];
+    if (!res) fail('the image bytes were not stored in resources.images');
+    if (res.mime !== 'image/png') fail('wrong mime recorded: ' + res.mime);
+    if (!res.data || res.data.length < 20) fail('the resource carries no base64 payload');
+    if (imgEl.source) fail('an embedded image should not also carry a URL source');
+    // this drop carried no coordinates, so placement must fall back rather than
+    // write NaN bounds that only blow up inside the PDF writer much later
+    const b = imgEl.bounds;
+    if (![b.x, b.y, b.width, b.height].every(Number.isFinite))
+      fail('a drop without coordinates produced non-finite bounds: ' + JSON.stringify(b));
+
+    // and it really embeds in the PDF, which is the whole point of doing it this way
+    const pdfBytes = Buffer.from((await P.renderToPdf(store.getState(), { data: {} })).bytes);
+    if (!pdfBytes.toString('latin1').includes('/Subtype /Image'))
+      fail('the embedded image did not reach the PDF as an image XObject');
+
+    // one undo removes both the element and the bytes
+    store.undo();
+    if (band0().elements.some((e) => e.type === 'image')) fail('undo left the image element');
+    if (resources().length !== 0) fail('undo left the image bytes behind: ' + resources().length);
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

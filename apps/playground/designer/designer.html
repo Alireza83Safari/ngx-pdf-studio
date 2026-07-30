@@ -1429,6 +1429,33 @@
         flex: none;
         accent-color: var(--accent);
       }
+      /* file picker for an image element (designer-ux 1.3) */
+      .pickimg {
+        flex: 1;
+        min-width: 0;
+        height: var(--h-md);
+        border: 1px dashed var(--border-strong);
+        border-radius: var(--r-md);
+        background: var(--field);
+        color: var(--ink);
+        font-size: var(--fs-xs);
+        cursor: pointer;
+      }
+      .pickimg:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      /* an inline destructive action inside a hint line */
+      .linkbtn {
+        border: 0;
+        padding: 0;
+        background: none;
+        color: var(--danger);
+        font: inherit;
+        font-size: var(--fs-2xs);
+        text-decoration: underline;
+        cursor: pointer;
+      }
       /* three independent typography switches sharing one row (designer-ux 1.1):
          bold / italic / underline. Each is a label wrapping a hidden checkbox, so
          the whole tile is the hit target and the state stays a real form control. */
@@ -3839,6 +3866,8 @@
 
     <input id="fileInput" type="file" accept="application/json" style="display: none" />
     <input id="pdfInput" type="file" accept="application/pdf" style="display: none" />
+    <!-- only the formats the PDF painter can embed (designer-ux 1.3) -->
+    <input id="imageInput" type="file" accept="image/png,image/jpeg" style="display: none" />
 
     <div id="cloneReview" class="gallery-backdrop">
       <div

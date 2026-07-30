@@ -18,6 +18,7 @@ import type { AnyElement, ContainerElement, TableCell } from '../model/elements'
 import type { DatasetDef } from '../model/dataset';
 import type { TemplateMetadata } from '../model/metadata';
 import type { PageSetup } from '../model/page';
+import type { ImageResource } from '../model/resource';
 import type { NamedStyle } from '../model/style';
 import type { Rect } from '../model/units';
 import type { PdfTemplate, TemplateSection } from '../model/template';
@@ -685,6 +686,86 @@ export function ensureDataset(name: string, source?: DatasetDef['source']): Comm
         type: 'removeDataset',
         apply: (s) => ({ ...s, datasets: s.datasets.filter((d) => d.name !== trimmed) }),
         invert: () => ensureDataset(name, source),
+      };
+    },
+  };
+}
+
+/**
+ * Add an image to `resources.images` if that id is not taken, so an element can
+ * reference it by `resourceId`. Idempotent, like {@link ensureStyles} — an
+ * editor pairs it with `addElement` in one `composite` so dropping a logo onto
+ * the page is a single undo step, and re-adding the same asset does not
+ * duplicate the bytes.
+ */
+export function ensureImageResource(image: ImageResource): Command {
+  const needed = (state: PdfTemplate): boolean =>
+    !state.resources.images.some((i) => i.id === image.id);
+  return {
+    type: 'ensureImageResource',
+    apply: (state) =>
+      needed(state)
+        ? {
+            ...state,
+            resources: { ...state.resources, images: [...state.resources.images, image] },
+          }
+        : state,
+    invert: (state) => {
+      if (!needed(state)) return NO_OP;
+      return {
+        type: 'removeImageResource',
+        apply: (s) => ({
+          ...s,
+          resources: {
+            ...s.resources,
+            images: s.resources.images.filter((i) => i.id !== image.id),
+          },
+        }),
+        invert: () => ensureImageResource(image),
+      };
+    },
+  };
+}
+
+/**
+ * Drop images no element references any more. Editors call this after deleting
+ * elements so a template does not carry megabytes of orphaned base64 forever.
+ */
+export function pruneImageResources(): Command {
+  const used = (state: PdfTemplate): Set<string> => {
+    const ids = new Set<string>();
+    const walk = (els: AnyElement[]): void => {
+      for (const el of els) {
+        if (el.type === 'image' && el.resourceId) ids.add(el.resourceId);
+        const kids = (el as { children?: AnyElement[] }).children;
+        if (kids) walk(kids);
+        const items = (el as { itemTemplate?: AnyElement[] }).itemTemplate;
+        if (items) walk(items);
+      }
+    };
+    for (const band of state.bands) walk(band.elements);
+    for (const section of state.sections ?? []) for (const b of section.bands) walk(b.elements);
+    return ids;
+  };
+  return {
+    type: 'pruneImageResources',
+    apply: (state) => {
+      const keep = used(state);
+      const next = state.resources.images.filter((i) => keep.has(i.id));
+      if (next.length === state.resources.images.length) return state;
+      return { ...state, resources: { ...state.resources, images: next } };
+    },
+    invert: (state) => {
+      const keep = used(state);
+      const dropped = state.resources.images.filter((i) => !keep.has(i.id));
+      if (dropped.length === 0) return NO_OP;
+      return {
+        type: 'restoreImageResources',
+        apply: (s) => ({
+          ...s,
+          resources: { ...s.resources, images: [...s.resources.images, ...dropped] },
+        }),
+        invert: () => pruneImageResources(),
       };
     },
   };

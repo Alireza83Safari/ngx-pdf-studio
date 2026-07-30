@@ -39,6 +39,8 @@ export {
   renameTemplate,
   ensureStyles,
   ensureDataset,
+  ensureImageResource,
+  pruneImageResources,
   replaceTemplate,
   // style library
   addStyle,

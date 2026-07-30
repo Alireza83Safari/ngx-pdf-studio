@@ -2224,10 +2224,18 @@
     e.preventDefault();
     // A dropped PDF runs the Format Cloner — the whole point of F2 is that you
     // should be able to throw a document at the canvas and get it back editable.
+    // A dropped picture becomes an embedded image element (1.3).
     var dropped = e.dataTransfer.files && e.dataTransfer.files[0];
     if (dropped) {
       if (/\.pdf$/i.test(dropped.name) || dropped.type === 'application/pdf') cloneFromPdf(dropped);
-      else toast('فقط PDF را می‌شود کلون کرد', true);
+      else if (IMAGE_TYPES[dropped.type]) {
+        var rect = pageEl.getBoundingClientRect();
+        var m = store.getState().page.margins;
+        importImageFile(dropped, {
+          x: Math.max(0, Math.round((e.clientX - rect.left) / zoom - m.left)),
+          y: Math.max(0, Math.round((e.clientY - rect.top) / zoom - m.top)),
+        });
+      } else toast('فقط PDF یا تصویرِ PNG/JPEG را می‌شود اینجا انداخت', true);
       return;
     }
     var path = e.dataTransfer.getData('text/plain');
@@ -2722,9 +2730,35 @@
         '«شماره صفحه» و کنارش یک «تعداد کل صفحات» بگذار و بینشان یک متنِ «از».</p>';
     }
     if (el.type === 'image') {
+      // Embedded bytes are the route that actually prints; a URL renders in the
+      // preview but the PDF painter cannot fetch it (1.3).
+      var res = el.resourceId
+        ? (t.resources.images || []).filter(function (r) {
+            return r.id === el.resourceId;
+          })[0]
+        : null;
+      content +=
+        '<div class="row"><label>فایل</label>' +
+        '<button type="button" class="pickimg" data-pick-image>' +
+        (res ? 'تعویضِ تصویر…' : 'انتخابِ تصویر…') +
+        '</button></div>';
+      if (res) {
+        content +=
+          '<p class="tinyhint">' +
+          esc(el.name || res.id) +
+          ' · جاسازی‌شده در قالب' +
+          (res.width && res.height ? ' · ' + res.width + '×' + res.height + 'px' : '') +
+          ' — بدونِ اینترنت هم چاپ می‌شود.' +
+          ' <button type="button" class="linkbtn" data-clear-image>حذفِ تصویر</button></p>';
+      } else {
+        content +=
+          '<p class="tinyhint">یا فایل را مستقیم روی بوم بینداز. ' +
+          '<b>PNG و JPEG</b> در قالب جاسازی می‌شوند؛ آدرسِ اینترنتی فقط در پیش‌نمایش ' +
+          'دیده می‌شود و در PDF جاسازی نمی‌شود.</p>';
+      }
       content += field(
         'آدرس',
-        '<input dir="ltr" data-prop="imgsource" value="' +
+        '<input dir="ltr" title="جایگزینِ فایلِ جاسازی‌شده — در PDF جاسازی نمی‌شود" data-prop="imgsource" value="' +
           esc(el.source ? el.source.source : '') +
           '">',
       );
@@ -3161,6 +3195,20 @@
     bindProp('imgsource', function (e, v) {
       e.source = { source: v };
     });
+    // pick a picture for the selected image element (1.3)
+    var pickBtn = inspectorEl.querySelector('[data-pick-image]');
+    if (pickBtn)
+      pickBtn.addEventListener('click', function () {
+        pickImageFor(el.id);
+      });
+    var clearBtn = inspectorEl.querySelector('[data-clear-image]');
+    if (clearBtn)
+      clearBtn.addEventListener('click', function () {
+        // drop the reference, then sweep the bytes it was the last user of
+        store.dispatch(
+          P.composite([P.patchElement(el.id, { resourceId: undefined }), P.pruneImageResources()]),
+        );
+      });
     bindProp('fit', function (e, v) {
       e.fit = v;
     });
@@ -3740,6 +3788,136 @@
    * bind → load. Shared by the file menu and by dropping a PDF on the canvas,
    * so the two entry points cannot drift.
    */
+  /**
+   * Only the two raster formats both painters embed (measured, 1.3). SVG is in
+   * the model's `ImageMime` and the SVG painter shows it, but the PDF painter
+   * cannot embed it ("The input is not a PNG file!"), so it is refused at the
+   * door with a reason rather than accepted and quietly dropped from the print.
+   */
+  var IMAGE_TYPES = { 'image/png': true, 'image/jpeg': true };
+  var MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+  /**
+   * Read a picture into the template as an embedded resource and place an
+   * element referencing it — one undoable step. The bytes live in
+   * `resources.images` so the template stays self-contained and prints without
+   * a network round trip (a URL image is not embedded in the PDF at all).
+   */
+  function readImageResource(file, done) {
+    if (!IMAGE_TYPES[file.type]) {
+      toast('فقط PNG و JPEG پشتیبانی می‌شوند — SVG در PDF جاسازی نمی‌شود', true);
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast('تصویر بزرگ‌تر از ۴ مگابایت است؛ اول فشرده‌اش کن', true);
+      return;
+    }
+    var reader = new FileReader();
+    reader.onerror = function () {
+      toast('خواندن تصویر ناموفق بود', true);
+    };
+    reader.onload = function () {
+      var dataUri = String(reader.result || '');
+      var comma = dataUri.indexOf(',');
+      if (comma < 0) return toast('تصویر خوانده نشد', true);
+      var resource = { id: 'img-' + uid++, mime: file.type, data: dataUri.slice(comma + 1) };
+      // Measure it so the element can land at the picture's own aspect ratio.
+      // The intrinsic size is a nicety, not a requirement, so the import must
+      // not hang on it: an environment without an image decoder (jsdom) fires
+      // neither event, and a corrupt file can stall a real decoder too.
+      var probe = new window.Image();
+      var settled = false;
+      var finish = function (w, h) {
+        if (settled) return;
+        settled = true;
+        if (w > 0 && h > 0) {
+          resource.width = w;
+          resource.height = h;
+        }
+        done(resource, w, h);
+      };
+      setTimeout(function () {
+        finish(0, 0);
+      }, 250);
+      probe.onerror = function () {
+        finish(0, 0);
+      };
+      probe.onload = function () {
+        finish(probe.naturalWidth, probe.naturalHeight);
+      };
+      probe.src = dataUri;
+    };
+    reader.readAsDataURL(file);
+  }
+  function importImageFile(file, at) {
+    readImageResource(file, function (resource, natW, natH) {
+      var elId = 'el-' + uid++;
+      selected = [elId];
+      store.dispatch(
+        P.composite([
+          P.ensureImageResource(resource),
+          P.addElement(curBandId(), {
+            id: elId,
+            type: 'image',
+            bounds: imageBox(natW, natH, at),
+            zIndex: 1,
+            resourceId: resource.id,
+            fit: 'contain',
+            name: file.name,
+          }),
+        ]),
+      );
+      setTab('design');
+      toast('تصویر جاسازی شد', { type: 'success' });
+    });
+  }
+  /** Fit a picture into a sensible default box, preserving its aspect ratio. */
+  function imageBox(natW, natH, at) {
+    var MAXW = 180;
+    var w = MAXW;
+    var h = natW > 0 && natH > 0 ? Math.round((natH / natW) * MAXW) : 120;
+    if (h > 240) {
+      h = 240;
+      w = natH > 0 ? Math.round((natW / natH) * 240) : MAXW;
+    }
+    // A drop point is only usable if it actually arrived: a drag whose event
+    // carries no coordinates yields NaN, and NaN bounds crash the PDF writer
+    // several steps later with nothing pointing back here.
+    var usable = at && Number.isFinite(at.x) && Number.isFinite(at.y);
+    var spot = usable ? at : nextSpot(w, h);
+    return { x: spot.x, y: spot.y, width: w, height: h };
+  }
+  /**
+   * Open the picker and point the given element at whatever comes back. One
+   * hidden input is reused, so the pending target is tracked here.
+   */
+  var imageInputEl = document.getElementById('imageInput');
+  var pendingImageFor = null;
+  function pickImageFor(elementId) {
+    pendingImageFor = elementId || null;
+    imageInputEl.value = '';
+    imageInputEl.click();
+  }
+  imageInputEl.addEventListener('change', function () {
+    var file = imageInputEl.files && imageInputEl.files[0];
+    if (!file) return;
+    var target = pendingImageFor;
+    pendingImageFor = null;
+    if (!target) return importImageFile(file, null);
+    // replacing an existing element's picture: keep its box, swap the bytes,
+    // and sweep whatever it used to point at — one undo step
+    readImageResource(file, function (resource) {
+      store.dispatch(
+        P.composite([
+          P.ensureImageResource(resource),
+          P.patchElement(target, { resourceId: resource.id, source: undefined }),
+          P.pruneImageResources(),
+        ]),
+      );
+      toast('تصویر جاسازی شد', { type: 'success' });
+    });
+  });
+
   async function cloneFromPdf(file) {
     if (!file || cloneBusy) return;
     if (!window.pdfjsLib) {

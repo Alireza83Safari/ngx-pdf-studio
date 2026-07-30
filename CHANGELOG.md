@@ -15,6 +15,14 @@ entries below into a released section.
 
 ### Added
 
+- Two commands for embedded images: **`ensureImageResource`** adds an image to
+  `resources.images` if that id is free (idempotent, like `ensureStyles`, so an
+  editor can pair it with `addElement` in one `composite` and dropping a logo is
+  a single undo step), and **`pruneImageResources`** drops images no element
+  references any more — without it a template accumulates orphaned base64
+  forever. The reference sweep recurses into containers and list item templates,
+  so a logo nested in a group is not mistaken for garbage.
+
 - `ExpressionDiagnostic` gained an optional **`elementId`**, and every
   diagnostic raised while resolving an element now sets it. Diagnostics carried
   only `{severity, message, source?}`, so a tool could not say _which_ element a

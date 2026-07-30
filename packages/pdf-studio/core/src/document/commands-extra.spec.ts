@@ -13,8 +13,10 @@ import {
   addElement,
   composite,
   ensureDataset,
+  ensureImageResource,
   ensureStyles,
   modifyElement,
+  pruneImageResources,
   moveBand,
   moveElementsBy,
   patchBand,
@@ -82,6 +84,72 @@ function expectReversible(before: PdfTemplate, cmd: Command): void {
 const boundsOf = (t: PdfTemplate, id: string): AnyElement['bounds'] =>
   findElement(t, id)!.element.bounds;
 const bandIds = (t: PdfTemplate): string[] => t.bands.map((b) => b.id);
+
+describe('image resources (designer-ux 1.3)', () => {
+  const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA';
+  const logo = { id: 'img-1', mime: 'image/png' as const, data: PNG, width: 1, height: 1 };
+  const imageEl = (id: string, resourceId: string): AnyElement =>
+    ({
+      id,
+      type: 'image',
+      bounds: { x: 0, y: 0, width: 40, height: 40 },
+      zIndex: 1,
+      resourceId,
+    }) as AnyElement;
+
+  it('adds a resource and undo removes it again', () => {
+    expectReversible(template(), ensureImageResource(logo));
+  });
+
+  it('is idempotent — re-adding the same id does not duplicate the bytes', () => {
+    const once = ensureImageResource(logo).apply(template());
+    const twice = ensureImageResource(logo).apply(once);
+    expect(twice.resources.images).toHaveLength(1);
+    expect(twice).toBe(once); // untouched state is returned by reference
+  });
+
+  it('pairs with addElement as one undo step', () => {
+    const store = new DocumentStore(template());
+    store.dispatch(
+      composite([ensureImageResource(logo), addElement('b1', imageEl('logo-el', 'img-1'))]),
+    );
+    expect(store.getState().resources.images).toHaveLength(1);
+    store.undo();
+    expect(store.getState().resources.images).toHaveLength(0);
+    expect(findElement(store.getState(), 'logo-el')).toBeUndefined();
+  });
+
+  it('prunes only the images no element references', () => {
+    const used = { ...logo, id: 'used' };
+    const orphan = { ...logo, id: 'orphan' };
+    const before = ensureImageResource(orphan).apply(
+      ensureImageResource(used).apply(addElement('b1', imageEl('e', 'used')).apply(template())),
+    );
+    const after = pruneImageResources().apply(before);
+    expect(after.resources.images.map((i) => i.id)).toEqual(['used']);
+  });
+
+  it('finds references inside containers, and undo restores what it pruned', () => {
+    const withGroup = addElement('b1', {
+      id: 'grp',
+      type: 'container',
+      bounds: { x: 0, y: 0, width: 80, height: 80 },
+      zIndex: 1,
+      children: [imageEl('nested', 'deep')],
+    } as AnyElement).apply(template());
+    const before = ensureImageResource({ ...logo, id: 'deep' }).apply(withGroup);
+    // nothing to prune: the only image is referenced from inside the group
+    expect(pruneImageResources().apply(before)).toBe(before);
+
+    const withOrphan = ensureImageResource({ ...logo, id: 'gone' }).apply(before);
+    expectReversible(withOrphan, pruneImageResources());
+  });
+
+  it('prunes nothing, reversibly, when every image is in use', () => {
+    const t = template();
+    expect(pruneImageResources().invert(t)).toEqual(expect.objectContaining({ type: 'noop' }));
+  });
+});
 
 describe('element commands: whole-element and multi-element edits', () => {
   it('replaceElement round-trips, reaching type-specific properties', () => {
