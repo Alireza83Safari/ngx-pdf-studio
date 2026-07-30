@@ -440,6 +440,53 @@
         background-size: 22px 22px;
         position: relative;
       }
+      /* canvas render failure (designer-ux 0.2) — floats over the sheet inside
+         the scroll container, so it stays put whatever the zoom */
+      #canvasError {
+        position: absolute;
+        z-index: 40;
+        top: var(--sp-4);
+        inset-inline: var(--sp-4);
+        display: flex;
+        align-items: flex-start;
+        gap: var(--sp-3);
+        padding: var(--sp-3) var(--sp-4);
+        border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+        border-radius: var(--r-lg);
+        background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+        box-shadow: var(--shadow-pop);
+        color: var(--danger);
+        font-size: var(--fs-xs);
+      }
+      #canvasError[hidden] {
+        display: none;
+      }
+      #canvasError > svg {
+        flex: none;
+        margin-top: 1px;
+      }
+      #canvasError .ce-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-1);
+        min-width: 0;
+        flex: 1;
+      }
+      #canvasError .ce-hint {
+        color: var(--muted);
+      }
+      #canvasError code {
+        overflow-x: auto;
+        padding: var(--sp-1) var(--sp-2);
+        border-radius: var(--r-sm);
+        background: color-mix(in srgb, var(--danger) 12%, transparent);
+        font-size: var(--fs-2xs);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #canvasError button {
+        flex: none;
+      }
       #page {
         position: relative;
         background: #fff;
@@ -3036,6 +3083,34 @@
       </nav>
 
       <div class="canvas-wrap">
+        <!-- layout threw, so the canvas has nothing to paint. Say so instead of
+             leaving a blank sheet that reads as a broken app (designer-ux 0.2). -->
+        <div id="canvasError" role="alert" hidden>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="10" cy="10" r="7" />
+            <path d="M10 6.5v4" />
+            <path d="M10 13.5h.01" />
+          </svg>
+          <div class="ce-body">
+            <b>این باند رندر نشد</b>
+            <span class="ce-hint"
+              >احتمالاً یکی از الِمان‌ها ناقص است. آخرین تغییر را واگرد کن یا الِمان مشکل‌دار را
+              حذف کن.</span
+            >
+            <code id="canvasErrorDetail" dir="ltr"></code>
+          </div>
+          <button id="canvasErrorUndo" class="btn" type="button">واگرد</button>
+        </div>
         <div id="page">
           <div id="pageSvg"></div>
           <div id="margins"></div>

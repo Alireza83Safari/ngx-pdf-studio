@@ -983,6 +983,40 @@ try {
       fail('fix-it is not one undo step: ' + JSON.stringify(band0().height));
     if (overflowBtn.hidden) fail('undo did not bring the warning back');
 
+    // --- canvas render failure is reported, not silent (designer-ux ۰.۲) ---
+    // A chart element with no `series` throws straight out of layoutDocument —
+    // exactly the shape a JSON import or a copilot answer can produce. Before
+    // this, the sheet just went blank.
+    const canvasErr = doc.getElementById('canvasError');
+    const canvasErrDetail = doc.getElementById('canvasErrorDetail');
+    const canvasErrUndo = doc.getElementById('canvasErrorUndo');
+    if (!canvasErr || !canvasErrDetail || !canvasErrUndo) fail('canvas error bar missing');
+    if (!canvasErr.hidden) fail('canvas error bar shown while the canvas renders fine');
+    if (canvasErr.getAttribute('role') !== 'alert') fail('canvas error bar is not an alert');
+
+    store.dispatch(
+      P.addElement(band0().id, {
+        id: 'boom',
+        type: 'chart',
+        bounds: { x: 0, y: 0, width: 100, height: 60 },
+        zIndex: 1,
+        chartKind: 'column',
+        dataset: 'items',
+        categories: { source: 'name' },
+        // no `series` — layout throws on it
+      }),
+    );
+    if (canvasErr.hidden) fail('a throwing template left the canvas blank and silent');
+    if (!canvasErrDetail.textContent.trim()) fail('canvas error carries no detail');
+    if (canvasErrUndo.hidden) fail('canvas error offers no way back');
+    if (doc.querySelector('#pageSvg svg')) fail('broken layout still painted an svg');
+
+    // the way back actually works, and the bar clears itself
+    canvasErrUndo.dispatchEvent(clickEv());
+    if (P.findElement(store.getState(), 'boom')) fail('undo from the error bar did nothing');
+    if (!canvasErr.hidden) fail('canvas error bar survived the fix');
+    if (!doc.querySelector('#pageSvg svg')) fail('canvas did not come back after undo');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

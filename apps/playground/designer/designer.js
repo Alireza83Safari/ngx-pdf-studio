@@ -854,6 +854,12 @@
   var bandBoxLabelEl = document.getElementById('bandBoxLabel');
   var bandRestEl = document.getElementById('bandRest');
   var overflowInfoEl = document.getElementById('overflowInfo');
+  var canvasErrorEl = document.getElementById('canvasError');
+  var canvasErrorDetailEl = document.getElementById('canvasErrorDetail');
+  var canvasErrorUndoEl = document.getElementById('canvasErrorUndo');
+  canvasErrorUndoEl.addEventListener('click', function () {
+    store.undo();
+  });
   var guideV = document.getElementById('guideV');
   var guideH = document.getElementById('guideH');
 
@@ -1025,8 +1031,14 @@
         svgNode.setAttribute('width', size.width * zoom);
         svgNode.setAttribute('height', size.height * zoom);
       }
+      setCanvasError(null);
     } catch (err) {
+      // A structurally broken element (a chart with no series, a band with no
+      // height — the shapes an import or a copilot answer can produce) throws
+      // out of layout. Blanking the sheet in silence reads as a crashed app, so
+      // say what happened and offer the way back (designer-ux 0.2).
       pageSvgEl.innerHTML = '';
+      setCanvasError(err);
     }
 
     // interactive overlays from the source elements
@@ -1142,6 +1154,22 @@
     document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
     document.getElementById('canvasHint').classList.toggle('show', band.elements.length === 0);
     renderQuickbar(t, m);
+  }
+
+  /**
+   * Show or clear the canvas render failure (0.2). `null` clears it. The undo
+   * button is the only real way out of a template the engine cannot lay out, so
+   * it is hidden when there is nothing to undo rather than lying about it.
+   */
+  function setCanvasError(err) {
+    if (!err) {
+      canvasErrorEl.hidden = true;
+      return;
+    }
+    canvasErrorEl.hidden = false;
+    // textContent, not innerHTML — the message carries engine/template strings
+    canvasErrorDetailEl.textContent = err && err.message ? err.message : String(err);
+    canvasErrorUndoEl.hidden = !store.canUndo();
   }
 
   /**
