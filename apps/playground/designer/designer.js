@@ -854,6 +854,10 @@
   var bandBoxLabelEl = document.getElementById('bandBoxLabel');
   var bandRestEl = document.getElementById('bandRest');
   var overflowInfoEl = document.getElementById('overflowInfo');
+  var diagInfoEl = document.getElementById('diagInfo');
+  diagInfoEl.addEventListener('click', function () {
+    revealDiagnostics();
+  });
   var canvasErrorEl = document.getElementById('canvasError');
   var canvasErrorDetailEl = document.getElementById('canvasErrorDetail');
   var canvasErrorUndoEl = document.getElementById('canvasErrorUndo');
@@ -966,6 +970,82 @@
       return 0;
     }
   }
+  // --- live diagnostics (designer-ux 0.3) -----------------------------------
+
+  /** Visit every element in a band subtree, including container children. */
+  function eachElement(els, fn) {
+    (els || []).forEach(function (el) {
+      fn(el);
+      if (el.children) eachElement(el.children, fn);
+      if (el.itemTemplate) eachElement(el.itemTemplate, fn);
+    });
+  }
+  /** Every expression an element carries, as `{id, source}` pairs. */
+  function eachElementExpression(t, fn) {
+    (t.bands || []).forEach(function (band) {
+      eachElement(band.elements, function (el) {
+        var push = function (expr) {
+          if (expr && expr.source) fn(el.id, expr.source);
+        };
+        push(el.value);
+        push(el.visibleWhen);
+        push(el.printWhen);
+        push(el.source); // image
+        push(el.categories); // chart
+        (el.series || []).forEach(function (s) {
+          push(s.values);
+        });
+        (el.columns || []).forEach(function (c) {
+          if (c.detail) push(c.detail.content);
+          if (c.footer) push(c.footer.content);
+        });
+        (el.conditionalStyles || []).forEach(function (cs) {
+          push(cs.when);
+        });
+      });
+    });
+  }
+  /** The band index that owns an element id, or -1. */
+  function bandIndexOf(t, id) {
+    var found = -1;
+    (t.bands || []).forEach(function (band, i) {
+      eachElement(band.elements, function (el) {
+        if (el.id === id && found === -1) found = i;
+      });
+    });
+    return found;
+  }
+  /**
+   * Best-effort trace from a diagnostic back to the element that produced it.
+   * The engine's `ExpressionDiagnostic` is `{severity, message, source?}` with no
+   * element id (threading one through all 31 `evaluateExpr` call sites is filed
+   * as 0.6), so this uses what is actually available: the `'<id>'` that layout
+   * and paint messages quote, and otherwise the expression text itself. Returns
+   * null when it cannot tell — the row then simply has no jump button, rather
+   * than guessing and selecting the wrong element.
+   */
+  function diagElementId(t, d) {
+    var quoted = /'([^']+)'/.exec(d.message || '');
+    if (quoted && P.findElement(t, quoted[1])) return quoted[1];
+    if (!d.source) return null;
+    var hit = null;
+    var ambiguous = false;
+    eachElementExpression(t, function (id, src) {
+      if (src !== d.source) return;
+      if (hit === null) hit = id;
+      else if (hit !== id) ambiguous = true;
+    });
+    return ambiguous ? null : hit;
+  }
+  /** Select an element wherever it lives, switching bands and tabs to reach it. */
+  function gotoElement(id) {
+    var t = store.getState();
+    var bi = bandIndexOf(t, id);
+    if (bi >= 0 && bi !== activeBand) setActiveBand(bi);
+    setTab('design');
+    selectById(id);
+  }
+
   /** Where the active band's painted content ends, in band-relative pt. */
   function bandContentBottom(t) {
     try {
@@ -1195,6 +1275,103 @@
     document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
     document.getElementById('canvasHint').classList.toggle('show', band.elements.length === 0);
     renderQuickbar(t, m);
+  }
+
+  /**
+   * Live diagnostics (0.3). These used to appear only after clicking "download
+   * PDF", so a mistyped binding or an undeclared dataset stayed hidden until
+   * export. They are computed over the WHOLE document, not the active band —
+   * a broken footer must not read as "no problems" while you edit the header.
+   *
+   * Debounced, because this is a second layout pass on every change. It is
+   * cheaper than the preview pane's existing 120ms `renderToSvg` (layout AND
+   * paint), so the canvas stays responsive during a drag.
+   */
+  var liveDiags = [];
+  var diagTimer = null;
+  var DIAG_DEBOUNCE = 150;
+  function scheduleDiagnostics() {
+    clearTimeout(diagTimer);
+    diagTimer = setTimeout(runDiagnostics, DIAG_DEBOUNCE);
+  }
+  function runDiagnostics() {
+    try {
+      liveDiags = P.layoutDocument(store.getState(), { data: sampleData }).diagnostics || [];
+    } catch (err) {
+      // a template layout cannot even complete — the canvas bar (0.2) explains
+      // it in Persian; here it belongs in the list as an error too
+      liveDiags = [{ severity: 'error', message: err && err.message ? err.message : String(err) }];
+    }
+    renderDiagnostics();
+  }
+  var DIAG_ICONS = {
+    warning:
+      '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M10 3.6 2.8 16.4h14.4L10 3.6Z"/><path d="M10 8.6v3"/><path d="M10 14h.01"/></svg>',
+    error:
+      '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<circle cx="10" cy="10" r="7"/><path d="M10 6.5v4"/><path d="M10 13.5h.01"/></svg>',
+  };
+  function renderDiagnostics() {
+    var t = store.getState();
+    var errors = liveDiags.filter(function (d) {
+      return d.severity === 'error';
+    }).length;
+    // status-bar counter
+    if (!liveDiags.length) {
+      diagInfoEl.hidden = true;
+    } else {
+      diagInfoEl.hidden = false;
+      diagInfoEl.classList.toggle('has-error', errors > 0);
+      diagInfoEl.innerHTML = DIAG_ICONS[errors ? 'error' : 'warning'];
+      diagInfoEl.appendChild(
+        document.createTextNode(
+          liveDiags.length + (errors ? ' خطا' : ' هشدار'), // Latin digits (design-review 2.3)
+        ),
+      );
+    }
+    // the list itself
+    diagEl.innerHTML = '';
+    liveDiags.forEach(function (d) {
+      var row = document.createElement('div');
+      row.className = 'dg-row sev-' + (d.severity === 'error' ? 'error' : 'warning');
+      row.innerHTML = DIAG_ICONS[d.severity === 'error' ? 'error' : 'warning'];
+      var msg = document.createElement('span');
+      msg.className = 'dg-msg';
+      msg.textContent = d.message; // engine text — never innerHTML
+      row.appendChild(msg);
+      var id = diagElementId(t, d);
+      if (id) {
+        var go = document.createElement('button');
+        go.type = 'button';
+        go.className = 'dg-goto';
+        go.textContent = 'برو';
+        go.title = 'انتخابِ الِمانِ مربوطه روی بوم';
+        go.addEventListener('click', function () {
+          gotoElement(id);
+        });
+        row.appendChild(go);
+      }
+      diagEl.appendChild(row);
+    });
+  }
+  /**
+   * Replace the list with one designer-side message (bad sample JSON, a failed
+   * import, a failed export). It goes through the same list so there is one
+   * place diagnostics appear, and the next edit recomputes over it.
+   */
+  function showLocalDiag(severity, message) {
+    liveDiags = [{ severity: severity, message: message }];
+    renderDiagnostics();
+  }
+  /** Jump to the list when the counter is clicked. */
+  function revealDiagnostics() {
+    setTab('data');
+    if (isDrawerLayout()) setPanelOpen(true);
+    var first = diagEl.querySelector('.dg-row');
+    if (first && first.scrollIntoView) first.scrollIntoView({ block: 'nearest' });
   }
 
   /**
@@ -3224,7 +3401,7 @@
             return i.path + ': ' + i.message;
           })
           .join('\n');
-        diagEl.textContent = 'JSON نامعتبر:\n' + detail;
+        showLocalDiag('error', 'JSON نامعتبر:\n' + detail);
         // surface it wherever the user is — not just on the hidden data tab
         toast('واردکردن ناموفق — JSON نامعتبر:\n' + detail.split('\n')[0], true);
         return;
@@ -3471,13 +3648,11 @@
       a.download = 'document.pdf';
       a.click();
       URL.revokeObjectURL(url);
-      diagEl.textContent = res.diagnostics.length
-        ? res.diagnostics
-            .map(function (d) {
-              return d.message;
-            })
-            .join('\n')
-        : '';
+      // the export ran layout AND paint, so its diagnostics are a superset of
+      // the live ones (font/image embedding only fails at paint time). Show
+      // them until the next edit recomputes the live pass.
+      liveDiags = res.diagnostics;
+      renderDiagnostics();
       var verifyNote = '';
       if (verifyOn) {
         try {
@@ -3493,7 +3668,7 @@
         { type: res.diagnostics.length ? 'info' : 'success' },
       );
     } catch (err) {
-      diagEl.textContent = err.message;
+      showLocalDiag('error', err.message);
       toast('ساخت PDF ناموفق: ' + err.message, true);
     } finally {
       pdfBusy = false;
@@ -3515,12 +3690,15 @@
   sampleEl.addEventListener('input', function () {
     try {
       sampleData = JSON.parse(sampleEl.value);
-      diagEl.textContent = '';
       renderFieldPicker();
       renderCanvas();
       renderPreview();
+      // the data drives every binding, so its diagnostics change with it (0.3)
+      scheduleDiagnostics();
     } catch (err) {
-      diagEl.textContent = 'دادهٔ JSON نامعتبر';
+      // invalid JSON means nothing can be evaluated — say that instead of
+      // reporting stale diagnostics from the last parseable data
+      showLocalDiag('error', 'دادهٔ JSON نامعتبر');
     }
   });
   // keep editor-global shortcuts (Ctrl+Z/D/K…) out of free-text fields so
@@ -5035,6 +5213,7 @@
     renderStyleList();
     renderStatus();
     renderPreview();
+    scheduleDiagnostics();
     updateVerifyUi();
     autosave();
   }

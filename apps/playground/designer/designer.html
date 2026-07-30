@@ -1472,13 +1472,66 @@
         color: var(--muted);
         background: var(--field);
       }
+      /* live diagnostics list (designer-ux 0.3). Was a single pre-wrap blob in a
+         literal #c77d1e (about 3:1 on white); it is a real list now, on --warn. */
       .diag {
-        color: #c77d1e;
-        font-size: var(--fs-2xs);
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-1);
         margin-top: var(--sp-3);
-        white-space: pre-wrap;
+        font-size: var(--fs-2xs);
+      }
+      .diag:empty {
+        display: none;
+      }
+      .dg-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--sp-2);
+        padding: var(--sp-2);
+        border: 1px solid transparent;
+        border-radius: var(--r-sm);
+        background: var(--field);
+        line-height: 1.7;
+      }
+      .dg-row.sev-warning {
+        color: var(--warn);
+        border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+      }
+      .dg-row.sev-error {
+        color: var(--danger);
+        border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+      }
+      .dg-row > svg {
+        flex: none;
+        margin-top: 2px;
+      }
+      .dg-msg {
+        flex: 1;
+        min-width: 0;
         direction: ltr;
         text-align: left;
+        overflow-wrap: break-word;
+      }
+      /* only rendered when the diagnostic could be traced back to an element */
+      .dg-goto {
+        flex: none;
+        height: var(--h-sm);
+        padding: 0 var(--sp-2);
+        border: 1px solid currentColor;
+        border-radius: var(--r-sm);
+        background: transparent;
+        color: inherit;
+        font-size: var(--fs-2xs);
+        cursor: pointer;
+      }
+      .dg-goto:hover {
+        background: color-mix(in srgb, currentColor 12%, transparent);
+      }
+      .dg-ok {
+        color: var(--muted);
+        font-size: var(--fs-2xs);
+        margin-top: var(--sp-3);
       }
 
       /* ================= status bar ================= */
@@ -1531,6 +1584,30 @@
         color: var(--accent-ink);
       }
       .statusbar .sbtn.s-warn svg {
+        flex: none;
+      }
+      /* live diagnostics counter (designer-ux 0.3) — amber, distinct from the
+         red band-overflow chip next to it */
+      .statusbar .sbtn.s-diag {
+        gap: var(--sp-1);
+        padding: 0 var(--sp-3);
+        background: color-mix(in srgb, var(--warn) 6%, transparent);
+        color: var(--warn);
+        font-weight: 600;
+      }
+      .statusbar .sbtn.s-diag.has-error {
+        background: color-mix(in srgb, var(--danger) 8%, transparent);
+        color: var(--danger);
+      }
+      .statusbar .sbtn.s-diag:hover {
+        background: var(--warn);
+        color: var(--accent-ink);
+      }
+      .statusbar .sbtn.s-diag.has-error:hover {
+        background: var(--danger);
+        color: var(--accent-ink);
+      }
+      .statusbar .sbtn.s-diag svg {
         flex: none;
       }
       #zoomLabel {
@@ -3380,7 +3457,8 @@
             <div class="hint">
               دادهٔ تست برای پیش‌نمایش و خروجی؛ چارت به آرایهٔ <code>items</code> بایند می‌شود.
             </div>
-            <div id="diag" class="diag"></div>
+            <!-- live layout diagnostics, refreshed on every change (0.3) -->
+            <div id="diag" class="diag" role="status"></div>
           </div>
           <div class="sec">
             <div class="sec-title">میان‌برها</div>
@@ -3406,6 +3484,13 @@
       <span id="pageInfo" data-tip="اندازه و جهت کاغذ سند">A4 · عمودی</span>
       <span class="sdot"></span>
       <span id="selInfo" data-tip="وضعیت انتخاب فعلی روی بوم">چیزی انتخاب نشده</span>
+      <!-- live engine diagnostics for the whole document (0.3) -->
+      <button
+        id="diagInfo"
+        class="sbtn s-diag"
+        hidden
+        data-tip="هشدارهای زندهٔ موتور روی کلِ سند — کلیک کن تا فهرستشان را ببینی"
+      ></button>
       <!-- shown only when the active band paints past its own height (0.1) -->
       <button
         id="overflowInfo"

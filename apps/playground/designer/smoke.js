@@ -1067,6 +1067,103 @@ try {
       fail('fit is not one undo step');
     if (!tightNode().classList.contains('is-clipped')) fail('undo did not restore the flag');
 
+    // --- live diagnostics (designer-ux ۰.۳) ---
+    // These used to appear only after "download PDF". They are debounced by
+    // 150ms, so every assertion below waits the timer out rather than polling.
+    const settle = () => new Promise((r) => setTimeout(r, 260));
+    const diagInfo = doc.getElementById('diagInfo');
+    const diagList = doc.getElementById('diag');
+    if (!diagInfo || !diagList) fail('diagnostics chrome missing');
+
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    store.dispatch(P.patchBand(band0().id, { height: { mode: 'fixed', value: 200 } }));
+    await settle();
+    if (!diagInfo.hidden) fail('diagnostics counter shown on a clean document');
+    if (diagList.querySelector('.dg-row')) fail('diagnostics listed on a clean document');
+
+    // a mistyped binding: `sum(` never parses, so the engine reports an error
+    store.dispatch(
+      P.addElement(band0().id, {
+        id: 'badbind',
+        type: 'dataField',
+        bounds: { x: 0, y: 0, width: 120, height: 16 },
+        zIndex: 1,
+        value: { source: 'sum(' },
+        typography: { fontFamily: 'Vazirmatn', fontSize: 11 },
+      }),
+    );
+    await settle();
+    if (diagInfo.hidden) fail('a broken binding did not light up the counter');
+    if (!/\d/.test(diagInfo.textContent)) fail('counter has no count: ' + diagInfo.textContent);
+    const rows = () => Array.from(diagList.querySelectorAll('.dg-row'));
+    if (!rows().length) fail('diagnostics list stayed empty');
+    if (!rows().some((r) => /sev-error/.test(r.className)))
+      fail('a parse error was not reported as an error');
+    if (!diagInfo.classList.contains('has-error')) fail('counter does not show the error severity');
+
+    // the row traces back to the element, and the jump selects it
+    const goto = diagList.querySelector('.dg-goto');
+    if (!goto) fail('no jump button for a diagnostic that names an expression');
+    // dispatching addElement straight at the store never touched the selection,
+    // so this element being selected afterwards can only be the jump's doing
+    if (doc.querySelector('.el[data-id="badbind"].selected'))
+      fail('the element was already selected — the jump assertion proves nothing');
+    goto.dispatchEvent(clickEv());
+    if (!doc.querySelector('.el[data-id="badbind"].selected'))
+      fail('jumping from the diagnostic did not select the element');
+
+    // clicking the counter reveals the list on the data tab
+    doc.querySelector('.tab[data-tab="design"]').dispatchEvent(clickEv());
+    diagInfo.dispatchEvent(clickEv());
+    if (!doc.querySelector('.tab[data-tab="data"]').classList.contains('active'))
+      fail('the counter did not reveal the data tab');
+
+    // diagnostics are whole-document, not just the active band: park the broken
+    // field in a second band and keep editing the first one
+    store.dispatch(
+      P.addBand(
+        {
+          id: 'band-diag',
+          type: 'reportFooter',
+          height: { mode: 'fixed', value: 40 },
+          elements: [],
+        },
+        store.getState().bands.length,
+      ),
+    );
+    const other = store.getState().bands.length - 1;
+    store.dispatch(P.removeElementById('badbind'));
+    store.dispatch(
+      P.addElement(store.getState().bands[other].id, {
+        id: 'badbind2',
+        type: 'dataField',
+        bounds: { x: 0, y: 0, width: 120, height: 16 },
+        zIndex: 1,
+        value: { source: 'sum(' },
+        typography: { fontFamily: 'Vazirmatn', fontSize: 11 },
+      }),
+    );
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    await settle();
+    if (diagInfo.hidden)
+      fail('a diagnostic in another band was invisible while editing band 0 — the whole point');
+    // and the jump crosses bands
+    const goto2 = diagList.querySelector('.dg-goto');
+    if (!goto2) fail('no jump button for the cross-band diagnostic');
+    goto2.dispatchEvent(clickEv());
+    if (!doc.querySelector('.el[data-id="badbind2"].selected'))
+      fail('jumping did not switch bands to reach the element');
+
+    // invalid sample JSON reports itself instead of leaving stale diagnostics
+    const sampleBox = doc.getElementById('sampleData');
+    const goodJson = sampleBox.value;
+    sampleBox.value = '{ oops';
+    sampleBox.dispatchEvent(new window.Event('input', { bubbles: true }));
+    if (!/نامعتبر/.test(diagList.textContent)) fail('invalid sample JSON was not reported');
+    sampleBox.value = goodJson;
+    sampleBox.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await settle();
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,
