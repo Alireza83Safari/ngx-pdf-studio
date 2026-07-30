@@ -14,5 +14,10 @@ apps/playground/designer/pdf.worker.min.js
 *.tsbuildinfo
 release/
 
+# Throwaway investigation scripts. One of these (`probe-pdfjs.tmp.ts`) reached
+# master carrying absolute paths from another machine; no gate covers this
+# folder, so nothing caught it.
+*.tmp.ts
+
 # Claude Code personal project settings (memory-reconcile hook)
 .claude/settings.local.json

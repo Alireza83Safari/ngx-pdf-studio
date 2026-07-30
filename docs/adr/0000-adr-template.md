@@ -8,7 +8,7 @@
 ## Context
 
 What is the problem? What forces are at play (technical, product, legal,
-performance, the Angular 12→latest constraint, RTL/Persian, browser/Node
+performance, the Angular 14→latest constraint, RTL/Persian, browser/Node
 parity)? State the constraints that make this a real decision, not an obvious
 one.
 

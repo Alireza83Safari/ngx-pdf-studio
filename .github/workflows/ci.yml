@@ -33,14 +33,21 @@ jobs:
       - run: npm run build:angular
       - run: npm run smoke:tarball
 
-  # Public-API type compatibility of the built packages against every
-  # supported Angular major (§2.1): install the tarballs into a pristine
-  # consumer and type-check imports of the module/service/component.
+  # Compatibility of the built packages against every supported Angular major
+  # (§2.1), in two layers that fail for different reasons:
+  #
+  #  1. the **linker** actually rejects a library published by a newer Angular,
+  #     which is what decides the supported floor;
+  #  2. the **type** check catches public-API breakage against each major's
+  #     TypeScript.
+  #
+  # The type check alone is not enough: `.d.ts` files carry no Angular version,
+  # so it passes even for majors that cannot build the package at all.
   angular-compat:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        angular-version: ['12', '17', 'latest']
+        angular-version: ['14', '17', 'latest']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,4 +56,33 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: node tools/smoke-angular-linker.mjs ${{ matrix.angular-version }}
       - run: node tools/smoke-angular-consumer.mjs ${{ matrix.angular-version }}
+
+  # The floor is a claim, so prove it from below too: Angular 13 must fail to
+  # link. If a future ng-packagr lowers `minVersion` and this job starts
+  # passing, the supported range widened and the docs/peer range should follow.
+  angular-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build:angular
+      - name: Angular 13 must reject the published bundle
+        run: |
+          if node tools/smoke-angular-linker.mjs 13 > floor.log 2>&1; then
+            echo "::error::Angular 13 linked the bundle — the floor is lower than 14, update peerDependencies and the docs"
+            exit 1
+          fi
+          # Insist on the *right* failure: a broken install or a bad probe also
+          # exits nonzero, and would otherwise read as proof of the floor.
+          if ! grep -q "requires Angular version" floor.log; then
+            echo "::error::Angular 13 failed, but not with the linker's version diagnostic — the probe is broken, not the claim"
+            cat floor.log
+            exit 1
+          fi
+          echo "Angular 13 rejects the bundle with the expected linker diagnostic."

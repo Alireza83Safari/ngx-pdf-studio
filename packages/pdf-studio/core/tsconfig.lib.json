@@ -6,7 +6,13 @@
     "composite": true,
     "declaration": true,
     "module": "CommonJS",
-    "types": ["node"]
+    "types": ["node"],
+    // Sources are not published, so a map would resolve to nothing: a debugger
+    // reads `sources: ["../src/index.ts"]` out of the tarball and looks for a
+    // `src/` that is not there. 104 files / 364 kB of "source not found". The
+    // ESM half has always set this; the CommonJS half inherited `true` from
+    // tsconfig.base.json, which is what the local `tsc -b` wants for the specs.
+    "sourceMap": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts", "src/testing/**", "src/**/__fixtures__/**"]

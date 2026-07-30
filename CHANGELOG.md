@@ -37,9 +37,17 @@ entries below into a released section.
   dependency to `^<version>` and copies `LICENSE`/`README.md` into the dist).
 - The release workflow type-checks a pristine Angular consumer against the
   freshly stamped tarballs before publishing.
+- `tools/smoke-angular-linker.mjs` — runs the **real** partial-Ivy linker (the
+  same `createEs2015LinkerPlugin` the Angular CLI uses) from a given
+  `@angular/compiler-cli` version over the built fesm2022 bundle. The existing
+  consumer smoke test checks types only, and declarations carry no Angular
+  version, so it passed for majors that could not build the package at all — the
+  CI matrix was green on Angular 12 while the artifact was unusable there. CI now
+  runs the linker across 14/17/latest, and a separate job asserts Angular 13
+  still **fails**, so the documented floor cannot drift unnoticed.
 - `smoke:tarball` now exercises both halves of the published package: `require`
   of the Node subpath renders a Persian PDF, and `import` of the main entry
-  renders SVG. It asserts the specifier *resolves into* `esm/`, since importing
+  renders SVG. It asserts the specifier _resolves into_ `esm/`, since importing
   named exports alone would pass against a CommonJS entry too and the bailout
   would come back unnoticed.
 - `.gitattributes` normalizing text to LF, so `format:check` behaves the same on
@@ -48,6 +56,23 @@ entries below into a released section.
 
 ### Changed
 
+- **`@ngx-pdf-studio/angular` now declares Angular 14 as its floor, not 12.**
+  ng-packagr stamps its partial-Ivy declarations `minVersion: "14.0.0"`, and
+  Angular 12/13 refuse to link them: _"this application depends upon a library
+  published using Angular version 17.3.12, which requires Angular version 14.0.0
+  or newer to work correctly."_ The old `>=12.0.0` peer range let npm install the
+  package happily and then fail at build time. Verified by running the real
+  linker against every major: 12 ✗, 13 ✗, 14 ✓, 15 ✓, 16 ✓, 17 ✓.
+- `rxjs` dropped from `@ngx-pdf-studio/angular`'s peer dependencies — the package
+  does not import it. It returns when the designer entry point lands.
+- The core tarball no longer ships source maps. They referenced `../src/*.ts`,
+  which is not published, so every one of them resolved to nothing: 104 files and
+  364 kB of "source not found". 525 → 421 files, 411.8 → 337.6 kB packed. The ESM
+  half already did this; the CommonJS half inherited `sourceMap: true` from
+  `tsconfig.base.json`.
+- `build:core` now cleans `dist/` and the build-info file first. `tsc -b` keeps
+  its `.tsbuildinfo` next to the config, not in `dist`, so stale outputs (like
+  those source maps) survived a rebuild and would have been published.
 - `FontkitTextMeasurer` — the measurer every PDF render goes through — is back
   under the coverage gate. It had been excluded from `collectCoverageFrom`
   pending a bundled font; Vazirmatn has been bundled since Phase 3.

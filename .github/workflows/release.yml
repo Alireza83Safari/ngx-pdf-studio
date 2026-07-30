@@ -41,8 +41,11 @@ jobs:
       - run: npm run build:core
       - run: npm run build:angular
       - run: npm run smoke:tarball
-      # Type-check a pristine consumer against the freshly stamped tarballs
-      # before anything reaches the registry — a publish cannot be taken back.
+      # Prove the artifact against the *oldest* Angular the package advertises
+      # before anything reaches the registry — a publish cannot be taken back,
+      # and a wrong `peerDependencies` floor installs fine and breaks at build.
+      - run: node tools/smoke-angular-linker.mjs 14
+      # Type-check a pristine consumer against the freshly stamped tarballs.
       - run: node tools/smoke-angular-consumer.mjs latest
       - name: Publish @ngx-pdf-studio/core
         run: npm publish packages/pdf-studio/core/dist --provenance --access public

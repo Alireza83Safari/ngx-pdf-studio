@@ -8,7 +8,7 @@
 ## Context
 
 A large multi-package monorepo (engine + Angular lib + playground + docs) with a
-**CI matrix across Angular 12→latest**, golden-snapshot PDF tests, and consumer
+**CI matrix across Angular 14→latest**, golden-snapshot PDF tests, and consumer
 tarball smoke tests. We need good task orchestration, caching, and an
 `affected`-aware CI to keep the matrix tractable. The spec prefers Nx, allows an
 Angular CLI multi-project workspace.
@@ -46,5 +46,15 @@ ADR records the destination; the README documents the current state honestly.
 - **Risks & mitigations:** the "Nx present but targets run direct" interim could
   drift; mitigated by adopting Nx executors in the same PR that introduces the
   first ng-packagr build, so the two never diverge for long.
+
+  **That mitigation did not hold.** ng-packagr landed in Phase 4 without Nx: `nx`
+  is not a dependency, no script invokes it, and `nx.json` is inert configuration
+  describing a task graph nothing reads. The npm-workspaces + direct-target setup
+  has carried the project to a release-ready state, so the interim is arguably
+  the answer rather than a stopgap. Decide before `v1.0.0`: adopt Nx and make
+  `nx.json` load-bearing, or delete it and supersede this ADR. Leaving an
+  aspirational config file in the repo reads as a working cache to contributors
+  and is the worst of the three.
+
 - **Revisit when:** the workspace shrinks to a single publishable package, where
   Nx would be unnecessary overhead.

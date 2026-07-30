@@ -3,8 +3,12 @@
  * the core dist it depends on), installs both tarballs into a pristine temp
  * project against a specific `@angular/core` major, and type-checks a consumer
  * that imports the module, service, and component. This catches public-API
- * breakage against each supported Angular major (12 → latest) without needing
+ * breakage against each supported Angular major (14 → latest) without needing
  * a full CLI app per version.
+ *
+ * This checks **types only**. Declarations carry no Angular version, so it
+ * passes for majors that cannot build the package at all — the supported floor
+ * is proven by `smoke-angular-linker.mjs`, which runs the real linker.
  *
  * Usage: node tools/smoke-angular-consumer.mjs <angularVersion|latest>
  * Requires `npm run build` (core dist + Angular APF) to have run first.

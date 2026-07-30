@@ -15,7 +15,7 @@ in-browser visual designer with a template gallery.
 | --------------------------- | ------------------------------------------------------------------------------------------------- |
 | `@ngx-pdf-studio/core`      | Framework-agnostic engine: model, expressions, layout, painters. Browser + Node, identical bytes. |
 | `@ngx-pdf-studio/core/node` | Node entry: `renderToFile`, `renderBatch`, `renderMerged`, `loadBundledVazirmatn`.                |
-| `@ngx-pdf-studio/angular`   | Angular render service + `<pdf-studio-preview>` (Angular 12 → latest, APF).                       |
+| `@ngx-pdf-studio/angular`   | Angular render service + `<pdf-studio-preview>` (Angular 14 → latest, APF).                       |
 
 ## Quick start (Node)
 
@@ -167,13 +167,20 @@ in Node. See [docs/adr/0005-package-topology.md](docs/adr/0005-package-topology.
 
 ## Angular compatibility
 
-The published library targets **Angular 12 → latest, inclusive**. The distributed
+The published library targets **Angular 14 → latest, inclusive**. The distributed
 code avoids Signals, block control flow (`@if`/`@for`), `inject()`, and
 standalone-only delivery. The pure-TS `core` package has no Angular dependency.
 
+The floor is 14 because ng-packagr emits partial-Ivy declarations stamped
+`minVersion: "14.0.0"`; Angular 12 and 13 reject them at build time with _"this
+application depends upon a library published using Angular version 17.x, which
+requires Angular version 14.0.0 or newer"_. `npm run smoke:angular-linker 14`
+runs the real linker over the built bundle and is what holds this claim honest —
+a type-check against the `.d.ts` cannot, because declarations carry no version.
+
 `core` is a **dual-format package**: `import` resolves to ES modules, `require`
-to CommonJS. That is what keeps the Angular CLI from reporting a *"CommonJS or
-AMD dependencies can cause optimization bailouts"* warning and lets it
+to CommonJS. That is what keeps the Angular CLI from reporting a _"CommonJS or
+AMD dependencies can cause optimization bailouts"_ warning and lets it
 tree-shake the engine. The `core/node` subpath is CommonJS only — it is
 server-side, and Node imports its named exports fine either way.
 
@@ -187,6 +194,8 @@ npm run typecheck      # tsc
 npm run build          # core dist (CJS + d.ts + fonts) + Angular APF package
 npm run smoke:tarball  # pack the dist & render a PDF from a pristine install
 npm run smoke:docs     # run docs/index.html in jsdom (translations, links, code samples)
+npm run smoke:angular-linker 14   # run the real Angular linker over the built bundle
+npm run smoke:angular 14          # type-check a pristine consumer on that major
 npm run demo           # playground: Persian invoice → PDF + HTML preview
 node apps/playground/designer/smoke.js   # designer jsdom smoke test
 ```

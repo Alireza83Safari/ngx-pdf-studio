@@ -1,7 +1,7 @@
 {
   "name": "@ngx-pdf-studio/angular",
   "version": "0.0.0",
-  "description": "Angular bindings for ngx-pdf-studio: render service + preview component (and, later, the visual designer). Supports Angular 12 → latest.",
+  "description": "Angular bindings for ngx-pdf-studio: render service + preview component (and, later, the visual designer). Supports Angular 14 → latest.",
   "license": "MIT",
   "author": "ngx-pdf-studio contributors",
   "homepage": "https://github.com/Alireza83Safari/ngx-pdf-studio#readme",
@@ -23,10 +23,9 @@
     "invoice"
   ],
   "peerDependencies": {
-    "@angular/core": ">=12.0.0 <99.0.0",
-    "@angular/common": ">=12.0.0 <99.0.0",
-    "rxjs": "^6.0.0 || ^7.0.0",
-    "@angular/platform-browser": ">=12.0.0 <99.0.0"
+    "@angular/core": ">=14.0.0 <99.0.0",
+    "@angular/common": ">=14.0.0 <99.0.0",
+    "@angular/platform-browser": ">=14.0.0 <99.0.0"
   },
   "dependencies": {
     "@ngx-pdf-studio/core": "*",

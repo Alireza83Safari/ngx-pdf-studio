@@ -9,7 +9,7 @@
 
 The designer needs undo/redo over **every** mutation, drag-coalescing,
 autosave/draft recovery, multi-select, and a reactive UI — across Angular
-12→latest (no Signals, no `inject()`, RxJS 6 **and** 7). The spec is emphatic:
+14→latest (no Signals, no `inject()`, RxJS 6 **and** 7). The spec is emphatic:
 state mutations go **exclusively through commands**; components **never** mutate
 the template tree directly (§8). State must be **framework-agnostic** so it is
 unit-testable without Angular and reusable by the Node path.
@@ -52,7 +52,7 @@ exposes its observables through the `async` pipe + `OnPush`.
 ## Consequences
 
 - **Positive:** undo/redo is correct by construction; the entire editing model
-  is unit-testable without a browser; works unchanged on Angular 12→latest.
+  is unit-testable without a browser; works unchanged on Angular 14→latest.
 - **Negative / costs:** we hand-write immutability helpers and command inverses
   (more discipline than Immer); we provide our own selector memoization.
 - **Risks & mitigations:** command/inverse drift is caught by a property test —

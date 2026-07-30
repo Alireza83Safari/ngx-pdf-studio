@@ -25,12 +25,14 @@
     "typecheck": "tsc -b packages/pdf-studio/core/tsconfig.lib.json",
     "demo": "ts-node --project apps/playground/tsconfig.json apps/playground/demo.ts",
     "designer:build": "node apps/playground/designer/build.mjs",
-    "build:core": "tsc -b packages/pdf-studio/core/tsconfig.lib.json && tsc -p packages/pdf-studio/core/tsconfig.lib.esm.json && node tools/prepare-core-dist.mjs",
+    "clean:core": "node -e \"const{rmSync}=require('fs');rmSync('packages/pdf-studio/core/dist',{recursive:true,force:true});rmSync('packages/pdf-studio/core/tsconfig.lib.tsbuildinfo',{force:true})\"",
+    "build:core": "npm run clean:core && tsc -b packages/pdf-studio/core/tsconfig.lib.json && tsc -p packages/pdf-studio/core/tsconfig.lib.esm.json && node tools/prepare-core-dist.mjs",
     "smoke:tarball": "node tools/smoke-tarball.mjs",
     "build:angular": "ng-packagr -p packages/pdf-studio/angular/ng-package.json -c packages/pdf-studio/angular/tsconfig.lib.json && node tools/prepare-angular-dist.mjs",
     "build": "npm run build:core && npm run build:angular",
     "designer:smoke": "npm run designer:build && node apps/playground/designer/smoke.js",
     "smoke:angular": "node tools/smoke-angular-consumer.mjs",
+    "smoke:angular-linker": "node tools/smoke-angular-linker.mjs",
     "smoke:docs": "node tools/smoke-docs.mjs"
   },
   "devDependencies": {
