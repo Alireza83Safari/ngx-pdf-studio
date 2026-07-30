@@ -17,7 +17,7 @@ entries below into a released section.
 
 - `ExpressionDiagnostic` gained an optional **`elementId`**, and every
   diagnostic raised while resolving an element now sets it. Diagnostics carried
-  only `{severity, message, source?}`, so a tool could not say *which* element a
+  only `{severity, message, source?}`, so a tool could not say _which_ element a
   warning came from — it had to parse the message or match the expression text,
   and gave up whenever two elements shared one. Threaded through all
   `evaluateExpr` call sites that have an element in scope (text, fields,
