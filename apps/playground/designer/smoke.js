@@ -182,6 +182,38 @@ try {
   if (doc.getElementById('palette').classList.contains('show')) fail('palette did not close');
   if (doc.querySelectorAll('.el').length !== before + 1) fail('palette command did not run');
 
+  // designer-ux ۱.۹ — every toolbox entry must be reachable from Ctrl+K. The
+  // hand-kept list had drifted to 9 while the rail grew to 12, hiding the table.
+  doc.dispatchEvent(
+    new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
+  );
+  const railTools = Array.from(doc.querySelectorAll('.toolrail [data-add]'));
+  const paletteLabels = Array.from(doc.querySelectorAll('#paletteList li')).map((n) =>
+    n.textContent.replace(/\s+/g, ' ').trim(),
+  );
+  if (!paletteLabels.length) fail('palette listed nothing');
+  for (const btn of railTools) {
+    const want = btn.getAttribute('aria-label');
+    if (!want) fail('toolbox button ' + btn.dataset.add + ' has no aria-label to derive from');
+    if (!paletteLabels.some((l) => l.indexOf(want) === 0))
+      fail('toolbox entry missing from the palette: ' + want + ' (' + btn.dataset.add + ')');
+  }
+  // and running one of the previously-missing ones really adds that element.
+  // The store is only exposed further down, so this stays on the DOM.
+  const beforeTable = doc.querySelectorAll('.el').length;
+  const pi = doc.getElementById('paletteInput');
+  pi.value = 'افزودن جدول';
+  pi.dispatchEvent(new window.Event('input', { bubbles: true }));
+  pi.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  if (doc.querySelectorAll('.el').length !== beforeTable + 1)
+    fail('the palette table command added no element');
+  // the designer selects what it just added, so the inspector names its type
+  if (!doc.getElementById('inspector').innerHTML.includes('table'))
+    fail('the palette table command added something other than a table');
+  doc.getElementById('undo').dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (doc.querySelectorAll('.el').length !== beforeTable)
+    fail('undo did not remove the palette-added table');
+
   // --- professional-UX shell ---
   // editable doc name in the top bar
   if (!doc.getElementById('docName')) fail('docName input missing');

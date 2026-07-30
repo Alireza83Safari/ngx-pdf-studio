@@ -3760,17 +3760,31 @@
   var paletteInput = document.getElementById('paletteInput');
   var paletteListEl = document.getElementById('paletteList');
   var paletteIndex = 0;
+  /**
+   * Toolbox entries, read off the rail instead of repeated here. The hand-kept
+   * copy had drifted to 9 while the rail grew to 12, so **table**, labelled
+   * field and page field were unreachable from Ctrl+K — the table being the one
+   * element a report author reaches for first (designer-ux 1.9). Deriving them
+   * means the two can no longer disagree.
+   */
+  function toolboxCommands() {
+    return Array.prototype.map.call(
+      document.querySelectorAll('.toolrail [data-add]'),
+      function (btn) {
+        var type = btn.dataset.add;
+        return {
+          // the rail already carries a Persian "افزودن …" label for screen readers
+          label: btn.getAttribute('aria-label') || 'افزودن ' + faName(type),
+          hint: 'toolbox',
+          run: function () {
+            addElement(type);
+          },
+        };
+      },
+    );
+  }
   function paletteCommands() {
-    var cmds = [
-      { label: 'افزودن متن', hint: 'toolbox', run: () => addElement('staticText') },
-      { label: 'افزودن فیلد داده', hint: 'toolbox', run: () => addElement('dataField') },
-      { label: 'افزودن مستطیل', hint: 'toolbox', run: () => addElement('rectangle') },
-      { label: 'افزودن خط', hint: 'toolbox', run: () => addElement('line') },
-      { label: 'افزودن بیضی', hint: 'toolbox', run: () => addElement('ellipse') },
-      { label: 'افزودن تصویر', hint: 'toolbox', run: () => addElement('image') },
-      { label: 'افزودن بارکد', hint: 'toolbox', run: () => addElement('barcode') },
-      { label: 'افزودن QR', hint: 'toolbox', run: () => addElement('qrcode') },
-      { label: 'افزودن چارت', hint: 'toolbox', run: () => addElement('chart') },
+    var cmds = toolboxCommands().concat([
       {
         label: 'گالری قالب‌ها',
         hint: '🗂',
@@ -3821,7 +3835,7 @@
         run: () => document.getElementById('importJson').click(),
       },
       { label: 'سند نو', hint: 'فایل', run: () => document.getElementById('newDoc').click() },
-    ];
+    ]);
     if (selected.length) {
       cmds.unshift(
         { label: 'کپی انتخاب (Ctrl+D)', hint: 'انتخاب', run: duplicateSelected },
