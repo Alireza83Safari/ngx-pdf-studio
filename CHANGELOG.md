@@ -111,6 +111,15 @@ entries below into a released section.
 
 ### Fixed
 
+- **`border.radius` rounded the corners in SVG and squared them in the PDF.**
+  `paintBox` drew every box with `page.drawRectangle`, which has no corner
+  radius, so a resolved radius was silently discarded — and like the underline
+  below, its only test asserted the SVG side. A box with a radius is now drawn
+  as an explicit path with cubic-Bézier corners (`C` rather than `A`, whose
+  support varies between path parsers), clamped to half the shorter side so the
+  corners cannot cross. A radius of zero still takes the plain `drawRectangle`
+  path, so existing square boxes are byte-identical.
+
 - **`decoration: 'underline'` rendered in SVG and vanished in the PDF.**
   `resolveTextStyle` has always resolved it and the SVG painter has always drawn
   it, but the word `underline` did not appear anywhere in `pdf-painter.ts`, so an

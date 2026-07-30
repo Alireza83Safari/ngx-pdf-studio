@@ -1285,6 +1285,85 @@ try {
       fail('no hint explaining that justify needs multi-line Persian text');
     store.undo();
 
+    // --- box & border panel (designer-ux ۱.۲) ---
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    store.dispatch(
+      P.addElement(band0().id, {
+        id: 'boxy',
+        type: 'rectangle',
+        bounds: { x: 0, y: 0, width: 120, height: 60 },
+        zIndex: 1,
+        // padding is in the model but no painter reads it (filed as 1.11); it is
+        // here to prove the panel carries unknown keys through instead of
+        // dropping them from an imported template
+        box: { padding: { top: 4, right: 4, bottom: 4, left: 4 } },
+      }),
+    );
+    doc
+      .querySelector('.el[data-id="boxy"]')
+      .dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+
+    const boxOf = () => P.findElement(store.getState(), 'boxy').element.box || {};
+    const ctl = (p) => {
+      const i = doc.querySelector('#inspector [data-prop="' + p + '"]');
+      if (!i) fail('box control missing: ' + p);
+      return i;
+    };
+    const setCtl = (p, v) => {
+      const i = ctl(p);
+      if (i.type === 'checkbox') i.checked = v;
+      else i.value = String(v);
+      i.dispatchEvent(new window.Event('change', { bubbles: true }));
+    };
+
+    // width alone is enough: the sides default to all four, and four collapse to
+    // `all` — the only form that can be stroked as one rectangle and take a radius
+    setCtl('boxBorderWidth', 2);
+    setCtl('boxBorderStyle', 'dashed');
+    let bd = boxOf().border || {};
+    if (!bd.all)
+      fail('a width with no explicit sides did not produce a border: ' + JSON.stringify(bd));
+    if (bd.all.style !== 'dashed') fail('border style not written');
+    if (bd.all.width !== 2) fail('border width not written');
+
+    // dropping one edge switches to the per-side shape
+    setCtl('boxSide-left', false);
+    bd = boxOf().border || {};
+    if (bd.all) fail('three sides still collapsed to `all`');
+    if (!bd.top || !bd.right || !bd.bottom)
+      fail('per-side border not written: ' + JSON.stringify(bd));
+    if (bd.left) fail('an unchecked side was still written');
+    if (bd.top.style !== 'dashed') fail('per-side border lost its style');
+    setCtl('boxSide-left', true);
+    if (!(boxOf().border || {}).all) fail('restoring the fourth side did not collapse to `all`');
+
+    setCtl('boxRadius', 8);
+    if ((boxOf().border || {}).radius !== 8) fail('radius not written');
+    setCtl('boxOpacity', 40);
+    if (boxOf().opacity !== 0.4) fail('opacity not written as a 0..1 fraction: ' + boxOf().opacity);
+    setCtl('boxFillOn', true);
+    if (!boxOf().fill) fail('fill toggle did not add a fill');
+    setCtl('boxFillOn', false);
+    if (boxOf().fill) fail('fill toggle did not remove the fill');
+
+    // the whole point of rebuilding from the panel: unmanaged keys survive
+    if (!boxOf().padding) fail('editing the box dropped padding from the element');
+
+    // zero width clears the border but keeps the radius the model allows
+    setCtl('boxBorderWidth', 0);
+    bd = boxOf().border || {};
+    if (bd.all) fail('zero width left a border behind');
+    if (bd.radius !== 8) fail('zero width also lost the radius');
+
+    // and it really reaches the PDF, not just the model (the divergence fixed here)
+    setCtl('boxBorderWidth', 1);
+    const withRadius = await P.renderToPdf(store.getState(), { data: {} });
+    setCtl('boxRadius', 0);
+    const noRadius = await P.renderToPdf(store.getState(), { data: {} });
+    if (Buffer.from(withRadius.bytes).equals(Buffer.from(noRadius.bytes)))
+      fail('corner radius made no difference to the PDF');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

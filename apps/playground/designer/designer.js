@@ -2832,22 +2832,6 @@
 
     // --- appearance ---------------------------------------------------------
     var looks = '';
-    if (el.type === 'container') {
-      looks += field(
-        'رنگ پُری',
-        '<input type="color" data-prop="cfill" value="' +
-          (el.box && el.box.fill ? rgbToHex(el.box.fill.color) : '#f8fafc') +
-          '">',
-      );
-      looks += field(
-        'رنگ کادر',
-        '<input type="color" data-prop="cborder" value="' +
-          (el.box && el.box.border && el.box.border.all
-            ? rgbToHex(el.box.border.all.color)
-            : '#cbd5e1') +
-          '">',
-      );
-    }
     if (el.type === 'line') {
       looks += field(
         'رنگ خط',
@@ -2855,10 +2839,6 @@
           rgbToHex(el.stroke ? el.stroke.color : rgb(51, 65, 85)) +
           '">',
       );
-    }
-    if (el.type === 'rectangle' || el.type === 'ellipse') {
-      var fill = el.box && el.box.fill ? rgbToHex(el.box.fill.color) : '#f1f5f9';
-      looks += field('رنگ پُری', '<input type="color" data-prop="fill" value="' + fill + '">');
     }
     if (
       el.type === 'staticText' ||
@@ -2928,6 +2908,15 @@
       html += '<div class="sec"><div class="sec-title">' + looksTitle + '</div>' + looks + '</div>';
     }
 
+    // --- box & border (designer-ux 1.2) --------------------------------------
+    // `box` lives on every element, so this replaces the per-type fill controls
+    // that used to be scattered through "ظاهر" (and that text, image, barcode,
+    // chart and table never had at all). `line` is excluded: it paints from
+    // `stroke`, so box controls there would be decoration.
+    if (el.type !== 'line') {
+      html += '<div class="sec"><div class="sec-title">جعبه و کادر</div>' + boxHtml(el) + '</div>';
+    }
+
     // conditions (ROADMAP ۲.۳): engine-side visibleWhen + one style rule
     var cond0 = (el.conditionalStyles || [])[0];
     html +=
@@ -2966,6 +2955,110 @@
     wireBandBar();
     upgradeTooltips(inspectorEl);
   }
+  var BOX_SIDES = [
+    ['top', '↑', 'بالا'],
+    ['right', '→', 'راست'],
+    ['bottom', '↓', 'پایین'],
+    ['left', '←', 'چپ'],
+  ];
+  /**
+   * Read the border facts back out of the model. A `BorderSet` is either one
+   * `all` side or a mix of named sides, so the panel shows a single
+   * colour/width/style plus which edges are on — and `all` reads as all four.
+   */
+  function borderFacts(el) {
+    var bx = el.box || {};
+    var bd = bx.border || {};
+    var ref = bd.all || bd.top || bd.right || bd.bottom || bd.left || null;
+    // Width is the on/off switch; the side toggles only choose which edges a
+    // border covers. With no border yet they default to all four, so typing a
+    // width alone produces the box the user expects — otherwise the width would
+    // have nowhere to live and would snap back to 0 on the next render.
+    var on = {};
+    BOX_SIDES.forEach(function (s) {
+      on[s[0]] = ref ? (bd.all ? true : !!bd[s[0]]) : true;
+    });
+    return {
+      hasFill: !!bx.fill,
+      fill: bx.fill ? rgbToHex(bx.fill.color) : '#f1f5f9',
+      color: ref ? rgbToHex(ref.color) : '#cbd5e1',
+      width: ref ? ref.width : 0,
+      style: (ref && ref.style) || 'solid',
+      on: on,
+      radius: bd.radius == null ? '' : bd.radius,
+      opacityPct: Math.round((bx.opacity == null ? 1 : bx.opacity) * 100),
+    };
+  }
+  function boxHtml(el) {
+    var f = borderFacts(el);
+    var s = '';
+    s += field(
+      'پُری',
+      '<label class="chk"><input type="checkbox" data-prop="boxFillOn"' +
+        (f.hasFill ? ' checked' : '') +
+        '> دارد</label>' +
+        '<input type="color" title="رنگ پُری" data-prop="boxFill" value="' +
+        f.fill +
+        '">',
+    );
+    s += field(
+      'رنگ کادر',
+      '<input type="color" data-prop="boxBorderColor" value="' + f.color + '">',
+    );
+    s += field(
+      'ضخامت',
+      '<input type="number" min="0" step="0.5" title="ضخامتِ کادر (pt) — صفر یعنی بدون کادر" ' +
+        'data-prop="boxBorderWidth" value="' +
+        f.width +
+        '">',
+    );
+    s += field(
+      'سبک کادر',
+      '<select data-prop="boxBorderStyle">' +
+        '<option value="solid"' +
+        (f.style === 'solid' ? ' selected' : '') +
+        '>توپر</option>' +
+        '<option value="dashed"' +
+        (f.style === 'dashed' ? ' selected' : '') +
+        '>خط‌چین</option>' +
+        '<option value="dotted"' +
+        (f.style === 'dotted' ? ' selected' : '') +
+        '>نقطه‌چین</option>' +
+        '</select>',
+    );
+    s +=
+      '<div class="row"><label>اضلاع</label><div class="tog-group">' +
+      BOX_SIDES.map(function (sd) {
+        return (
+          '<label class="tog" title="' +
+          sd[2] +
+          '"><input type="checkbox" data-prop="boxSide-' +
+          sd[0] +
+          '"' +
+          (f.on[sd[0]] ? ' checked' : '') +
+          '>' +
+          sd[1] +
+          '</label>'
+        );
+      }).join('') +
+      '</div></div>';
+    s += field(
+      'گردی گوشه',
+      '<input type="number" min="0" step="1" title="شعاعِ گوشه (pt) — بیشتر از نصفِ ضلعِ کوتاه‌تر خودکار محدود می‌شود" ' +
+        'data-prop="boxRadius" value="' +
+        f.radius +
+        '" placeholder="0">',
+    );
+    s += field(
+      'شفافیت',
+      '<input type="number" min="0" max="100" step="5" title="۱۰۰ یعنی کاملاً مات" ' +
+        'data-prop="boxOpacity" value="' +
+        f.opacityPct +
+        '">',
+    );
+    return s;
+  }
+
   var BOUND_TIPS = {
     x: 'فاصلهٔ افقی از لبهٔ ناحیهٔ محتوا (pt)',
     y: 'فاصلهٔ عمودی از بالای ناحیهٔ محتوا (pt)',
@@ -3215,13 +3308,7 @@
       },
       true,
     );
-    bindProp(
-      'fill',
-      function (e, v) {
-        e.box = Object.assign({}, e.box, { fill: { color: hexToRgb(v) } });
-      },
-      true,
-    );
+    // `fill` moved into the box panel below, which owns the whole `box` shape
     bindProp(
       'stroke',
       function (e, v) {
@@ -3248,15 +3335,82 @@
         }
       e.children = ch;
     });
-    bindProp('cfill', function (e, v) {
-      e.box = Object.assign({}, e.box, { fill: { color: hexToRgb(v) } });
-    });
-    bindProp('cborder', function (e, v) {
-      var prev = (e.box && e.box.border && e.box.border.all) || { width: 1 };
-      e.box = Object.assign({}, e.box, {
-        border: { all: Object.assign({}, prev, { color: hexToRgb(v) }) },
+    /**
+     * Box & border (1.2). Every control rebuilds the whole `box` from the panel,
+     * because a `BorderSet` is one shape — you cannot edit "the width" without
+     * knowing which sides are on. Keys the panel does not manage (notably
+     * `padding`, which no painter reads yet) are carried through untouched
+     * rather than dropped from an imported template.
+     */
+    function applyBox() {
+      var q = function (p) {
+        return inspectorEl.querySelector('[data-prop="' + p + '"]');
+      };
+      var num = function (p) {
+        var i = q(p);
+        return i && i.value.trim() !== '' ? Number(i.value) : NaN;
+      };
+      var hasFill = q('boxFillOn') ? q('boxFillOn').checked : false;
+      var fillHex = q('boxFill') ? q('boxFill').value : '#ffffff';
+      var colorHex = q('boxBorderColor') ? q('boxBorderColor').value : '#cbd5e1';
+      var width = num('boxBorderWidth');
+      var styleSel = q('boxBorderStyle');
+      var lineStyle = styleSel ? styleSel.value : 'solid';
+      var sides = BOX_SIDES.map(function (s) {
+        return s[0];
+      }).filter(function (name) {
+        var i = q('boxSide-' + name);
+        return i && i.checked;
       });
-    });
+      var radius = num('boxRadius');
+      var opacity = num('boxOpacity');
+
+      updateSelected(function (e) {
+        var box = Object.assign({}, e.box);
+        if (hasFill) box.fill = { color: hexToRgb(fillHex) };
+        else delete box.fill;
+
+        var border = {};
+        if (width > 0 && sides.length) {
+          var side = { width: width, color: hexToRgb(colorHex) };
+          if (lineStyle !== 'solid') side.style = lineStyle;
+          // all four edges collapse to `all` — the only form that can be drawn
+          // as a single stroked rectangle, and the only one radius applies to
+          if (sides.length === BOX_SIDES.length) border.all = side;
+          else
+            sides.forEach(function (name) {
+              border[name] = side;
+            });
+        }
+        if (radius > 0) border.radius = radius;
+        if (Object.keys(border).length) box.border = border;
+        else delete box.border;
+
+        if (Number.isFinite(opacity) && opacity < 100) {
+          box.opacity = Math.max(0, Math.min(100, opacity)) / 100;
+        } else delete box.opacity;
+
+        if (!Object.keys(box).length) delete e.box;
+        else e.box = box;
+        return e;
+      });
+    }
+    BOX_SIDES.map(function (s) {
+      return 'boxSide-' + s[0];
+    })
+      .concat([
+        'boxFillOn',
+        'boxFill',
+        'boxBorderColor',
+        'boxBorderWidth',
+        'boxBorderStyle',
+        'boxRadius',
+        'boxOpacity',
+      ])
+      .forEach(function (prop) {
+        var inp = inspectorEl.querySelector('[data-prop="' + prop + '"]');
+        if (inp) inp.addEventListener('change', applyBox);
+      });
     bindProp(
       'lineHeight',
       function (e, v) {

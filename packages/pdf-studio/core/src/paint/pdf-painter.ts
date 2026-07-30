@@ -411,6 +411,35 @@ function paintIcon(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): v
   }
 }
 
+/** A corner cannot exceed half the shorter side, or the arcs cross over. */
+function clampRadius(radius: number | undefined, width: number, height: number): number {
+  if (!radius || radius <= 0) return 0;
+  return Math.min(radius, width / 2, height / 2);
+}
+
+/**
+ * A rounded rectangle as an SVG path in layout (top-down) coordinates. Corners
+ * are cubic Béziers rather than arcs: `A` support varies between path parsers,
+ * while `C` is universal, and the 0.5523 handle length is the standard circular
+ * approximation.
+ */
+function roundedRectPath(x: number, y: number, w: number, h: number, r: number): string {
+  const k = r * 0.5523;
+  const n = (v: number): string => (Math.round(v * 1000) / 1000).toString();
+  return [
+    `M ${n(x + r)} ${n(y)}`,
+    `L ${n(x + w - r)} ${n(y)}`,
+    `C ${n(x + w - r + k)} ${n(y)} ${n(x + w)} ${n(y + r - k)} ${n(x + w)} ${n(y + r)}`,
+    `L ${n(x + w)} ${n(y + h - r)}`,
+    `C ${n(x + w)} ${n(y + h - r + k)} ${n(x + w - r + k)} ${n(y + h)} ${n(x + w - r)} ${n(y + h)}`,
+    `L ${n(x + r)} ${n(y + h)}`,
+    `C ${n(x + r - k)} ${n(y + h)} ${n(x)} ${n(y + h - r + k)} ${n(x)} ${n(y + h - r)}`,
+    `L ${n(x)} ${n(y + r)}`,
+    `C ${n(x)} ${n(y + r - k)} ${n(x + r - k)} ${n(y)} ${n(x + r)} ${n(y)}`,
+    'Z',
+  ].join(' ');
+}
+
 function paintBox(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): void {
   const style = resolveBoxStyle(el);
   const edges = resolveBorderEdges(style.border);
@@ -418,17 +447,31 @@ function paintBox(page: PDFPage, el: LaidOutElement, layoutPage: LayoutPage): vo
   const uniform = edges.uniform;
   if (style.fill || uniform) {
     const dash = uniform ? dashPattern(uniform) : undefined;
-    page.drawRectangle({
-      x,
-      y: flipY(layoutPage, y, height),
-      width,
-      height,
+    const paint = {
       ...(style.fill ? { color: toPdfColor(style.fill) } : {}),
       ...(uniform ? { borderColor: toPdfColor(uniform.color), borderWidth: uniform.width } : {}),
       ...(dash ? { borderDashArray: dash } : {}),
       opacity: style.opacity,
       borderOpacity: style.opacity,
-    });
+    };
+    // `drawRectangle` has square corners only, so a radius used to be resolved,
+    // drawn by the SVG painter, and dropped here — the preview showed rounded
+    // corners the print did not have. Above zero we draw the same box as an
+    // explicit path instead (§7).
+    const radius = clampRadius(style.radius, width, height);
+    if (radius > 0) {
+      // drawSvgPath anchors local (0,0) at (x,y) with y growing downward, so the
+      // path is written in layout space and anchored at the page top, exactly
+      // like the icon triangles above.
+      page.drawSvgPath(roundedRectPath(x, y, width, height, radius), {
+        x: 0,
+        y: layoutPage.size.height,
+        scale: 1,
+        ...paint,
+      });
+    } else {
+      page.drawRectangle({ x, y: flipY(layoutPage, y, height), width, height, ...paint });
+    }
   }
   // Individually declared sides are stroked as their own lines, matching the
   // SVG painter — a rectangle can only carry one uniform stroke.

@@ -1,8 +1,9 @@
 /**
- * `decoration: 'underline'` used to render in SVG and vanish in the PDF, so an
- * underlined element previewed one way and printed another. The existing
- * coverage only asserted the SVG side, which is how it survived. These tests
- * pin both painters to the same behaviour (§7, designer-ux 1.1).
+ * Properties the SVG painter drew and the PDF painter dropped, so the preview
+ * disagreed with the print. Both were found the same way — measuring real output
+ * rather than reading the model — and both survived because their only tests
+ * asserted the SVG side. These pin the two painters together (§7, designer-ux
+ * 1.1 and 1.2).
  */
 import { inflateSync } from 'zlib';
 import type { AnyElement } from '../model/elements';
@@ -97,5 +98,47 @@ describe('underline parity between the painters (designer-ux 1.1)', () => {
     expect(renderToSvg(template(text()), { data: {} }).pages[0]).toEqual(
       renderToSvg(template(text('none')), { data: {} }).pages[0],
     );
+  });
+});
+
+describe('corner-radius parity between the painters (designer-ux 1.2)', () => {
+  const black = { space: 'rgb', r: 0, g: 0, b: 0 } as const;
+  const boxed = (radius?: number): AnyElement =>
+    ({
+      id: 'r',
+      type: 'rectangle',
+      bounds: { x: 0, y: 0, width: 120, height: 60 },
+      zIndex: 1,
+      box: {
+        fill: { color: { space: 'rgb', r: 0.9, g: 0.9, b: 0.9 } },
+        border: { all: { width: 1, color: black }, ...(radius ? { radius } : {}) },
+      },
+    }) as AnyElement;
+
+  it('rounds the corners in the PDF, not only in the SVG', async () => {
+    const square = await renderToPdf(template(boxed()), { data: {} });
+    const round = await renderToPdf(template(boxed(10)), { data: {} });
+    expect(Buffer.from(square.bytes).equals(Buffer.from(round.bytes))).toBe(false);
+    // a square box is one `re`; a rounded one is a path of curves
+    expect(pdfOps(round.bytes)).toContain(' c\n');
+  });
+
+  it('still rounds them in the SVG', () => {
+    const svg = renderToSvg(template(boxed(10)), { data: {} }).pages[0] as string;
+    expect(svg).toMatch(/rx="10"|rx='10'/);
+  });
+
+  it('leaves a square box byte-identical to before', async () => {
+    // radius 0 must take the plain drawRectangle path, not the curve path
+    const a = await renderToPdf(template(boxed()), { data: {} });
+    const b = await renderToPdf(template(boxed(0)), { data: {} });
+    expect(Buffer.from(a.bytes).equals(Buffer.from(b.bytes))).toBe(true);
+  });
+
+  it('clamps a radius larger than half the box instead of crossing the arcs', async () => {
+    // 120×60 box: anything over 30 must behave as 30
+    const huge = await renderToPdf(template(boxed(999)), { data: {} });
+    const half = await renderToPdf(template(boxed(30)), { data: {} });
+    expect(Buffer.from(huge.bytes).equals(Buffer.from(half.bytes))).toBe(true);
   });
 });
