@@ -32,7 +32,7 @@ import type { VariableDef } from '../model/variable';
 import { isVisible, layoutLeaf, type LeafDeps } from './leaf-layout';
 import { layoutList } from './list-layout';
 import { SimpleTextMeasurer, type TextMeasurer } from './measure';
-import { resolvePageSize } from './page-size';
+import { pageSizeProblem, resolvePageSize } from './page-size';
 import type { BookmarkEntry, LaidOutElement, LayoutPage, PaginatedDocument } from './page';
 import { layoutTable, type TableLayoutDeps } from './table-layout';
 
@@ -185,6 +185,8 @@ interface SectionPlan {
 function planSection(page: PageSetup, bands: Band[], shared: SharedDeps): SectionPlan {
   const { ctx, measurer, styles, rootScope, barcodes, elements, images, resolveRows, subreports } =
     shared;
+  const sizeProblem = pageSizeProblem(page.size);
+  if (sizeProblem) warnOnce(ctx, `${sizeProblem} — falling back to A4`);
   const size = resolvePageSize(page.size, page.orientation);
   const content = contentRect(size, page.margins);
   const byType = categorizeBands(bands, ctx);
@@ -657,10 +659,11 @@ function layoutSubreport(
     leafDeps.ctx.diagnostics.push({
       severity: 'warning',
       message: `Subreport template '${el.templateRef}' is not registered`,
+      elementId: el.id,
     });
     return [];
   }
-  const value = evaluateExpr(el.dataset.source, scope, leafDeps.ctx, digits);
+  const value = evaluateExpr(el.dataset.source, scope, leafDeps.ctx, digits, el.id);
   const subData =
     typeof value === 'object' && value !== null && !Array.isArray(value)
       ? (value as Record<string, unknown>)

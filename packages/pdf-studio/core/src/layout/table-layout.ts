@@ -62,7 +62,7 @@ export function layoutTable(table: TableElement, scope: Scope, deps: TableLayout
 
   // Header row -------------------------------------------------------------
   if (hasHeader) {
-    const texts = table.columns.map((c) => cellText(c.header, scope, locale, ctx));
+    const texts = table.columns.map((c) => cellText(c.header, scope, locale, ctx, table.id));
     const h = rowHeight(texts, widths, measurer);
     table.columns.forEach((col, ci) => {
       // Header cells repeat when the table splits across pages (§6).
@@ -86,7 +86,7 @@ export function layoutTable(table: TableElement, scope: Scope, deps: TableLayout
   // Detail rows ------------------------------------------------------------
   rows.forEach((row, r) => {
     const rowScope = scope.child(row, { $index: r, $first: r === 0, $last: r === rows.length - 1 });
-    const texts = table.columns.map((c) => cellText(c.detail, rowScope, locale, ctx));
+    const texts = table.columns.map((c) => cellText(c.detail, rowScope, locale, ctx, table.id));
     const h = rowHeight(texts, widths, measurer);
     const stripe = r % 2 === 1 ? table.rowStripeStyleId : undefined;
     table.columns.forEach((col, ci) => {
@@ -108,7 +108,7 @@ export function layoutTable(table: TableElement, scope: Scope, deps: TableLayout
 
   // Aggregate footer -------------------------------------------------------
   if (hasFooter) {
-    const texts = table.columns.map((col) => footerText(col, rows, scope, locale, ctx));
+    const texts = table.columns.map((col) => footerText(col, rows, scope, locale, ctx, table.id));
     const h = rowHeight(texts, widths, measurer);
     table.columns.forEach((col, ci) => {
       elements.push(
@@ -172,11 +172,12 @@ function cellText(
   scope: Scope,
   locale: LocaleSetup,
   ctx: RenderContext,
+  elementId: string,
 ): string {
   if (!cell) return '';
   if (cell.text !== undefined) return cell.text;
   if (cell.content) {
-    const value = evaluateExpr(cell.content.source, scope, ctx, locale.digits);
+    const value = evaluateExpr(cell.content.source, scope, ctx, locale.digits, elementId);
     return applyFormat(value, undefined, locale).text;
   }
   return '';
@@ -188,6 +189,7 @@ function footerText(
   scope: Scope,
   locale: LocaleSetup,
   ctx: RenderContext,
+  elementId: string,
 ): string {
   const footer = col.footer;
   if (!footer) return '';
@@ -195,11 +197,11 @@ function footerText(
   if (footer.aggregate && col.detail?.content) {
     const expr = col.detail.content.source;
     const values = rows.map((row, r) =>
-      Number(evaluateExpr(expr, scope.child(row, { $index: r }), ctx, locale.digits)),
+      Number(evaluateExpr(expr, scope.child(row, { $index: r }), ctx, locale.digits, elementId)),
     );
     return applyFormat(aggregate(footer.aggregate, values), undefined, locale).text;
   }
-  return cellText(footer, scope, locale, ctx);
+  return cellText(footer, scope, locale, ctx, elementId);
 }
 
 function aggregate(kind: Aggregate, values: number[]): number | null {

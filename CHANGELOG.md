@@ -15,6 +15,27 @@ entries below into a released section.
 
 ### Added
 
+- `ExpressionDiagnostic` gained an optional **`elementId`**, and every
+  diagnostic raised while resolving an element now sets it. Diagnostics carried
+  only `{severity, message, source?}`, so a tool could not say *which* element a
+  warning came from — it had to parse the message or match the expression text,
+  and gave up whenever two elements shared one. Threaded through all
+  `evaluateExpr` call sites that have an element in scope (text, fields,
+  barcodes, QR, images, charts, tables, crosstabs, rich-text runs, conditional
+  styles, links, bookmarks, subreports), plus the layout-side warnings that
+  already named an element in prose. Diagnostics that genuinely belong to no
+  element — dataset declarations, band group keys, report variables, page setup
+  — leave it unset, which is why the field is optional. Additive: `source` is
+  unchanged and existing consumers keep working.
+
+- An invalid **page size** is now reported instead of silently substituted.
+  `resolvePageSize` fell back to A4 for an unknown name without a word, and
+  passed a non-positive `{width, height}` straight through, so `{width: -10}`
+  produced a page with negative extent that every later measurement treated as
+  real. Both cases now warn and fall back to A4 — one rule, so the document
+  stays renderable. The new `pageSizeProblem()` is exported for tools that want
+  to validate ahead of rendering.
+
 - Pagination now reports a **band overflow** as a diagnostic. A `fixed` band
   keeps its declared height however tall its content is (and an `auto` band is
   clamped by `max`), so anything positioned below that line was still painted —

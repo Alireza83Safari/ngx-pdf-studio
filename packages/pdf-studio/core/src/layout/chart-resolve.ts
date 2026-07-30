@@ -42,6 +42,7 @@ export function resolveChart(
       scope.child(row, { $index: index }),
       deps.ctx,
       digits,
+      el.id,
     );
     return value == null ? '' : String(value);
   });
@@ -55,6 +56,7 @@ export function resolveChart(
         scope.child(row, { $index: index }),
         deps.ctx,
         digits,
+        el.id,
       );
       const num = Number(value);
       return Number.isFinite(num) ? num : 0;

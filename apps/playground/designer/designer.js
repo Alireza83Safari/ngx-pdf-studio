@@ -1016,15 +1016,15 @@
     return found;
   }
   /**
-   * Best-effort trace from a diagnostic back to the element that produced it.
-   * The engine's `ExpressionDiagnostic` is `{severity, message, source?}` with no
-   * element id (threading one through all 31 `evaluateExpr` call sites is filed
-   * as 0.6), so this uses what is actually available: the `'<id>'` that layout
-   * and paint messages quote, and otherwise the expression text itself. Returns
-   * null when it cannot tell — the row then simply has no jump button, rather
-   * than guessing and selecting the wrong element.
+   * Trace a diagnostic back to the element that produced it. Since 0.6 the
+   * engine names it outright, which is exact; the two fallbacks below still earn
+   * their keep for diagnostics raised outside any element scope — a dataset
+   * declaration, a band group key, a report variable — where the message may
+   * still quote an id. Returns null when it cannot tell, so the row simply has
+   * no jump button rather than selecting the wrong element.
    */
   function diagElementId(t, d) {
+    if (d.elementId && P.findElement(t, d.elementId)) return d.elementId;
     var quoted = /'([^']+)'/.exec(d.message || '');
     if (quoted && P.findElement(t, quoted[1])) return quoted[1];
     if (!d.source) return null;

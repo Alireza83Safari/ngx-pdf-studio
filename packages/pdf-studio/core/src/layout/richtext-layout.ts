@@ -45,7 +45,7 @@ export function resolveRichText(
   const maxWidth = el.bounds.width;
   let height = 0;
   const paragraphs = el.paragraphs.map((p) => {
-    const laid = layoutParagraph(p, maxWidth, scope, locale, deps);
+    const laid = layoutParagraph(p, maxWidth, scope, locale, deps, el.id);
     height += laid.lines.reduce((sum, line) => sum + line.height, 0);
     return laid;
   });
@@ -58,10 +58,11 @@ function layoutParagraph(
   scope: Scope,
   locale: LocaleSetup,
   deps: Deps,
+  elementId: string,
 ): LaidParagraph {
   const words: Word[] = [];
   for (const run of p.runs) {
-    const text = runText(run, scope, locale, deps);
+    const text = runText(run, scope, locale, deps, elementId);
     const style = runStyle(run);
     for (const token of text.split(/(\s+)/)) {
       if (token === '') continue;
@@ -116,10 +117,16 @@ function toLine(words: Word[], lineMultiplier: number): LaidTextLine {
   return { runs, width, height: maxFontSize * lineMultiplier };
 }
 
-function runText(run: TextRun, scope: Scope, locale: LocaleSetup, deps: Deps): string {
+function runText(
+  run: TextRun,
+  scope: Scope,
+  locale: LocaleSetup,
+  deps: Deps,
+  elementId: string,
+): string {
   if (run.text !== undefined) return run.text;
   if (run.expr) {
-    const value = evaluateExpr(run.expr.source, scope, deps.ctx, locale.digits);
+    const value = evaluateExpr(run.expr.source, scope, deps.ctx, locale.digits, elementId);
     return value == null ? '' : String(value);
   }
   return '';

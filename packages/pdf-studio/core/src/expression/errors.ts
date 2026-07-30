@@ -23,4 +23,10 @@ export interface ExpressionDiagnostic {
   message: string;
   /** The expression source that produced the diagnostic, when known. */
   source?: string;
+  /**
+   * The element the diagnostic came from, when known — so a tool can point at
+   * it rather than guessing from the message. Optional: diagnostics raised
+   * outside any element (page setup, a dataset declaration) have none.
+   */
+  elementId?: string;
 }

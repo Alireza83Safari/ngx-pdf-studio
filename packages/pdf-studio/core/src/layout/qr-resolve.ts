@@ -23,7 +23,7 @@ export function resolveQr(
   locale: LocaleSetup,
   deps: Deps,
 ): LaidQr | undefined {
-  const value = evaluateExpr(el.value.source, scope, deps.ctx, locale.digits);
+  const value = evaluateExpr(el.value.source, scope, deps.ctx, locale.digits, el.id);
   const text = value == null ? '' : String(value);
   if (text === '') {
     deps.ctx.diagnostics.push({ severity: 'warning', message: `QR code '${el.id}' has no value` });

@@ -68,10 +68,16 @@ export function isVisible(
   locale: LocaleSetup,
   ctx: RenderContext,
 ): boolean {
-  if (el.visibleWhen && !truthy(evaluateExpr(el.visibleWhen.source, scope, ctx, locale.digits))) {
+  if (
+    el.visibleWhen &&
+    !truthy(evaluateExpr(el.visibleWhen.source, scope, ctx, locale.digits, el.id))
+  ) {
     return false;
   }
-  if (el.printWhen && !truthy(evaluateExpr(el.printWhen.source, scope, ctx, locale.digits))) {
+  if (
+    el.printWhen &&
+    !truthy(evaluateExpr(el.printWhen.source, scope, ctx, locale.digits, el.id))
+  ) {
     return false;
   }
   return true;
@@ -91,7 +97,7 @@ export function layoutLeaf(
 
   // Data-driven conditional styling: overlay each matching condition (§11A-D).
   for (const cond of el.conditionalStyles ?? []) {
-    if (truthy(evaluateExpr(cond.when.source, scope, deps.ctx, locale.digits))) {
+    if (truthy(evaluateExpr(cond.when.source, scope, deps.ctx, locale.digits, el.id))) {
       typography = mergeTypography(typography, cond.typography);
       box = mergeBox(box, cond.box);
     }
@@ -126,7 +132,7 @@ export function layoutLeaf(
   }
 
   if (el.type === 'barcode') {
-    const value = evaluateExpr(el.value.source, scope, deps.ctx, locale.digits);
+    const value = evaluateExpr(el.value.source, scope, deps.ctx, locale.digits, el.id);
     const text = value == null ? '' : String(value);
     const bits = deps.barcodes.encode(el.symbology, text);
     if (bits) {
@@ -142,7 +148,7 @@ export function layoutLeaf(
 
   if (el.type === 'custom') {
     const value = el.value
-      ? evaluateExpr(el.value.source, scope, deps.ctx, locale.digits)
+      ? evaluateExpr(el.value.source, scope, deps.ctx, locale.digits, el.id)
       : undefined;
     custom = deps.elements.render(el.renderer, {
       value,
@@ -211,7 +217,7 @@ export function layoutLeaf(
   let bookmark: { title: string; level: number } | undefined;
   if (el.bookmark) {
     const title = el.bookmark.title
-      ? String(evaluateExpr(el.bookmark.title.source, scope, deps.ctx, locale.digits) ?? '')
+      ? String(evaluateExpr(el.bookmark.title.source, scope, deps.ctx, locale.digits, el.id) ?? '')
       : (text ?? '');
     bookmark = { title, level: el.bookmark.level ?? 0 };
   }
@@ -219,7 +225,9 @@ export function layoutLeaf(
   // Value-driven color scale: overlay the interpolated color as the box fill
   // so it flows through the existing fill painting in both painters (§11A-D).
   if (el.colorScale) {
-    const v = Number(evaluateExpr(el.colorScale.value.source, scope, deps.ctx, locale.digits));
+    const v = Number(
+      evaluateExpr(el.colorScale.value.source, scope, deps.ctx, locale.digits, el.id),
+    );
     if (Number.isFinite(v)) {
       box = mergeBox(box, { fill: { color: colorScaleColor(el.colorScale.stops, v) } });
     }
@@ -227,7 +235,7 @@ export function layoutLeaf(
 
   let dataBar: LaidOutElement['dataBar'];
   if (el.dataBar) {
-    const v = Number(evaluateExpr(el.dataBar.value.source, scope, deps.ctx, locale.digits));
+    const v = Number(evaluateExpr(el.dataBar.value.source, scope, deps.ctx, locale.digits, el.id));
     if (Number.isFinite(v)) {
       dataBar = {
         fraction: dataBarFraction(v, el.dataBar.max, el.dataBar.min),
@@ -238,14 +246,14 @@ export function layoutLeaf(
 
   let icon: LaidOutElement['icon'];
   if (el.iconSet && el.iconSet.thresholds.length > 0) {
-    const v = Number(evaluateExpr(el.iconSet.value.source, scope, deps.ctx, locale.digits));
+    const v = Number(evaluateExpr(el.iconSet.value.source, scope, deps.ctx, locale.digits, el.id));
     if (Number.isFinite(v)) icon = pickIcon(el.iconSet, v);
   }
 
   let formField: LaidOutElement['formField'];
   if (el.type === 'formField') {
     const raw = el.defaultValue
-      ? evaluateExpr(el.defaultValue.source, scope, deps.ctx, locale.digits)
+      ? evaluateExpr(el.defaultValue.source, scope, deps.ctx, locale.digits, el.id)
       : undefined;
     formField = {
       kind: el.fieldKind,
@@ -258,7 +266,7 @@ export function layoutLeaf(
 
   let link: LaidOutElement['link'];
   if (el.link) {
-    const target = evaluateExpr(el.link.target.source, scope, deps.ctx, locale.digits);
+    const target = evaluateExpr(el.link.target.source, scope, deps.ctx, locale.digits, el.id);
     if (el.link.kind === 'url') {
       if (target != null && String(target) !== '') link = { kind: 'url', url: String(target) };
     } else {
@@ -306,7 +314,7 @@ function resolveText(
     case 'staticText':
       return el.text;
     case 'dataField': {
-      const value = evaluateExpr(el.value.source, scope, ctx, locale.digits);
+      const value = evaluateExpr(el.value.source, scope, ctx, locale.digits, el.id);
       if (value === null || value === undefined) return el.fallback ?? '';
       const outcome = applyFormat(value, el.format, locale);
       if (outcome.warning) ctx.diagnostics.push({ severity: 'warning', message: outcome.warning });

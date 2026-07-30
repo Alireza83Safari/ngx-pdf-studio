@@ -30,6 +30,8 @@ export interface EvaluationContext {
   diagnostics: ExpressionDiagnostic[];
   /** The expression source, attached to diagnostics. */
   source?: string;
+  /** The element this expression belongs to, attached to diagnostics. */
+  elementId?: string;
   /** Optional override for the step budget. */
   maxSteps?: number;
 }
@@ -65,6 +67,7 @@ export function evaluate(ast: Expr, scope: Scope, ctx: EvaluationContext): unkno
       severity: 'warning',
       message,
       ...(ctx.source ? { source: ctx.source } : {}),
+      ...(ctx.elementId ? { elementId: ctx.elementId } : {}),
     });
   };
 

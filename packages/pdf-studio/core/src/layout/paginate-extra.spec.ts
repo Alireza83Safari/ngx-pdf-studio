@@ -192,6 +192,158 @@ describe('pagination engine — additional bands & sources', () => {
     });
   });
 
+  describe('diagnostics name their element (designer-ux 0.6)', () => {
+    const bandWith = (elements: Band['elements']): Band => ({
+      id: 'b',
+      type: 'reportHeader',
+      height: { mode: 'fixed', value: 200 },
+      elements,
+    });
+
+    it('tags a parse error with the data field that carries it', () => {
+      const ctx = createRenderContext({ data: {} });
+      paginate(
+        template([
+          bandWith([
+            {
+              id: 'broken-field',
+              type: 'dataField',
+              bounds: { x: 0, y: 0, width: 100, height: 16 },
+              zIndex: 1,
+              value: { source: 'sum(' },
+            },
+          ]),
+        ]),
+        ctx,
+      );
+      const d = ctx.diagnostics.find((x) => /Parse error/.test(x.message));
+      expect(d?.elementId).toBe('broken-field');
+      // the expression text is still there — elementId is additive
+      expect(d?.source).toBe('sum(');
+    });
+
+    // the runtime warn() path, several frames deep: table → cellText → evaluator
+    it('tags an evaluation warning raised inside a table cell', () => {
+      const ctx = createRenderContext({ data: { rows: [{ n: 1 }] } });
+      paginate(
+        template([
+          bandWith([
+            {
+              id: 'the-table',
+              type: 'table',
+              bounds: { x: 0, y: 0, width: 300, height: 60 },
+              zIndex: 1,
+              dataset: 'rows',
+              columns: [
+                {
+                  id: 'c1',
+                  width: { kind: 'auto' },
+                  detail: { content: { source: 'nosuchfn(n)' } },
+                },
+              ],
+            },
+          ]),
+        ]),
+        ctx,
+      );
+      const d = ctx.diagnostics.find((x) => /Unknown function/.test(x.message));
+      expect(d?.elementId).toBe('the-table');
+      expect(d?.severity).toBe('warning');
+    });
+
+    it('tags a chart series expression with the chart', () => {
+      const ctx = createRenderContext({ data: { rows: [{ n: 1 }] } });
+      paginate(
+        template([
+          bandWith([
+            {
+              id: 'the-chart',
+              type: 'chart',
+              bounds: { x: 0, y: 0, width: 200, height: 100 },
+              zIndex: 1,
+              chartKind: 'column',
+              dataset: 'rows',
+              categories: { source: 'n' },
+              series: [{ values: { source: 'nosuchfn(n)' } }],
+            },
+          ]),
+        ]),
+        ctx,
+      );
+      const d = ctx.diagnostics.find((x) => /Unknown function/.test(x.message));
+      expect(d?.elementId).toBe('the-chart');
+    });
+
+    it('leaves elementId off diagnostics that belong to no element', () => {
+      const ctx = createRenderContext({ data: { rows: [{ n: 1 }] } });
+      paginate(
+        template([
+          {
+            id: 'd',
+            type: 'detail',
+            height: { mode: 'fixed', value: 16 },
+            dataset: 'rows',
+            elements: [],
+          },
+        ]),
+        ctx,
+      );
+      // "Dataset 'rows' is not declared" is a template-level problem
+      const d = ctx.diagnostics.find((x) => /is not declared/.test(x.message));
+      expect(d).toBeDefined();
+      expect(d?.elementId).toBeUndefined();
+    });
+  });
+
+  describe('invalid page size (designer-ux 0.5)', () => {
+    const sizeWarnings = (ctx: ReturnType<typeof createRenderContext>) =>
+      ctx.diagnostics.filter((d) => /falling back to A4/.test(d.message));
+    const A4 = { width: 595.28, height: 841.89 };
+
+    it('warns and falls back to A4 for an unknown paper name', () => {
+      const ctx = createRenderContext({ data: {} });
+      const t = template([
+        { id: 'b', type: 'reportHeader', height: { mode: 'fixed', value: 20 }, elements: [] },
+      ]);
+      // the model types `size` as a union, so a bad name is a real possibility
+      (t.page as { size: unknown }).size = 'NotAPaperSize';
+      const doc = paginate(t, ctx);
+      expect(sizeWarnings(ctx)[0]?.message).toContain("Unknown page size 'NotAPaperSize'");
+      expect(doc.pages[0]!.size).toEqual(A4);
+    });
+
+    it('warns and falls back to A4 for a non-positive area', () => {
+      const ctx = createRenderContext({ data: {} });
+      const t = template([
+        { id: 'b', type: 'reportHeader', height: { mode: 'fixed', value: 20 }, elements: [] },
+      ]);
+      t.page.size = { width: -10, height: -10 };
+      const doc = paginate(t, ctx);
+      expect(sizeWarnings(ctx)[0]?.message).toContain('is not a positive area');
+      // previously this produced a page with negative extent, in silence
+      expect(doc.pages[0]!.size).toEqual(A4);
+    });
+
+    it('stays silent for every named size and for a real custom size', () => {
+      for (const size of ['A3', 'A4', 'A5', 'Letter', 'Legal'] as const) {
+        const ctx = createRenderContext({ data: {} });
+        const t = template([
+          { id: 'b', type: 'reportHeader', height: { mode: 'fixed', value: 20 }, elements: [] },
+        ]);
+        t.page.size = size;
+        paginate(t, ctx);
+        expect(sizeWarnings(ctx)).toEqual([]);
+      }
+      const ctx = createRenderContext({ data: {} });
+      const t = template([
+        { id: 'b', type: 'reportHeader', height: { mode: 'fixed', value: 20 }, elements: [] },
+      ]);
+      t.page.size = { width: 283, height: 170 };
+      paginate(t, ctx);
+      expect(sizeWarnings(ctx)).toEqual([]);
+    });
+  });
+
   it('warns when a detail band references an undeclared dataset', () => {
     const ctx = createRenderContext({ data: { rows: [{ n: 1 }] } });
     paginate(

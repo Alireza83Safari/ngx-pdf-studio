@@ -43,13 +43,14 @@ export function layoutCrosstab(
     deps.ctx.diagnostics.push({
       severity: 'warning',
       message: `Crosstab '${el.id}' needs a row group, a column group, and a measure`,
+      elementId: el.id,
     });
     return { elements: [], height: 0 };
   }
 
   const rows = deps.resolveRows(el.dataset, scope);
   const keyOf = (source: string, row: Record<string, unknown>): string =>
-    String(evaluateExpr(source, scope.child(row), deps.ctx, locale.digits) ?? '');
+    String(evaluateExpr(source, scope.child(row), deps.ctx, locale.digits, el.id) ?? '');
   const rowKeys = distinct(rows.map((r) => keyOf(rowGroup.source, r)));
   const colKeys = distinct(rows.map((r) => keyOf(colGroup.source, r)));
 
@@ -57,7 +58,7 @@ export function layoutCrosstab(
     const values = rows
       .filter(predicate)
       .map((r) =>
-        Number(evaluateExpr(measure.value.source, scope.child(r), deps.ctx, locale.digits)),
+        Number(evaluateExpr(measure.value.source, scope.child(r), deps.ctx, locale.digits, el.id)),
       );
     const result = aggregate(measure.aggregate, values);
     return applyFormat(result, undefined, locale).text;

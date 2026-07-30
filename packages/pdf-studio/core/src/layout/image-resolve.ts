@@ -30,7 +30,7 @@ export function resolveImage(
   if (el.resourceId) {
     const res = deps.images.get(el.resourceId);
     if (!res) {
-      warn(deps, `Image resource '${el.resourceId}' not found`);
+      warn(deps, `Image resource '${el.resourceId}' not found`, el.id);
       return undefined;
     }
     return {
@@ -42,9 +42,9 @@ export function resolveImage(
   }
 
   if (el.source) {
-    const value = evaluateExpr(el.source.source, scope, deps.ctx, locale.digits);
+    const value = evaluateExpr(el.source.source, scope, deps.ctx, locale.digits, el.id);
     if (typeof value !== 'string' || value === '') {
-      warn(deps, `Image source for '${el.id}' did not resolve to a string`);
+      warn(deps, `Image source for '${el.id}' did not resolve to a string`, el.id);
       return undefined;
     }
     const match = DATA_URI.exec(value);
@@ -55,6 +55,10 @@ export function resolveImage(
   return undefined;
 }
 
-function warn(deps: Deps, message: string): void {
-  deps.ctx.diagnostics.push({ severity: 'warning', message });
+function warn(deps: Deps, message: string, elementId?: string): void {
+  deps.ctx.diagnostics.push({
+    severity: 'warning',
+    message,
+    ...(elementId ? { elementId } : {}),
+  });
 }

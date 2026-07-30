@@ -51,6 +51,7 @@ export function evaluateCompiled(
       severity: 'error',
       message: `Parse error: ${compiled.error?.message ?? 'invalid expression'}`,
       source: compiled.source,
+      ...(ctx.elementId ? { elementId: ctx.elementId } : {}),
     });
     return null;
   }

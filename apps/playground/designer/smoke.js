@@ -1101,6 +1101,13 @@ try {
       fail('a parse error was not reported as an error');
     if (!diagInfo.classList.contains('has-error')) fail('counter does not show the error severity');
 
+    // designer-ux ۰.۶: the engine names the element outright now, so the jump
+    // rests on a real field rather than on parsing the message
+    const engDiags = P.layoutDocument(store.getState(), { data: {} }).diagnostics;
+    const tagged = engDiags.find((d) => d.elementId === 'badbind');
+    if (!tagged) fail('the engine diagnostic does not carry elementId');
+    if (!tagged.source) fail('elementId replaced source instead of joining it');
+
     // the row traces back to the element, and the jump selects it
     const goto = diagList.querySelector('.dg-goto');
     if (!goto) fail('no jump button for a diagnostic that names an expression');
