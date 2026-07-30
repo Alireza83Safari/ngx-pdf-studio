@@ -2382,8 +2382,10 @@
     s += field('نوع', '<select data-band-type>' + typeOpts + '</select>');
     s += field(
       'ارتفاع',
-      '<input type="number" min="8" data-band-height title="ارتفاع باند (pt)" value="' +
-        (h === '' ? '' : Math.round(h)) +
+      '<input type="number" step="any" min="0" data-band-height title="ارتفاع باند (' +
+        unitLabel(t) +
+        ')" value="' +
+        (h === '' ? '' : toDisplay(h, t)) +
         '">',
     );
     if (isRowBand(band)) {
@@ -2485,7 +2487,9 @@
     if (hInp)
       hInp.addEventListener('change', function () {
         store.dispatch(
-          patchBandAt(i, { height: { mode: 'fixed', value: Number(hInp.value) || 8 } }),
+          patchBandAt(i, {
+            height: { mode: 'fixed', value: Math.max(8, fromDisplay(hInp.value) || 8) },
+          }),
         );
       });
     var masterSel = inspectorEl.querySelector('[data-band-master]');
@@ -2556,7 +2560,11 @@
       '</small></div></div>';
 
     // --- placement ----------------------------------------------------------
-    html += '<div class="sec"><div class="sec-title">قرارگیری و اندازه</div>';
+    html +=
+      '<div class="sec"><div class="sec-title">قرارگیری و اندازه ' +
+      '<small class="hint">· ' +
+      unitLabel(t) +
+      '</small></div>';
     html +=
       '<div class="grid2">' +
       numField('x', b.x) +
@@ -3007,6 +3015,38 @@
     wireBandBar();
     upgradeTooltips(inspectorEl);
   }
+  // --- display units (designer-ux 1.6) --------------------------------------
+  // The model stores points, always — `page.unit` is documented as a display
+  // convenience and the engine ignores it. So this converts on the way in and
+  // out of the number fields and nothing else.
+  //
+  // Deliberately NOT converted: font size, border width and corner radius. Those
+  // are typographic measures that every design tool keeps in points whatever the
+  // ruler says, and mixing them into a millimetre document would read as a bug.
+  var UNITS = {
+    pt: { perPt: 1, decimals: 0, label: 'pt' },
+    mm: { perPt: 25.4 / 72, decimals: 1, label: 'mm' },
+    cm: { perPt: 2.54 / 72, decimals: 2, label: 'cm' },
+  };
+  function unitOf(t) {
+    return UNITS[(t && t.page && t.page.unit) || 'pt'] || UNITS.pt;
+  }
+  /** Points → the document's display unit, rounded for a number input. */
+  function toDisplay(pt, t) {
+    var u = unitOf(t || store.getState());
+    var v = pt * u.perPt;
+    var f = Math.pow(10, u.decimals);
+    return Math.round(v * f) / f;
+  }
+  /** A number typed in the display unit → points. */
+  function fromDisplay(value, t) {
+    var u = unitOf(t || store.getState());
+    return Number(value) / u.perPt;
+  }
+  function unitLabel(t) {
+    return unitOf(t || store.getState()).label;
+  }
+
   var BOX_SIDES = [
     ['top', '↑', 'بالا'],
     ['right', '→', 'راست'],
@@ -3112,21 +3152,21 @@
   }
 
   var BOUND_TIPS = {
-    x: 'فاصلهٔ افقی از لبهٔ ناحیهٔ محتوا (pt)',
-    y: 'فاصلهٔ عمودی از بالای ناحیهٔ محتوا (pt)',
-    w: 'پهنای الِمان (pt)',
-    h: 'بلندی الِمان (pt)',
+    x: 'فاصلهٔ افقی از لبهٔ ناحیهٔ محتوا',
+    y: 'فاصلهٔ عمودی از بالای ناحیهٔ محتوا',
+    w: 'پهنای الِمان',
+    h: 'بلندی الِمان',
   };
   function numField(k, v) {
     return (
       '<div class="row"><label>' +
       k +
-      '</label><input type="number" title="' +
+      '</label><input type="number" step="any" title="' +
       (BOUND_TIPS[k] || '') +
       '" data-bound="' +
       k +
       '" value="' +
-      Math.round(v) +
+      toDisplay(v) +
       '"></div>'
     );
   }
@@ -3146,7 +3186,7 @@
     inspectorEl.querySelectorAll('[data-bound]').forEach(function (inp) {
       inp.addEventListener('change', function () {
         var k = inp.dataset.bound,
-          v = Number(inp.value);
+          v = fromDisplay(inp.value);
         update(id, function (e) {
           var nb = Object.assign({}, e.bounds);
           nb[k === 'w' ? 'width' : k === 'h' ? 'height' : k] = v;
@@ -3655,14 +3695,58 @@
     }
   });
   function dispatchCustomSize() {
-    var w = Math.max(40, Number(document.getElementById('pageW').value) || 0);
-    var hgt = Math.max(40, Number(document.getElementById('pageH').value) || 0);
+    var w = Math.max(40, fromDisplay(document.getElementById('pageW').value) || 0);
+    var hgt = Math.max(40, fromDisplay(document.getElementById('pageH').value) || 0);
     store.dispatch(P.patchPageSetup({ size: { width: w, height: hgt } }));
   }
   document.getElementById('pageW').addEventListener('change', dispatchCustomSize);
   document.getElementById('pageH').addEventListener('change', dispatchCustomSize);
   document.getElementById('pageOrient').addEventListener('change', function (e) {
     store.dispatch(P.patchPageSetup({ orientation: e.target.value }));
+  });
+  // display unit (1.6) — stored on the page so it travels with the template,
+  // but it changes nothing about the output, only what the number fields say
+  document.getElementById('pageUnit').addEventListener('change', function (e) {
+    store.dispatch(P.patchPageSetup({ unit: e.target.value }));
+  });
+  // locale (1.7) — digits and calendar both measurably change the output
+  document.getElementById('pageDigits').addEventListener('change', function (e) {
+    var loc = store.getState().page.locale;
+    store.dispatch(
+      P.patchPageSetup({ locale: Object.assign({}, loc, { digits: e.target.value }) }),
+    );
+  });
+  document.getElementById('pageCalendar').addEventListener('change', function (e) {
+    var loc = store.getState().page.locale;
+    store.dispatch(
+      P.patchPageSetup({ locale: Object.assign({}, loc, { calendar: e.target.value }) }),
+    );
+  });
+  // margins (1.5)
+  var MARGIN_INPUTS = {
+    top: document.getElementById('mgTop'),
+    right: document.getElementById('mgRight'),
+    bottom: document.getElementById('mgBottom'),
+    left: document.getElementById('mgLeft'),
+  };
+  var marginLinkEl = document.getElementById('mgLink');
+  function applyMargins(changedSide) {
+    var t = store.getState();
+    var next = {};
+    if (marginLinkEl.checked && changedSide) {
+      var all = Math.max(0, fromDisplay(MARGIN_INPUTS[changedSide].value, t) || 0);
+      next = { top: all, right: all, bottom: all, left: all };
+    } else {
+      Object.keys(MARGIN_INPUTS).forEach(function (side) {
+        next[side] = Math.max(0, fromDisplay(MARGIN_INPUTS[side].value, t) || 0);
+      });
+    }
+    store.dispatch(P.patchPageSetup({ margins: next }));
+  }
+  Object.keys(MARGIN_INPUTS).forEach(function (side) {
+    MARGIN_INPUTS[side].addEventListener('change', function () {
+      applyMargins(side);
+    });
   });
   document.getElementById('exportJson').addEventListener('click', function () {
     download(
@@ -5780,13 +5864,25 @@
     var isCustom = typeof pg.size !== 'string';
     document.getElementById('pageSize').value = isCustom ? '__custom__' : pg.size;
     document.getElementById('pageOrient').value = pg.orientation;
+    document.getElementById('pageUnit').value = pg.unit || 'pt';
+    document.getElementById('pageDigits').value = pg.locale.digits;
+    document.getElementById('pageCalendar').value = pg.locale.calendar;
+    // the unit applies to these fields, so say which one is active next to them
+    document.querySelectorAll('.unit-tag').forEach(function (tag) {
+      tag.textContent = '(' + unitLabel(store.getState()) + ')';
+    });
     document.getElementById('customSizeRow').style.display = isCustom ? '' : 'none';
     if (isCustom) {
       var wInp = document.getElementById('pageW');
       var hInp = document.getElementById('pageH');
-      if (document.activeElement !== wInp) wInp.value = Math.round(pg.size.width);
-      if (document.activeElement !== hInp) hInp.value = Math.round(pg.size.height);
+      if (document.activeElement !== wInp) wInp.value = toDisplay(pg.size.width);
+      if (document.activeElement !== hInp) hInp.value = toDisplay(pg.size.height);
     }
+    // never overwrite the box being typed into, or the caret jumps
+    Object.keys(MARGIN_INPUTS).forEach(function (side) {
+      var inp = MARGIN_INPUTS[side];
+      if (document.activeElement !== inp) inp.value = toDisplay(pg.margins[side]);
+    });
     if (document.activeElement !== docNameEl) {
       docNameEl.value = store.getState().metadata.name || 'سند بی‌نام';
     }

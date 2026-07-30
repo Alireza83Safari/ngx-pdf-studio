@@ -1429,6 +1429,22 @@
         flex: none;
         accent-color: var(--accent);
       }
+      /* four margin boxes in a 2×2 that mirrors the page (designer-ux 1.5) */
+      .margin-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--sp-2);
+        flex: 1;
+        min-width: 0;
+      }
+      .margin-grid input {
+        min-width: 0;
+      }
+      /* the active display unit, echoed next to the fields it applies to */
+      .unit-tag {
+        color: var(--faint);
+        font-size: var(--fs-2xs);
+      }
       /* file picker for an image element (designer-ux 1.3) */
       .pickimg {
         flex: 1;
@@ -3465,16 +3481,19 @@
                 <option value="__custom__">سفارشی…</option>
               </select>
             </div>
-            <div
-              class="row"
-              id="customSizeRow"
-              style="display: none"
-              data-tip="ابعاد دلخواه کاغذ به پونت (هر میلی‌متر ≈ ۲.۸۳ پونت)"
-            >
-              <label>ابعاد (pt)</label>
-              <input type="number" id="pageW" min="40" step="1" aria-label="پهنای کاغذ" />
+            <div class="row" data-tip="واحد نمایش اعداد — ذخیره همیشه به پونت است">
+              <label>واحد</label>
+              <select id="pageUnit">
+                <option value="pt">پونت (pt)</option>
+                <option value="mm">میلی‌متر (mm)</option>
+                <option value="cm">سانتی‌متر (cm)</option>
+              </select>
+            </div>
+            <div class="row" id="customSizeRow" style="display: none" data-tip="ابعاد دلخواه کاغذ">
+              <label>ابعاد <span class="unit-tag"></span></label>
+              <input type="number" id="pageW" min="1" step="any" aria-label="پهنای کاغذ" />
               <span style="color: var(--faint)">×</span>
-              <input type="number" id="pageH" min="40" step="1" aria-label="بلندی کاغذ" />
+              <input type="number" id="pageH" min="1" step="any" aria-label="بلندی کاغذ" />
             </div>
             <div class="row" data-tip="عمودی یا افقی بودن کاغذ">
               <label>جهت کاغذ</label>
@@ -3483,11 +3502,43 @@
                 <option value="landscape">افقی</option>
               </select>
             </div>
+            <!-- margins (designer-ux 1.5): the engine has always honoured them,
+                 nothing could set them -->
+            <div class="row" data-tip="حاشیهٔ کاغذ — ناحیهٔ محتوا از این خط شروع می‌شود">
+              <label>حاشیه <span class="unit-tag"></span></label>
+              <div class="margin-grid">
+                <input type="number" id="mgTop" min="0" step="any" aria-label="حاشیهٔ بالا" />
+                <input type="number" id="mgRight" min="0" step="any" aria-label="حاشیهٔ راست" />
+                <input type="number" id="mgBottom" min="0" step="any" aria-label="حاشیهٔ پایین" />
+                <input type="number" id="mgLeft" min="0" step="any" aria-label="حاشیهٔ چپ" />
+              </div>
+            </div>
+            <div class="row">
+              <label></label>
+              <label class="chk" data-tip="هر چهار حاشیه با هم تغییر کنند">
+                <input type="checkbox" id="mgLink" checked /> هر چهار طرف یکی
+              </label>
+            </div>
             <div class="row" data-tip="جهت نوشتار سند — برای فارسی راست‌به‌چپ">
               <label>نوشتار</label>
               <select id="pageDir">
                 <option value="rtl">راست‌به‌چپ (RTL)</option>
                 <option value="ltr">چپ‌به‌راست (LTR)</option>
+              </select>
+            </div>
+            <!-- locale (designer-ux 1.7): both of these measurably change output -->
+            <div class="row" data-tip="ارقامی که در خروجی چاپ می‌شوند">
+              <label>ارقام</label>
+              <select id="pageDigits">
+                <option value="persian">فارسی (۱۲۳)</option>
+                <option value="latn">لاتین (123)</option>
+              </select>
+            </div>
+            <div class="row" data-tip="تقویمی که تاریخ‌ها با آن نمایش داده می‌شوند">
+              <label>تقویم</label>
+              <select id="pageCalendar">
+                <option value="jalali">جلالی (شمسی)</option>
+                <option value="gregorian">میلادی</option>
               </select>
             </div>
           </div>

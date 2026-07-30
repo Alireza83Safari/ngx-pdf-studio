@@ -1485,6 +1485,89 @@ try {
     store.undo();
     if (fonts().length !== 1) fail('undo did not restore the font');
 
+    // --- page setup: margins, unit, locale (designer-ux ۱.۵/۱.۶/۱.۷) ---
+    const pageOf = () => store.getState().page;
+    const setVal = (id, v) => {
+      const i = doc.getElementById(id);
+      if (!i) fail('page control missing: ' + id);
+      i.value = String(v);
+      i.dispatchEvent(new window.Event('change', { bubbles: true }));
+    };
+
+    // 1.5 — margins were honoured by the engine and settable by nothing
+    doc.getElementById('mgLink').checked = true;
+    setVal('mgTop', 40);
+    if (
+      JSON.stringify(pageOf().margins) !==
+      JSON.stringify({ top: 40, right: 40, bottom: 40, left: 40 })
+    )
+      fail('linked margins did not apply to all four: ' + JSON.stringify(pageOf().margins));
+    doc.getElementById('mgLink').checked = false;
+    setVal('mgLeft', 12);
+    if (pageOf().margins.left !== 12) fail('unlinked margin did not apply');
+    if (pageOf().margins.top !== 40) fail('unlinked margin changed a side it should not have');
+    // and the content really moves
+    const laidX = P.layoutDocument(store.getState(), { data: {} }).pages[0].elements[0].bounds.x;
+    if (laidX !== 12) fail('the margin did not move the content: x=' + laidX);
+
+    // 1.6 — the unit is display-only: the model must still hold points
+    setVal('pageUnit', 'mm');
+    if (pageOf().unit !== 'mm') fail('unit not stored');
+    if (pageOf().margins.left !== 12)
+      fail('switching units rewrote the stored points: ' + pageOf().margins.left);
+    // 12pt ≈ 4.2mm, so the field must now read millimetres, not 12
+    const mgLeftShown = Number(doc.getElementById('mgLeft').value);
+    if (Math.abs(mgLeftShown - 12 * (25.4 / 72)) > 0.11)
+      fail('the margin field did not convert to mm: ' + mgLeftShown);
+    // typing in mm stores the equivalent points
+    setVal('mgLeft', 10);
+    if (Math.abs(pageOf().margins.left - 10 / (25.4 / 72)) > 0.01)
+      fail('a millimetre entry was stored as points wrongly: ' + pageOf().margins.left);
+    // element geometry follows the same unit
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    const anyEl = doc.querySelector('.el');
+    anyEl.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    if (!/mm/.test(doc.getElementById('inspector').textContent))
+      fail('the placement section does not name the active unit');
+    setVal('pageUnit', 'pt');
+
+    // 1.7 — digits and calendar both measurably change the output, and each
+    // control must leave the other alone (they share one `locale` object)
+    setVal('pageCalendar', 'jalali');
+    const calBefore = pageOf().locale.calendar;
+    setVal('pageDigits', 'latn');
+    if (pageOf().locale.digits !== 'latn') fail('digits not stored');
+    if (pageOf().locale.calendar !== calBefore) fail('changing digits clobbered the calendar');
+    setVal('pageCalendar', 'gregorian');
+    if (pageOf().locale.calendar !== 'gregorian') fail('calendar not stored');
+    if (pageOf().locale.digits !== 'latn') fail('changing the calendar clobbered the digits');
+    // and it reaches the output, not just the model
+    const dated = P.layoutDocument(
+      {
+        ...store.getState(),
+        bands: [
+          {
+            id: 'dt',
+            type: 'reportHeader',
+            height: { mode: 'fixed', value: 40 },
+            elements: [
+              {
+                id: 'd',
+                type: 'pageField',
+                bounds: { x: 0, y: 0, width: 200, height: 16 },
+                zIndex: 1,
+                field: 'currentDate',
+              },
+            ],
+          },
+        ],
+      },
+      { data: {}, now: Date.parse('2026-07-30T00:00:00Z') },
+    ).pages[0].elements[0].text;
+    if (!/^2026/.test(String(dated)))
+      fail('gregorian + latin digits did not reach the rendered date: ' + dated);
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

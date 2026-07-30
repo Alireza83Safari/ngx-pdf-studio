@@ -55,48 +55,78 @@ function template(fonts: FontResource[]): PdfTemplate {
 const encodingFailure = (d: { message: string }[]): boolean =>
   d.some((x) => /with the selected font/.test(x.message));
 
+/**
+ * Every case here embeds and subsets a full Vazirmatn two or three times over,
+ * which is CPU-heavy enough to overrun Jest's 5s default once the rest of the
+ * suite is contending for cores — the same reason the byte-determinism and
+ * golden-i18n specs carry their own. These measure correctness, not speed.
+ */
+const SUBSET_TIMEOUT = 180000;
+
 describe('template-declared fonts reach the PDF', () => {
-  it('embeds a font carried in resources.fonts, with no options at all', async () => {
-    const bare = await renderToPdf(template([]), { data: {} });
-    const carried = await renderToPdf(template([{ id: 'f1', family: 'MyBrand', data: FONT_B64 }]), {
-      data: {},
-    });
-    // without it, Persian cannot be encoded by the Standard-14 fallback
-    expect(encodingFailure(bare.diagnostics)).toBe(true);
-    expect(encodingFailure(carried.diagnostics)).toBe(false);
-    expect(carried.bytes.length).toBeGreaterThan(bare.bytes.length);
-  });
+  it(
+    'embeds a font carried in resources.fonts, with no options at all',
+    async () => {
+      const bare = await renderToPdf(template([]), { data: {} });
+      const carried = await renderToPdf(
+        template([{ id: 'f1', family: 'MyBrand', data: FONT_B64 }]),
+        {
+          data: {},
+        },
+      );
+      // without it, Persian cannot be encoded by the Standard-14 fallback
+      expect(encodingFailure(bare.diagnostics)).toBe(true);
+      expect(encodingFailure(carried.diagnostics)).toBe(false);
+      expect(carried.bytes.length).toBeGreaterThan(bare.bytes.length);
+    },
+    SUBSET_TIMEOUT,
+  );
 
-  it('embeds the bytes only once when the caller supplies the same family', async () => {
-    const carried = await renderToPdf(template([{ id: 'f1', family: 'MyBrand', data: FONT_B64 }]), {
-      data: {},
-    });
-    const both = await renderToPdf(
-      template([{ id: 'f1', family: 'MyBrand', data: FONT_B64 }]),
-      {
-        data: {},
-      },
-      { pdf: { fonts: [{ family: 'MyBrand', bytes: new Uint8Array(FONT_BYTES) }] } },
-    );
-    // one variant key, one embedded subset — not two copies of the same face
-    expect(both.bytes.length).toEqual(carried.bytes.length);
-  });
+  it(
+    'embeds the bytes only once when the caller supplies the same family',
+    async () => {
+      const carried = await renderToPdf(
+        template([{ id: 'f1', family: 'MyBrand', data: FONT_B64 }]),
+        {
+          data: {},
+        },
+      );
+      const both = await renderToPdf(
+        template([{ id: 'f1', family: 'MyBrand', data: FONT_B64 }]),
+        {
+          data: {},
+        },
+        { pdf: { fonts: [{ family: 'MyBrand', bytes: new Uint8Array(FONT_BYTES) }] } },
+      );
+      // one variant key, one embedded subset — not two copies of the same face
+      expect(both.bytes.length).toEqual(carried.bytes.length);
+    },
+    SUBSET_TIMEOUT,
+  );
 
-  it('warns about a URL-only font instead of silently losing the text', async () => {
-    const res = await renderToPdf(
-      template([{ id: 'f1', family: 'MyBrand', url: 'https://example.com/f.ttf' }]),
-      { data: {} },
-    );
-    expect(res.diagnostics.some((d) => /declared by URL/.test(d.message))).toBe(true);
-  });
+  it(
+    'warns about a URL-only font instead of silently losing the text',
+    async () => {
+      const res = await renderToPdf(
+        template([{ id: 'f1', family: 'MyBrand', url: 'https://example.com/f.ttf' }]),
+        { data: {} },
+      );
+      expect(res.diagnostics.some((d) => /declared by URL/.test(d.message))).toBe(true);
+    },
+    SUBSET_TIMEOUT,
+  );
 
-  it('lets a caller override what the template carries', async () => {
-    // both name the same family; the caller's copy must win the variant key
-    const res = await renderToPdf(
-      template([{ id: 'f1', family: 'MyBrand', data: FONT_B64 }]),
-      { data: {} },
-      { pdf: { fonts: [{ family: 'MyBrand', bytes: new Uint8Array(FONT_BYTES) }] } },
-    );
-    expect(encodingFailure(res.diagnostics)).toBe(false);
-  });
+  it(
+    'lets a caller override what the template carries',
+    async () => {
+      // both name the same family; the caller's copy must win the variant key
+      const res = await renderToPdf(
+        template([{ id: 'f1', family: 'MyBrand', data: FONT_B64 }]),
+        { data: {} },
+        { pdf: { fonts: [{ family: 'MyBrand', bytes: new Uint8Array(FONT_BYTES) }] } },
+      );
+      expect(encodingFailure(res.diagnostics)).toBe(false);
+    },
+    SUBSET_TIMEOUT,
+  );
 });
