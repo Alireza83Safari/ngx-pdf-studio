@@ -15,6 +15,14 @@ entries below into a released section.
 
 ### Added
 
+- **`decoration: 'line-through'` and `verticalAlign` now render.** Both sat in
+  the model reaching neither painter: a struck-through element printed
+  undecorated, and vertical alignment was accepted and ignored outright.
+  Strike-through is drawn as a rule at x-height in the PDF and as
+  `text-decoration` in the SVG, where it can now combine with underline.
+  Vertical alignment offsets the text block within its box, and is a no-op when
+  the box has no slack — which is why default output stays byte-identical.
+
 - **`resources.fonts` is finally read.** The resource bundle exists so a
   template is self-contained and portable (§4), but nothing consumed it: a font
   declared there was ignored, text fell back to a Standard-14 face, and Persian

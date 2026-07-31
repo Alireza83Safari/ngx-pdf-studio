@@ -7,7 +7,7 @@
  */
 import type { ResolvedDirection } from '../binding/effective-locale';
 import type { Color } from '../model/color';
-import type { BorderSet, BorderSide, Fill } from '../model/style';
+import type { BorderSet, BorderSide, Fill, VerticalAlign } from '../model/style';
 import type { LaidOutElement } from '../layout/page';
 
 export const DEFAULT_FONT_SIZE = 12;
@@ -22,10 +22,31 @@ export interface ResolvedTextStyle {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  strike: boolean;
   color: Color;
   align: PhysicalAlign;
+  /** Where the text block sits when the box is taller than the text. */
+  verticalAlign: VerticalAlign;
   /** Absolute line height in points. */
   lineHeight: number;
+}
+
+/**
+ * How far down to push a block of text inside its box. Layout already grows a
+ * box to at least fit its text, so this is zero unless the author made the box
+ * taller on purpose — which is exactly when vertical alignment means anything.
+ */
+export function verticalOffset(
+  style: ResolvedTextStyle,
+  boxHeight: number,
+  lineCount: number,
+): number {
+  const blockHeight = lineCount * style.lineHeight;
+  const slack = boxHeight - blockHeight;
+  if (slack <= 0) return 0;
+  if (style.verticalAlign === 'middle') return slack / 2;
+  if (style.verticalAlign === 'bottom') return slack;
+  return 0;
 }
 
 export interface ResolvedBoxStyle {
@@ -61,8 +82,10 @@ export function resolveTextStyle(el: LaidOutElement): ResolvedTextStyle {
     bold,
     italic: t.fontStyle === 'italic',
     underline: t.decoration === 'underline',
+    strike: t.decoration === 'line-through',
     color: t.color ?? DEFAULT_COLOR,
     align: physicalAlign(t.align, el.direction),
+    verticalAlign: t.verticalAlign ?? 'top',
     lineHeight: fontSize * (t.lineHeight ?? DEFAULT_LINE_HEIGHT),
   };
 }

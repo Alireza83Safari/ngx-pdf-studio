@@ -98,8 +98,19 @@ describe('template-declared fonts reach the PDF', () => {
         },
         { pdf: { fonts: [{ family: 'MyBrand', bytes: new Uint8Array(FONT_BYTES) }] } },
       );
-      // one variant key, one embedded subset — not two copies of the same face
-      expect(both.bytes.length).toEqual(carried.bytes.length);
+      // One variant key, one embedded subset — not two copies of the same face.
+      // Asserted as "no bigger", not "byte-identical": the invariant is that a
+      // second copy of the face is not embedded, and a second copy costs
+      // kilobytes. Exact equality would additionally pin object numbering and
+      // xref widths, which this test has no business caring about.
+      expect(both.bytes.length).toBeLessThanOrEqual(carried.bytes.length);
+      // guard the guard: a genuine second face must be detectable this way
+      const twoFaces = await renderToPdf(
+        template([{ id: 'f1', family: 'MyBrand', data: FONT_B64 }]),
+        { data: {} },
+        { pdf: { fonts: [{ family: 'OtherBrand', bytes: new Uint8Array(FONT_BYTES) }] } },
+      );
+      expect(twoFaces.bytes.length).toBeGreaterThan(carried.bytes.length);
     },
     SUBSET_TIMEOUT,
   );

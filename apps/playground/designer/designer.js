@@ -3047,7 +3047,24 @@
         '<label class="tog" title="زیرخط"><input type="checkbox" data-prop="underline"' +
         (ty.decoration === 'underline' ? ' checked' : '') +
         '><u>ز</u></label>' +
+        '<label class="tog" title="خط‌خورده"><input type="checkbox" data-prop="strike"' +
+        (ty.decoration === 'line-through' ? ' checked' : '') +
+        '><s>خ</s></label>' +
         '</div></div>';
+      looks += field(
+        'تراز عمودی',
+        '<select title="وقتی جعبه از متن بلندتر است، متن کجا بنشیند" data-prop="verticalAlign">' +
+          '<option value="top"' +
+          ((ty.verticalAlign || 'top') === 'top' ? ' selected' : '') +
+          '>بالا</option>' +
+          '<option value="middle"' +
+          (ty.verticalAlign === 'middle' ? ' selected' : '') +
+          '>وسط</option>' +
+          '<option value="bottom"' +
+          (ty.verticalAlign === 'bottom' ? ' selected' : '') +
+          '>پایین</option>' +
+          '</select>',
+      );
       looks += field(
         'چینش',
         '<select title="تراز افقی متن. «دوطرفه» خطوط را با کشیدهٔ فارسی می‌کشد" data-prop="align">' +
@@ -3676,9 +3693,21 @@
     bindToggle('italic', function (on) {
       return { fontStyle: on ? 'italic' : 'normal' };
     });
+    // `decoration` holds one value, so the two switches are mutually exclusive:
+    // turning one on clears the other rather than silently losing the write
     bindToggle('underline', function (on) {
       return { decoration: on ? 'underline' : 'none' };
     });
+    bindToggle('strike', function (on) {
+      return { decoration: on ? 'line-through' : 'none' };
+    });
+    bindProp(
+      'verticalAlign',
+      function (e, v) {
+        e.typography = Object.assign({}, e.typography, { verticalAlign: v });
+      },
+      true,
+    );
     inspectorEl.querySelectorAll('[data-align]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         alignSelected(btn.dataset.align);

@@ -101,6 +101,68 @@ describe('underline parity between the painters (designer-ux 1.1)', () => {
   });
 });
 
+describe('strike-through and vertical alignment (designer-ux 1.10)', () => {
+  const boxed = (typography: Record<string, unknown>, height = 20): AnyElement =>
+    ({
+      id: 't',
+      type: 'staticText',
+      bounds: { x: 0, y: 0, width: 200, height },
+      zIndex: 1,
+      text: 'Struck',
+      typography: { fontFamily: 'Helvetica', fontSize: 14, ...typography },
+    }) as AnyElement;
+
+  it('draws a strike rule in the PDF and marks it in the SVG', async () => {
+    const plain = await renderToPdf(template(boxed({})), { data: {} });
+    const struck = await renderToPdf(template(boxed({ decoration: 'line-through' })), { data: {} });
+    const strokes = (s: string) => (s.match(/\bS\b/g) ?? []).length;
+    expect(strokes(pdfOps(struck.bytes))).toBeGreaterThan(strokes(pdfOps(plain.bytes)));
+
+    const svg = renderToSvg(template(boxed({ decoration: 'line-through' })), { data: {} })
+      .pages[0] as string;
+    expect(svg).toContain('text-decoration="line-through"');
+  });
+
+  it('moves the text down for middle and bottom, and only when there is room', () => {
+    // A box shorter than its text is grown by layout to exactly the text height,
+    // so there is no slack left and alignment has nothing to do. (A 20pt box
+    // around a 16.8pt line *does* have slack, and does shift — that is the
+    // point of the feature.)
+    const tight = (va: string) =>
+      renderToSvg(template(boxed({ verticalAlign: va }, 8)), { data: {} }).pages[0] as string;
+    expect(tight('bottom')).toEqual(tight('top'));
+
+    // a 100pt box has slack, so middle and bottom must differ from top
+    const roomy = (va: string) =>
+      renderToSvg(template(boxed({ verticalAlign: va }, 100)), { data: {} }).pages[0] as string;
+    const yOf = (svg: string) => Number(/<tspan[^>]*y="([\d.]+)"/.exec(svg)?.[1]);
+    expect(yOf(roomy('middle'))).toBeGreaterThan(yOf(roomy('top')));
+    expect(yOf(roomy('bottom'))).toBeGreaterThan(yOf(roomy('middle')));
+  });
+
+  it('shifts by the same amount in both painters', async () => {
+    // the PDF is bottom-up, so a downward shift must *lower* the baseline
+    const topPdf = pdfOps((await renderToPdf(template(boxed({}, 100)), { data: {} })).bytes);
+    const bottomPdf = pdfOps(
+      (await renderToPdf(template(boxed({ verticalAlign: 'bottom' }, 100)), { data: {} })).bytes,
+    );
+    const tdY = (ops: string) => Number(/1 0 0 1 [\d.]+ ([\d.]+) Tm/.exec(ops)?.[1] ?? NaN);
+    const top = tdY(topPdf);
+    const bottom = tdY(bottomPdf);
+    expect(Number.isFinite(top) && Number.isFinite(bottom)).toBe(true);
+    // 100pt box, one 16.8pt line → 83.2pt of slack
+    expect(top - bottom).toBeCloseTo(100 - 14 * 1.2, 1);
+  });
+
+  it('leaves default text byte-identical', async () => {
+    const a = await renderToPdf(template(boxed({})), { data: {} });
+    const b = await renderToPdf(template(boxed({ verticalAlign: 'top', decoration: 'none' })), {
+      data: {},
+    });
+    expect(Buffer.from(a.bytes).equals(Buffer.from(b.bytes))).toBe(true);
+  });
+});
+
 describe('corner-radius parity between the painters (designer-ux 1.2)', () => {
   const black = { space: 'rgb', r: 0, g: 0, b: 0 } as const;
   const boxed = (radius?: number): AnyElement =>

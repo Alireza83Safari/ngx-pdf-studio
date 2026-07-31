@@ -9,7 +9,13 @@ import type { LaidOutElement, LayoutPage, PaginatedDocument, VectorOp } from '..
 import { chartOps } from './chart-ops';
 import { colorToCss } from './color';
 import { qrRects } from './qr-geometry';
-import { dashPattern, resolveBorderEdges, resolveBoxStyle, resolveTextStyle } from './paint-style';
+import {
+  dashPattern,
+  resolveBorderEdges,
+  resolveBoxStyle,
+  resolveTextStyle,
+  verticalOffset,
+} from './paint-style';
 import type { BorderSide } from '../model/style';
 
 const rgb01ToCss = (c: { r: number; g: number; b: number }): string =>
@@ -384,12 +390,17 @@ function textMarkup(el: LaidOutElement): string {
           : 'start';
   const tx = style.align === 'center' ? x + width / 2 : style.align === 'right' ? x + width : x;
 
+  // both decorations can apply at once, and CSS takes them space-separated
+  const decorations = [style.underline ? 'underline' : '', style.strike ? 'line-through' : '']
+    .filter(Boolean)
+    .join(' ');
+
   const fontStyle = [
     `font-family="${escapeXml(style.fontFamily ?? 'sans-serif')}"`,
     `font-size="${r2(style.fontSize)}"`,
     style.bold ? `font-weight="bold"` : '',
     style.italic ? `font-style="italic"` : '',
-    style.underline ? `text-decoration="underline"` : '',
+    decorations ? `text-decoration="${decorations}"` : '',
     `fill="${colorToCss(style.color)}"`,
     `text-anchor="${anchor}"`,
     el.direction === 'rtl' ? `direction="rtl"` : '',
@@ -397,9 +408,10 @@ function textMarkup(el: LaidOutElement): string {
     .filter(Boolean)
     .join(' ');
 
+  const vShift = verticalOffset(style, el.bounds.height, lines.length);
   const tspans = lines
     .map((line, i) => {
-      const lineY = y + style.fontSize + i * style.lineHeight;
+      const lineY = y + vShift + style.fontSize + i * style.lineHeight;
       return `<tspan x="${r2(tx)}" y="${r2(lineY)}">${escapeXml(line)}</tspan>`;
     })
     .join('');

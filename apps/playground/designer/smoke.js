@@ -1256,6 +1256,23 @@ try {
     flipTypo('bold');
     if (typoOf().fontWeight !== 'bold') fail('bold toggle regressed');
 
+    // designer-ux ۱.۱۰ — `decoration` holds ONE value, so the two switches are
+    // mutually exclusive: turning either on replaces the other, and turning the
+    // active one off clears it.
+    flipTypo('strike');
+    if (typoOf().decoration !== 'line-through') fail('strike toggle did not write decoration');
+    flipTypo('underline'); // renders unchecked while strike is on, so this turns it ON
+    if (typoOf().decoration !== 'underline')
+      fail('underline did not replace line-through: ' + typoOf().decoration);
+    flipTypo('underline'); // now checked, so this turns it OFF
+    if (typoOf().decoration !== 'none')
+      fail('turning the active decoration off did not clear it: ' + typoOf().decoration);
+    const vaSel = doc.querySelector('#inspector [data-prop="verticalAlign"]');
+    if (!vaSel) fail('vertical-align control missing');
+    vaSel.value = 'middle';
+    vaSel.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (typoOf().verticalAlign !== 'middle') fail('vertical align did not apply');
+
     // line height: blank must clear rather than store 0
     const lh = doc.querySelector('#inspector [data-prop="lineHeight"]');
     if (!lh) fail('line-height control missing');

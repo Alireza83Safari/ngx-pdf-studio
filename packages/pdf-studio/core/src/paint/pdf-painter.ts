@@ -65,6 +65,7 @@ import {
   resolveBorderEdges,
   resolveBoxStyle,
   resolveTextStyle,
+  verticalOffset,
   type ResolvedTextStyle,
 } from './paint-style';
 
@@ -769,10 +770,12 @@ async function paintText(
   const lines = el.lines ?? [el.text];
   const ascent = style.fontSize * 0.8;
   const color = toPdfColor(style.color);
+  const vShift = verticalOffset(style, el.bounds.height, lines.length);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] as string;
-    const baselineY = layoutPage.size.height - (el.bounds.y + i * style.lineHeight + ascent);
+    const baselineY =
+      layoutPage.size.height - (el.bounds.y + vShift + i * style.lineHeight + ascent);
     // Split the line into directional runs in visual order; each run is drawn in
     // logical order so fontkit shapes (joins) it correctly (§7, §11, ADR-0003).
     const runs = getVisualRuns(line).map((run) => drawText(run));
@@ -799,22 +802,26 @@ async function paintText(
     // always drawn it — this side never did, so a decorated element previewed
     // underlined and printed plain. The two painters have to agree (§7).
     if (style.underline && total > 0) {
-      drawUnderline(page, lineX, baselineY, total, style.fontSize, color);
+      drawRule(page, lineX, baselineY - style.fontSize * 0.12, total, style.fontSize, color);
+    }
+    // struck through at roughly x-height, the same place the SVG painter's
+    // `line-through` lands
+    if (style.strike && total > 0) {
+      drawRule(page, lineX, baselineY + style.fontSize * 0.26, total, style.fontSize, color);
     }
   }
 }
 
-/** A decoration rule under one run of text, in PDF (bottom-up) coordinates. */
-function drawUnderline(
+/** A decoration rule across one run of text, in PDF (bottom-up) coordinates. */
+function drawRule(
   page: PDFPage,
   x: number,
-  baselineY: number,
+  y: number,
   width: number,
   fontSize: number,
   color: ReturnType<typeof toPdfColor>,
 ): void {
   const thickness = Math.max(0.4, fontSize / 16);
-  const y = baselineY - fontSize * 0.12;
   page.drawLine({ start: { x, y }, end: { x: x + width, y }, thickness, color });
 }
 
@@ -950,7 +957,7 @@ async function paintRichText(
         // same divergence as plain text: the SVG painter underlines runs, this
         // one did not
         if (run.underline && run.width > 0) {
-          drawUnderline(page, x, baselineY, run.width, run.fontSize, black);
+          drawRule(page, x, baselineY - run.fontSize * 0.12, run.width, run.fontSize, black);
         }
         x += run.width;
       }
