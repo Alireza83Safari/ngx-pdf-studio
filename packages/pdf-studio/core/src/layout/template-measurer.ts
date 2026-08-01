@@ -50,11 +50,19 @@ export class TemplateTextMeasurer implements TextMeasurer {
  */
 export function decodeFontBytes(data: string | Uint8Array | ArrayBuffer): Uint8Array {
   if (typeof data !== 'string') return data instanceof Uint8Array ? data : new Uint8Array(data);
+  // Returning the *same* array for the same base64 matters: the parsed-font
+  // cache downstream is keyed on the byte reference, and a template carries its
+  // font as base64, so decoding afresh each render would defeat it.
+  const hit = decoded.get(data);
+  if (hit) return hit;
   const binary = atob(data);
   const out = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  decoded.set(data, out);
   return out;
 }
+
+const decoded = new Map<string, Uint8Array>();
 
 /**
  * Build a measurer for a set of fonts, or `undefined` when there are none —
@@ -93,7 +101,8 @@ function sameKey(a: unknown[], b: unknown[]): boolean {
   return true;
 }
 
-/** Drop the memoised measurer. Exposed for tests and long-lived processes. */
+/** Drop the memoised measurer and decoded bytes. Exposed for tests. */
 export function clearMeasurerCache(): void {
   cache = null;
+  decoded.clear();
 }

@@ -9,7 +9,7 @@
  * font bytes are available.
  */
 import * as fontkitNs from '@pdf-lib/fontkit';
-import type { MeasureStyle, MeasuredText, TextMeasurer } from './measure';
+import { spacingWidth, type MeasureStyle, type MeasuredText, type TextMeasurer } from './measure';
 
 // esbuild's browser bundle nests this CJS module under `.default`; Node keeps
 // it on the namespace. Use whichever object actually exposes `create`.
@@ -38,6 +38,23 @@ export interface FontkitFontInput {
   bytes: Uint8Array;
 }
 
+/**
+ * Parsing a face is the expensive part — a real typeface is hundreds of
+ * kilobytes and an interactive canvas re-lays out on every pointer move. Keyed
+ * on the byte array itself, so the same bytes are parsed once however many
+ * measurers are built from them, and a garbage-collected buffer takes its
+ * parsed font with it.
+ */
+const parsed = new WeakMap<Uint8Array, FkFont>();
+
+function parseFont(bytes: Uint8Array): FkFont {
+  const hit = parsed.get(bytes);
+  if (hit) return hit;
+  const font = fk.create(bytes);
+  parsed.set(bytes, font);
+  return font;
+}
+
 export class FontkitTextMeasurer implements TextMeasurer {
   private readonly byFamily = new Map<string, FkFont>();
   private readonly fallback: FkFont;
@@ -47,7 +64,7 @@ export class FontkitTextMeasurer implements TextMeasurer {
     if (!first) throw new Error('FontkitTextMeasurer requires at least one font');
     for (const font of fonts) {
       const key = font.family.toLowerCase();
-      if (!this.byFamily.has(key)) this.byFamily.set(key, fk.create(font.bytes));
+      if (!this.byFamily.has(key)) this.byFamily.set(key, parseFont(font.bytes));
     }
     this.fallback = this.byFamily.get(first.family.toLowerCase()) as FkFont;
   }
@@ -61,7 +78,10 @@ export class FontkitTextMeasurer implements TextMeasurer {
         ? style.fontSize * style.lineHeight
         : (font.ascent - font.descent) * scale;
     const widthOf = (s: string): number =>
-      s ? font.layout(s).positions.reduce((sum, p) => sum + p.xAdvance, 0) * scale : 0;
+      s
+        ? font.layout(s).positions.reduce((sum, p) => sum + p.xAdvance, 0) * scale +
+          spacingWidth(s, style.letterSpacing)
+        : 0;
 
     const lines: string[] = [];
     for (const hard of text.split('\n')) {

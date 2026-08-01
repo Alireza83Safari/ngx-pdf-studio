@@ -403,6 +403,7 @@ function textMarkup(el: LaidOutElement): string {
     style.bold ? `font-weight="bold"` : '',
     style.italic ? `font-style="italic"` : '',
     decorations ? `text-decoration="${decorations}"` : '',
+    style.letterSpacing ? `letter-spacing="${r2(style.letterSpacing)}"` : '',
     `fill="${colorToCss(style.color)}"`,
     `text-anchor="${anchor}"`,
     el.direction === 'rtl' ? `direction="rtl"` : '',

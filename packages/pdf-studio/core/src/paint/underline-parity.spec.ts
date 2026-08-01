@@ -163,6 +163,67 @@ describe('strike-through and vertical alignment (designer-ux 1.10)', () => {
   });
 });
 
+describe('letter spacing (designer-ux 1.13)', () => {
+  const spaced = (letterSpacing?: number, id = 't'): AnyElement =>
+    ({
+      id,
+      type: 'staticText',
+      bounds: { x: 0, y: 0, width: 300, height: 20 },
+      zIndex: 1,
+      text: 'SPACED',
+      typography: {
+        fontFamily: 'Helvetica',
+        fontSize: 12,
+        ...(letterSpacing ? { letterSpacing } : {}),
+      },
+    }) as AnyElement;
+
+  it('emits Tc in the PDF and letter-spacing in the SVG', async () => {
+    const ops = pdfOps((await renderToPdf(template(spaced(3)), { data: {} })).bytes);
+    expect(ops).toMatch(/\b3 Tc\b/);
+    const svg = renderToSvg(template(spaced(3)), { data: {} }).pages[0] as string;
+    expect(svg).toContain('letter-spacing="3"');
+  });
+
+  it('clears Tc again so it cannot leak into the next element', async () => {
+    const ops = pdfOps((await renderToPdf(template(spaced(3)), { data: {} })).bytes);
+    // set once, cleared once — text state survives pdf-lib's own BT/ET blocks
+    expect(ops.match(/\b3 Tc\b/g)).toHaveLength(1);
+    expect(ops).toMatch(/\b0 Tc\b/);
+    expect(ops.lastIndexOf('0 Tc')).toBeGreaterThan(ops.indexOf('3 Tc'));
+  });
+
+  it('leaves a following element unspaced', async () => {
+    const doc = template(spaced(3));
+    doc.bands[0]!.elements.push({
+      ...(spaced(undefined, 'plain') as object),
+      bounds: { x: 0, y: 40, width: 300, height: 20 },
+    } as AnyElement);
+    const ops = pdfOps((await renderToPdf(doc, { data: {} })).bytes);
+    // the spacing is closed before the second element's text is drawn
+    const close = ops.lastIndexOf('0 Tc');
+    const lastText = ops.lastIndexOf('Tj');
+    expect(close).toBeLessThan(lastText);
+  });
+
+  it('widens the measured text, so it wraps sooner', () => {
+    const narrow = (letterSpacing?: number): AnyElement =>
+      ({
+        ...(spaced(letterSpacing) as object),
+        bounds: { x: 0, y: 0, width: 60, height: 20 },
+      }) as AnyElement;
+    const lines = (ls?: number) =>
+      (renderToSvg(template(narrow(ls)), { data: {} }).pages[0] as string).match(/<tspan/g)!.length;
+    expect(lines(6)).toBeGreaterThan(lines());
+  });
+
+  it('leaves unspaced text byte-identical', async () => {
+    const a = await renderToPdf(template(spaced()), { data: {} });
+    const b = await renderToPdf(template(spaced(0)), { data: {} });
+    expect(Buffer.from(a.bytes).equals(Buffer.from(b.bytes))).toBe(true);
+  });
+});
+
 describe('box padding insets the content (designer-ux 1.11)', () => {
   const padded = (
     padding?: { top: number; right: number; bottom: number; left: number },

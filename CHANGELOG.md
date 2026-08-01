@@ -15,6 +15,19 @@ entries below into a released section.
 
 ### Added
 
+- **`letterSpacing` is honoured**, in measurement and in both painters. It was
+  in the model and read nowhere. Measurement counts it the same way the
+  painters apply it — after every glyph, including the last, which is what
+  PDF's `Tc` and CSS `letter-spacing` both do — so spaced text wraps where it
+  is drawn. The PDF operator is text state and survives pdf-lib's own `BT`/`ET`
+  blocks, so it is reset to zero after the element rather than leaking into
+  everything drawn afterwards.
+
+  `fontFeatures` stays unimplemented on purpose: `PDFFont` exposes no way to
+  pass OpenType features to an embedded font, so honouring it in measurement
+  would guarantee the two painters disagree — the failure this release spent
+  its time removing.
+
 - **`BoxStyle.padding` is honoured.** It was accepted by the schema and read by
   nothing: text sat against the element edge and wrapped at the full width
   whatever the padding said. It now insets content in both painters _and_ in

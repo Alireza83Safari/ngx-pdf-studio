@@ -27,6 +27,8 @@ export interface ResolvedTextStyle {
   align: PhysicalAlign;
   /** Where the text block sits when the box is taller than the text. */
   verticalAlign: VerticalAlign;
+  /** Extra advance after every glyph, in points (0 when unset). */
+  letterSpacing: number;
   /** Absolute line height in points. */
   lineHeight: number;
 }
@@ -86,6 +88,7 @@ export function resolveTextStyle(el: LaidOutElement): ResolvedTextStyle {
     color: t.color ?? DEFAULT_COLOR,
     align: physicalAlign(t.align, el.direction),
     verticalAlign: t.verticalAlign ?? 'top',
+    letterSpacing: t.letterSpacing ?? 0,
     lineHeight: fontSize * (t.lineHeight ?? DEFAULT_LINE_HEIGHT),
   };
 }

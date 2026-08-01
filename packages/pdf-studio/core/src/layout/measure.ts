@@ -11,6 +11,18 @@ export interface MeasureStyle {
   /** Line-height multiplier of font size. */
   lineHeight?: number;
   fontFamily?: string;
+  /**
+   * Extra advance after every glyph, in points. Both painters add it after each
+   * character including the last (PDF's `Tc`, CSS `letter-spacing`), so
+   * measurement counts it the same way or wrapping would disagree with paint.
+   */
+  letterSpacing?: number;
+}
+
+/** Advance added by letter spacing across a string, matching what is painted. */
+export function spacingWidth(text: string, letterSpacing: number | undefined): number {
+  if (!letterSpacing || !text) return 0;
+  return [...text].length * letterSpacing;
 }
 
 export interface MeasuredText {
@@ -37,7 +49,9 @@ export class SimpleTextMeasurer implements TextMeasurer {
   }
 
   measure(text: string, style: MeasureStyle, maxWidth?: number): MeasuredText {
-    const charWidth = style.fontSize * this.charWidthFactor;
+    // letter spacing folds straight into the per-character advance here, since
+    // the estimator's whole model is "every glyph is the same width"
+    const charWidth = style.fontSize * this.charWidthFactor + (style.letterSpacing ?? 0);
     const lineHeight = style.fontSize * (style.lineHeight ?? 1.2);
     const hardLines = text.split('\n');
 

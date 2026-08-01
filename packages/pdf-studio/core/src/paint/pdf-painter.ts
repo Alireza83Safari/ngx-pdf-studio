@@ -30,6 +30,7 @@ import {
   popGraphicsState,
   pushGraphicsState,
   rgb,
+  setCharacterSpacing,
   type Color as PdfLibColor,
   type PDFFont,
   type PDFPage,
@@ -59,6 +60,7 @@ import type {
 import { chartOps } from './chart-ops';
 import { colorToRgb01 } from './color';
 import { paddedRect, resolvePadding } from '../layout/box-padding';
+import { spacingWidth } from '../layout/measure';
 import { qrRects } from './qr-geometry';
 import { FontProvider, type FontInput } from './font-provider';
 import {
@@ -775,13 +777,22 @@ async function paintText(
   const content = paddedRect(el.bounds, resolvePadding(el.box));
   const vShift = verticalOffset(style, content.height, lines.length);
 
+  // `Tc` is text state: it survives pdf-lib's own BT/ET blocks and would leak
+  // into every element drawn after this one, so it is set before the lines and
+  // cleared again below.
+  if (style.letterSpacing) page.pushOperators(setCharacterSpacing(style.letterSpacing));
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] as string;
     const baselineY = layoutPage.size.height - (content.y + vShift + i * style.lineHeight + ascent);
     // Split the line into directional runs in visual order; each run is drawn in
     // logical order so fontkit shapes (joins) it correctly (§7, §11, ADR-0003).
     const runs = getVisualRuns(line).map((run) => drawText(run));
-    const widths = runs.map((run) => safeWidth(font, run, style.fontSize));
+    // the spacing lands after every glyph, so it counts toward the advance the
+    // next run starts at and toward the width alignment centres on
+    const widths = runs.map(
+      (run) => safeWidth(font, run, style.fontSize) + spacingWidth(run, style.letterSpacing),
+    );
     const total = widths.reduce((a, b) => a + b, 0);
     const lineX = lineStartX(content.x, content.width, style.align, total);
     let x = lineX;
@@ -812,6 +823,8 @@ async function paintText(
       drawRule(page, lineX, baselineY + style.fontSize * 0.26, total, style.fontSize, color);
     }
   }
+
+  if (style.letterSpacing) page.pushOperators(setCharacterSpacing(0));
 }
 
 /** A decoration rule across one run of text, in PDF (bottom-up) coordinates. */

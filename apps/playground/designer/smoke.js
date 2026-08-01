@@ -1267,6 +1267,17 @@ try {
     flipTypo('underline'); // now checked, so this turns it OFF
     if (typoOf().decoration !== 'none')
       fail('turning the active decoration off did not clear it: ' + typoOf().decoration);
+    // designer-ux ۱.۱۳ — blank/zero must clear the key, not store a zero
+    const lsInp = doc.querySelector('#inspector [data-prop="letterSpacing"]');
+    if (!lsInp) fail('letter-spacing control missing');
+    lsInp.value = '2.5';
+    lsInp.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if (typoOf().letterSpacing !== 2.5)
+      fail('letter spacing not written: ' + typoOf().letterSpacing);
+    lsInp.value = '0';
+    lsInp.dispatchEvent(new window.Event('change', { bubbles: true }));
+    if ('letterSpacing' in typoOf()) fail('zero letter spacing should clear the key');
+
     const vaSel = doc.querySelector('#inspector [data-prop="verticalAlign"]');
     if (!vaSel) fail('vertical-align control missing');
     vaSel.value = 'middle';

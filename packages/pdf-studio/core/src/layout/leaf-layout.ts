@@ -177,6 +177,9 @@ export function layoutLeaf(
         fontSize,
         ...(typography?.lineHeight !== undefined ? { lineHeight: typography.lineHeight } : {}),
         ...(typography?.fontFamily !== undefined ? { fontFamily: typography.fontFamily } : {}),
+        ...(typography?.letterSpacing !== undefined
+          ? { letterSpacing: typography.letterSpacing }
+          : {}),
       },
       innerWidth,
     );
@@ -193,6 +196,9 @@ export function layoutLeaf(
         fontSize,
         ...(typography?.lineHeight !== undefined ? { lineHeight: typography.lineHeight } : {}),
         ...(typography?.fontFamily !== undefined ? { fontFamily: typography.fontFamily } : {}),
+        ...(typography?.letterSpacing !== undefined
+          ? { letterSpacing: typography.letterSpacing }
+          : {}),
       };
       const tatweelWidth = deps.measurer.measure('ـ', style).width;
       lines = lines.map((line, i) => {

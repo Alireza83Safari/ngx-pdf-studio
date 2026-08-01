@@ -3118,6 +3118,14 @@
           '<b>فارسی/عربیِ چندخطی</b> دیده می‌شود؛ خطِ آخر و متنِ لاتین دست‌نخورده می‌مانند.</p>';
       }
       looks += field(
+        'فاصلهٔ حروف',
+        '<input type="number" step="0.1" ' +
+          'title="فاصلهٔ اضافه بعد از هر نویسه (pt) — متن را پهن‌تر می‌کند پس زودتر می‌شکند" ' +
+          'data-prop="letterSpacing" value="' +
+          (ty.letterSpacing == null ? '' : ty.letterSpacing) +
+          '" placeholder="0">',
+      );
+      looks += field(
         'فاصلهٔ خطوط',
         '<input type="number" min="0.8" max="4" step="0.1" ' +
           'title="ضریبِ اندازهٔ فونت — ۱٫۲ پیش‌فرض. فقط روی متنِ چندخطی دیده می‌شود" ' +
@@ -3718,6 +3726,19 @@
         // blank means "inherit the engine default" — store nothing rather than 0
         if (v.trim() === '' || !Number.isFinite(n) || n <= 0) delete t.lineHeight;
         else t.lineHeight = n;
+        e.typography = t;
+      },
+      true,
+    );
+    bindProp(
+      'letterSpacing',
+      function (e, v) {
+        var n = Number(v);
+        var t = Object.assign({}, e.typography);
+        // blank or zero means "no extra advance" — store nothing, so the
+        // element stays byte-identical to one that never had the property
+        if (v.trim() === '' || !Number.isFinite(n) || n === 0) delete t.letterSpacing;
+        else t.letterSpacing = n;
         e.typography = t;
       },
       true,
