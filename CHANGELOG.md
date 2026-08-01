@@ -128,6 +128,26 @@ entries below into a released section.
 
 ### Changed
 
+- **Layout now measures with the fonts the document is drawn with.** It used to
+  measure with `SimpleTextMeasurer` — every glyph half an em — while the painter
+  drew with the real face, so line breaks were computed from a shape the paper
+  never had: text that "fit" in the engine could overflow in print, and an
+  `auto` band height was an estimate of an estimate. `layoutDocument` now builds
+  a measurer from `resources.fonts` plus `options.pdf.fonts`, so `renderToPdf`,
+  `renderToSvg` and the layout tree all agree.
+
+  ⚠️ **This moves output for any document that carries a font.** Line breaks
+  land where the real metrics put them, and line height comes from the face's
+  ascent/descent instead of a flat 1.2 multiplier unless `lineHeight` says
+  otherwise — for Vazirmatn that is noticeably more generous. Pass an explicit
+  `options.paginate.measurer` to keep the old behaviour.
+
+  A family with no bytes stays on the estimator rather than borrowing another
+  face's metrics: `FontkitTextMeasurer` alone falls back to its _first_ font,
+  which would measure Helvetica with Persian metrics and call it accurate.
+  Measurers are memoised by font identity, since an interactive canvas re-lays
+  out on every pointer move and parsing a TTF is not cheap.
+
 - **`@ngx-pdf-studio/angular` now declares Angular 14 as its floor, not 12.**
   ng-packagr stamps its partial-Ivy declarations `minVersion: "14.0.0"`, and
   Angular 12/13 refuse to link them: _"this application depends upon a library

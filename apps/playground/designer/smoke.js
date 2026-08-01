@@ -1701,6 +1701,51 @@ try {
     store.undo();
     if (P.findElement(store.getState(), 'grip').element.rotation) fail('rotation is not undoable');
 
+    // --- canvas and paper measure with the same font (designer-ux ۱.۱۲) ---
+    // The engine now measures with real metrics when it holds the bytes. The
+    // canvas, the preview and the PDF must therefore all be handed the same
+    // list, or the screen would break lines where the paper does not.
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    const wrapping = {
+      id: 'wrap',
+      type: 'staticText',
+      bounds: { x: 0, y: 0, width: 140, height: 20 },
+      zIndex: 1,
+      text: 'این یک متن فارسی برای سنجش محل شکست خط است',
+      typography: { fontFamily: 'Vazirmatn', fontSize: 12 },
+    };
+    store.dispatch(P.addElement(band0().id, wrapping));
+
+    const withFonts = P.layoutDocument(
+      store.getState(),
+      { data: {} },
+      // designer.js keeps its own decoder inside the closure, so decode here
+      {
+        pdf: {
+          fonts: [{ family: 'Vazirmatn', bytes: Buffer.from(window.VAZIRMATN_BASE64, 'base64') }],
+        },
+      },
+    ).pages[0].elements.find((e) => e.id === 'wrap');
+    const withoutFonts = P.layoutDocument(
+      store.getState(),
+      { data: {} },
+      {},
+    ).pages[0].elements.find((e) => e.id === 'wrap');
+    if (withFonts.lines.length === withoutFonts.lines.length)
+      fail('the fixture no longer distinguishes the two measurers — pick a narrower box');
+
+    // the canvas SVG must show the *real* line count, not the estimate
+    const tspans = (doc.querySelector('#pageSvg').innerHTML.match(/<tspan/g) || []).length;
+    if (tspans !== withFonts.lines.length)
+      fail(
+        'the canvas measured with the estimator: ' +
+          tspans +
+          ' lines drawn, ' +
+          withFonts.lines.length +
+          ' expected with the real font',
+      );
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

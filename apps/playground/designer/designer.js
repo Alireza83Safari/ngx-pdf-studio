@@ -63,6 +63,29 @@
     for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
   }
+  /**
+   * The faces every render path must agree on (designer-ux 1.12).
+   *
+   * The engine now measures with real font metrics when it holds the bytes, so
+   * the canvas, the preview pane, the gallery thumbnails, the live diagnostics
+   * and the downloaded PDF have to be handed the *same* list — otherwise the
+   * preview would break lines in one place and the paper in another, which is
+   * precisely the divergence this phase exists to remove.
+   *
+   * Cached: decoding the bundled font is not free and the canvas re-lays out on
+   * every pointer move. Handing back the same array also lets the engine reuse
+   * its parsed measurer instead of re-parsing the TTF each time.
+   */
+  var renderFonts = null;
+  function renderOpts() {
+    if (renderFonts === null) {
+      renderFonts = window.VAZIRMATN_BASE64
+        ? [{ family: 'Vazirmatn', bytes: base64ToBytes(window.VAZIRMATN_BASE64) }]
+        : [];
+    }
+    return renderFonts.length ? { pdf: { fonts: renderFonts } } : {};
+  }
+
   function lastSelected() {
     return selected.length ? selected[selected.length - 1] : null;
   }
@@ -958,9 +981,11 @@
   /** The height the engine actually paints an element at, in pt (0 if unknown). */
   function paintedHeightOf(t, id) {
     try {
-      var doc = P.layoutDocument(displayTemplate(activeBandTemplate(t)), {
-        data: activeBandData(t),
-      });
+      var doc = P.layoutDocument(
+        displayTemplate(activeBandTemplate(t)),
+        { data: activeBandData(t) },
+        renderOpts(),
+      );
       var h = 0;
       ((doc.pages[0] && doc.pages[0].elements) || []).forEach(function (le) {
         if (le && le.id === id && le.bounds) h = Math.max(h, le.bounds.height);
@@ -1049,9 +1074,11 @@
   /** Where the active band's painted content ends, in band-relative pt. */
   function bandContentBottom(t) {
     try {
-      var doc = P.layoutDocument(displayTemplate(activeBandTemplate(t)), {
-        data: activeBandData(t),
-      });
+      var doc = P.layoutDocument(
+        displayTemplate(activeBandTemplate(t)),
+        { data: activeBandData(t) },
+        renderOpts(),
+      );
       return laidContentBottom(doc.pages[0], t.page.margins);
     } catch (e) {
       return 0;
@@ -1129,9 +1156,11 @@
     // isolated at the top so band-relative overlays line up (§7). The Preview
     // pane shows the full multi-band paginated document.
     try {
-      var doc = P.layoutDocument(displayTemplate(activeBandTemplate(t)), {
-        data: activeBandData(t),
-      });
+      var doc = P.layoutDocument(
+        displayTemplate(activeBandTemplate(t)),
+        { data: activeBandData(t) },
+        renderOpts(),
+      );
       pageSvgEl.innerHTML = doc.pages.length ? P.paintPageToSvg(doc.pages[0]) : '';
       var svgNode = pageSvgEl.querySelector('svg');
       if (svgNode) {
@@ -1308,7 +1337,8 @@
   }
   function runDiagnostics() {
     try {
-      liveDiags = P.layoutDocument(store.getState(), { data: sampleData }).diagnostics || [];
+      liveDiags =
+        P.layoutDocument(store.getState(), { data: sampleData }, renderOpts()).diagnostics || [];
     } catch (err) {
       // a template layout cannot even complete — the canvas bar (0.2) explains
       // it in Persian; here it belongs in the list as an error too
@@ -3817,7 +3847,7 @@
     clearTimeout(previewTimer);
     previewTimer = setTimeout(function () {
       try {
-        var res = P.renderToSvg(store.getState(), { data: sampleData });
+        var res = P.renderToSvg(store.getState(), { data: sampleData }, renderOpts());
         previewEl.innerHTML = res.pages
           .map(function (svg) {
             return '<div class="page-svg">' + svg + '</div>';
@@ -4451,14 +4481,13 @@
     pdfBusy = true;
     setLoading(this, true);
     try {
-      var fonts = window.VAZIRMATN_BASE64
-        ? [{ family: 'Vazirmatn', bytes: base64ToBytes(window.VAZIRMATN_BASE64) }]
-        : [];
+      // the same list the canvas and preview measure with, so the paper cannot
+      // break its lines anywhere the screen did not (1.12)
       // With the verification stamp on, render from the reproducible input
       // (no volatile `now`) so the printed code matches verify.html; otherwise
       // pin `now` to the current clock so date/now fields render as today.
       var input = verifyOn ? verifyInput() : { data: sampleData, now: Date.now() };
-      var opts = { pdf: { fonts: fonts } };
+      var opts = Object.assign({}, renderOpts());
       if (verifyOn) opts.verify = true;
       var res = await P.renderToPdf(store.getState(), input, opts);
       var blob = new Blob([res.bytes], { type: 'application/pdf' });
@@ -5202,7 +5231,9 @@
       var svg = '';
       try {
         // live WYSIWYG thumbnail: the engine renders page 1 of the template
-        svg = P.renderToSvg(tplThemed(entry.template), { data: entry.data }).pages[0] || '';
+        svg =
+          P.renderToSvg(tplThemed(entry.template), { data: entry.data }, renderOpts()).pages[0] ||
+          '';
       } catch (err) {
         svg = '';
       }

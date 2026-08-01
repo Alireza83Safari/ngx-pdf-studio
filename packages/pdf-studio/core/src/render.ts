@@ -10,6 +10,8 @@ import type { ExpressionDiagnostic } from './expression/errors';
 import { withLogicalBounds } from './layout/logical-bounds';
 import { paginate, type PaginateOptions } from './layout/paginate';
 import type { PaginatedDocument } from './layout/page';
+import type { TextMeasurer } from './layout/measure';
+import { createTemplateMeasurer } from './layout/template-measurer';
 import type { FontInput } from './paint/font-provider';
 import { paintToPdf, type PdfPaintOptions } from './paint/pdf-painter';
 import { paintToSvg } from './paint/svg-painter';
@@ -74,7 +76,34 @@ export function layoutDocument(
   // the code `verify.html` recomputes are all the same (F1.5). Mirroring runs
   // after, and carries the stamp band along to the mirrored side of the page.
   const stamped = withVerification(template, input, options);
-  return paginate(withLogicalBounds(stamped), createRenderContext(input), options.paginate);
+  return paginate(withLogicalBounds(stamped), createRenderContext(input), {
+    ...options.paginate,
+    // Measure with the faces this document will actually be drawn with (§7).
+    // An explicit measurer still wins: a caller who supplied one has said what
+    // they want measured with.
+    ...(options.paginate?.measurer ? {} : withMeasurer(availableFonts(template, options.pdf))),
+  });
+}
+
+/** Every face this render can draw with: template-declared first, caller last. */
+function availableFonts(
+  template: PdfTemplate,
+  pdf: PdfPaintOptions | undefined,
+): { family: string; bytes: string | Uint8Array | ArrayBuffer }[] {
+  const out: { family: string; bytes: string | Uint8Array | ArrayBuffer }[] = [];
+  for (const font of template.resources.fonts) {
+    if (font.data) out.push({ family: font.family, bytes: font.data });
+  }
+  for (const font of pdf?.fonts ?? []) out.push({ family: font.family, bytes: font.bytes });
+  return out;
+}
+
+/** `{ measurer }` when there is anything to measure with, else nothing. */
+function withMeasurer(fonts: { family: string; bytes: string | Uint8Array | ArrayBuffer }[]): {
+  measurer?: TextMeasurer;
+} {
+  const measurer = createTemplateMeasurer(fonts);
+  return measurer ? { measurer } : {};
 }
 
 /**
