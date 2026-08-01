@@ -42,6 +42,7 @@ try {
   run('vazirmatn.js');
   run('templates.js');
   run('designer-util.js');
+  run('designer-content.js');
   run('designer.js');
 
   const doc = window.document;
