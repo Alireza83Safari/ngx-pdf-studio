@@ -4,7 +4,7 @@ A best-in-class Angular PDF **designer** and **generation engine** — a
 JasperReports / Stimulsoft-class report tool, rebuilt natively for TypeScript
 with first-class **RTL / Persian** support.
 
-**656 tests green** across the engine and the Angular package, at 93% statement
+**716 tests green** across the engine and the Angular package, at 93% statement
 coverage behind a CI gate. Byte-deterministic PDF output, WYSIWYG by construction
 (one layout tree feeds both the SVG preview and the PDF), and a working
 in-browser visual designer with a template gallery.
@@ -106,13 +106,29 @@ npm run designer:build
 # then open apps/playground/designer/designer.html in a browser
 ```
 
-- **True WYSIWYG canvas** — the page background is the engine's own SVG painting.
-- Toolbox: text, data field, rectangle, line, ellipse, image, barcode, QR, chart.
-- **Template gallery** (🗂): invoice, sales report, letterhead, product label,
-  certificate — Persian/RTL, loaded with one click, live engine-rendered thumbnails.
-- Snap to grid + element edges with live guides, multi-select (Shift), marquee,
-  align/distribute, z-order, inline edit (double-click), field picker with
-  **drag-to-bind**, zoom, autosave, undo/redo, JSON import/export, PDF download.
+- **True WYSIWYG canvas** — the page background is the engine's own SVG painting,
+  measured with the same fonts the PDF embeds, so a line breaks on screen where
+  it breaks on paper. The active band's extent is drawn on the sheet, and content
+  reaching past it is flagged before it collides with the band below.
+- **Toolbox (12)** — text, data field, rectangle, line, ellipse, image, barcode,
+  QR, chart, table, labelled field, page field.
+- **Template gallery** (🗂) — 22 Persian/RTL templates across six categories
+  (finance, office/HR, reporting, marketing, labels & cards), loaded with one
+  click, with live engine-rendered thumbnails.
+- **Assets** — drop a PNG/JPEG on the canvas to embed a logo, or load a TTF/OTF
+  to use your own typeface; both are stored in the template so it stays portable.
+- **Inspector** — full typography (family, size, weight, italic, underline,
+  strike, alignment incl. Persian kashida justification, vertical alignment,
+  letter spacing, line height), a complete box panel (fill, per-side borders,
+  dashed/dotted, corner radius, padding, opacity), and conditional styling.
+- **Page setup** — size, orientation, margins, display unit (pt/mm/cm), writing
+  direction, digits (Persian/Latin) and calendar (Jalali/Gregorian).
+- Eight resize grips plus a rotation grip, snap to grid + element edges with live
+  guides, multi-select (Shift), marquee, align/distribute, z-order, inline edit
+  (double-click), field picker with **drag-to-bind**, zoom, autosave, undo/redo,
+  JSON import/export, PDF download.
+- **Live diagnostics** — engine warnings for the whole document appear as you
+  edit, not only when you export, with a jump to the element that caused each.
 
 ## Engine features
 
@@ -132,6 +148,10 @@ npm run designer:build
   text), QR (verified by real decode), container nesting, page fields, AcroForm
   **form fields**, rotation, and a **custom-element registry** (your renderer emits
   vector ops → both painters draw it identically).
+- **Typography** — family, size, weight, italic, underline, strike-through,
+  line height, letter spacing, horizontal + vertical alignment, and Persian
+  kashida justification. Text is measured with the document's own fonts, so
+  line breaks and auto-grown heights match what is printed.
 - **Conditional formatting** — rule-based style overlays, data bars, color scales,
   icon sets.
 - **PDF niceties** — bookmarks/outline, internal + external hyperlinks, XMP
