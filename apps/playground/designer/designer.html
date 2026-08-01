@@ -44,6 +44,9 @@
         --paper-danger: #c62f2f;
         --paper-warn: #b45309;
 
+        /* ruler thickness (designer-ux 2.2) — theme-independent, like the scales */
+        --ruler-size: 20px;
+
         /* ---- type scale (design-review 3.1) — theme-independent ---- */
         --fs-2xs: 11px;
         --fs-xs: 12px;
@@ -526,6 +529,110 @@
         position: absolute;
         border: 1px dashed rgba(120, 130, 150, 0.38);
         pointer-events: none;
+      }
+      /* Rulers (designer-ux 2.2). The sheet is a 2×2 grid — corner, top ruler,
+         side ruler, page — so alignment is structural: there is no offset to
+         recompute on scroll or zoom, and nothing to drift. */
+      #sheet {
+        display: grid;
+        grid-template-columns: var(--ruler-size) auto;
+        grid-template-rows: var(--ruler-size) auto;
+        flex: none;
+      }
+      #rulerCorner {
+        background: var(--surface);
+        border-inline-end: 1px solid var(--border);
+        border-block-end: 1px solid var(--border);
+        border-start-start-radius: var(--r-sm);
+      }
+      .ruler {
+        position: relative;
+        overflow: hidden;
+        background: var(--surface);
+        color: var(--faint);
+        font-size: 9px;
+        font-variant-numeric: tabular-nums;
+        user-select: none;
+        cursor: crosshair;
+      }
+      #rulerH {
+        border-block-end: 1px solid var(--border);
+      }
+      #rulerV {
+        border-inline-end: 1px solid var(--border);
+      }
+      .ruler .tick {
+        position: absolute;
+        background: var(--border-strong);
+      }
+      #rulerH .tick {
+        top: 0;
+        bottom: 0;
+        width: 1px;
+      }
+      #rulerV .tick {
+        left: 0;
+        right: 0;
+        height: 1px;
+      }
+      .ruler .tick b {
+        position: absolute;
+        font-weight: 400;
+        white-space: nowrap;
+        direction: ltr;
+      }
+      #rulerH .tick b {
+        top: 2px;
+        inset-inline-start: 3px;
+      }
+      /* the side ruler reads bottom-up, like every drawing tool */
+      #rulerV .tick b {
+        inset-inline-start: 2px;
+        top: 3px;
+        transform-origin: 0 0;
+      }
+      /* the pointer's position on each ruler, so you can aim before you drag */
+      .ruler .cursor {
+        position: absolute;
+        background: var(--paper-danger);
+        opacity: 0.9;
+      }
+      #rulerH .cursor {
+        top: 0;
+        bottom: 0;
+        width: 1px;
+      }
+      #rulerV .cursor {
+        left: 0;
+        right: 0;
+        height: 1px;
+      }
+      /* Manual guides: dragged off a ruler, snapped to, dragged back to remove. */
+      .guide {
+        position: absolute;
+        z-index: 18;
+        background: color-mix(in srgb, var(--paper-accent) 70%, transparent);
+      }
+      .guide.gx {
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        cursor: ew-resize;
+        border-inline-start: 5px solid transparent;
+        margin-inline-start: -5px;
+        background-clip: content-box;
+      }
+      .guide.gy {
+        left: 0;
+        right: 0;
+        height: 1px;
+        cursor: ns-resize;
+        border-top: 5px solid transparent;
+        margin-top: -5px;
+        background-clip: content-box;
+      }
+      .guide.dragging {
+        background: var(--paper-danger);
       }
       /* band extent (designer-ux 0.1) — sits under the element overlays (z 20)
          so it never steals a click, and above the engine's SVG so the boundary
@@ -2893,6 +3000,16 @@
         .tpl-foot-hint {
           display: none;
         }
+        /* rulers cost 20px of width and height and are useless without a mouse
+           to drag a guide with, so the sheet collapses to just the page (2.2) */
+        #sheet {
+          grid-template-columns: auto;
+          grid-template-rows: auto;
+        }
+        #rulerCorner,
+        .ruler {
+          display: none;
+        }
         /* the inspector's own gutters cost 32px of an already-narrow drawer, which
            is most of a number field. Give the fields the room back. */
         .sec {
@@ -3465,7 +3582,13 @@
           </div>
           <button id="canvasErrorUndo" class="btn" type="button">واگرد</button>
         </div>
-        <div id="page">
+        <!-- Rulers share a grid with the sheet rather than tracking it with JS,
+             so they cannot drift out of alignment with the page (designer-ux 2.2). -->
+        <div id="sheet">
+          <div id="rulerCorner" data-tip="واحد را در تب طراحی → صفحه عوض کن"></div>
+          <div id="rulerH" class="ruler" aria-hidden="true"></div>
+          <div id="rulerV" class="ruler" aria-hidden="true"></div>
+          <div id="page">
           <div id="pageSvg"></div>
           <div id="margins"></div>
           <!-- the strip this band actually owns. Everything past #bandBox's
@@ -3482,6 +3605,7 @@
             <span>بوم خالیه ✨</span>
             یک ابزار را از ریل کناری بکش و همین‌جا رها کن،<br />
             یا از دکمهٔ «قالب‌ها» یک طرح آماده لود کن.
+          </div>
           </div>
         </div>
       </div>

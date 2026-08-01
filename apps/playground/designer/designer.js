@@ -1307,6 +1307,8 @@
         node.appendChild(rot);
       }
     });
+    renderRulers(t, size);
+    renderGuides();
     document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
     document.getElementById('canvasHint').classList.toggle('show', band.elements.length === 0);
     renderQuickbar(t, m);
@@ -1490,6 +1492,162 @@
         },
       },
     });
+  });
+
+  // --- rulers & manual guides (designer-ux 2.2) -----------------------------
+
+  /**
+   * Guides are an editing aid, not part of the document, so they live beside the
+   * draft in localStorage rather than in the template. Putting them in the
+   * template would mean a schema change, a migration, and every exported or
+   * shared JSON carrying someone else's scaffolding.
+   */
+  var GUIDES_KEY = 'pdfstudio.guides';
+  var guides = { x: [], y: [] };
+  function loadGuides() {
+    try {
+      var raw = JSON.parse(window.localStorage.getItem(GUIDES_KEY) || 'null');
+      if (raw && Array.isArray(raw.x) && Array.isArray(raw.y)) {
+        guides = { x: raw.x.filter(isFiniteNumber), y: raw.y.filter(isFiniteNumber) };
+      }
+    } catch (err) {
+      /* a corrupt entry is not worth failing the editor over */
+    }
+  }
+  function saveGuides() {
+    try {
+      window.localStorage.setItem(GUIDES_KEY, JSON.stringify(guides));
+    } catch (err) {
+      /* ignore persistence failure */
+    }
+  }
+  function isFiniteNumber(v) {
+    return typeof v === 'number' && isFinite(v);
+  }
+
+  var rulerHEl = document.getElementById('rulerH');
+  var rulerVEl = document.getElementById('rulerV');
+
+  /** Redraw both rulers for the current page, zoom and unit. */
+  function renderRulers(t, size) {
+    var m = t.page.margins;
+    var unit = currentUnit(t);
+    paintRuler(rulerHEl, U.rulerTicks(size.width, zoom, unit, m.left), 'x');
+    paintRuler(rulerVEl, U.rulerTicks(size.height, zoom, unit, m.top), 'y');
+  }
+  function paintRuler(host, ticks, axis) {
+    var html = '';
+    for (var i = 0; i < ticks.length; i++) {
+      var pos = Math.round(ticks[i].pt * zoom);
+      html +=
+        '<div class="tick" style="' +
+        (axis === 'x' ? 'left:' : 'top:') +
+        pos +
+        'px"><b>' +
+        ticks[i].label +
+        '</b></div>';
+    }
+    // the cursor marker is re-used rather than recreated on every pointer move
+    html += '<div class="cursor" style="display:none"></div>';
+    host.innerHTML = html;
+  }
+  function moveRulerCursor(host, axis, pt) {
+    var cur = host.querySelector('.cursor');
+    if (!cur) return;
+    if (pt === null) {
+      cur.style.display = 'none';
+      return;
+    }
+    cur.style.display = '';
+    cur.style[axis === 'x' ? 'left' : 'top'] = Math.round(pt * zoom) + 'px';
+  }
+
+  /** Draw the manual guides onto the page, in page (not band) coordinates. */
+  function renderGuides() {
+    Array.prototype.slice.call(pageEl.querySelectorAll('.guide')).forEach(function (n) {
+      n.remove();
+    });
+    guides.x.forEach(function (pt, i) {
+      pageEl.appendChild(guideNode('x', i, pt));
+    });
+    guides.y.forEach(function (pt, i) {
+      pageEl.appendChild(guideNode('y', i, pt));
+    });
+  }
+  function guideNode(axis, index, pt) {
+    var node = document.createElement('div');
+    node.className = 'guide ' + (axis === 'x' ? 'gx' : 'gy');
+    node.dataset.guide = axis;
+    node.dataset.index = index;
+    node.style[axis === 'x' ? 'left' : 'top'] = pt * zoom + 'px';
+    node.title = 'راهنما — بکش تا جابه‌جا شود، به بیرونِ کاغذ ببر تا حذف شود';
+    return node;
+  }
+
+  /** Guide positions in band-relative points, which is what snapping speaks. */
+  function guideEdges(t) {
+    var m = t.page.margins;
+    return {
+      xs: guides.x.map(function (pt) {
+        return pt - m.left;
+      }),
+      ys: guides.y.map(function (pt) {
+        return pt - m.top;
+      }),
+    };
+  }
+
+  // dragging a new guide off a ruler, or an existing one around
+  var guideDrag = null;
+  function pageCoords(e) {
+    var rect = pageEl.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) / zoom, y: (e.clientY - rect.top) / zoom };
+  }
+  [
+    [rulerHEl, 'x'],
+    [rulerVEl, 'y'],
+  ].forEach(function (pair) {
+    var host = pair[0];
+    var axis = pair[1];
+    host.addEventListener('mousemove', function (e) {
+      var p = pageCoords(e);
+      moveRulerCursor(host, axis, axis === 'x' ? p.x : p.y);
+    });
+    host.addEventListener('mouseleave', function () {
+      moveRulerCursor(host, axis, null);
+    });
+    host.addEventListener('mousedown', function (e) {
+      var p = pageCoords(e);
+      guides[axis].push(axis === 'x' ? p.x : p.y);
+      guideDrag = { axis: axis, index: guides[axis].length - 1, fresh: true };
+      renderGuides();
+      e.preventDefault();
+    });
+  });
+  pageEl.addEventListener('mousedown', function (e) {
+    var g = e.target.dataset && e.target.dataset.guide;
+    if (!g) return;
+    guideDrag = { axis: g, index: Number(e.target.dataset.index), fresh: false };
+    e.target.classList.add('dragging');
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (!guideDrag) return;
+    var p = pageCoords(e);
+    guides[guideDrag.axis][guideDrag.index] = guideDrag.axis === 'x' ? p.x : p.y;
+    renderGuides();
+  });
+  window.addEventListener('mouseup', function () {
+    if (!guideDrag) return;
+    var size = pageSize(store.getState());
+    var pos = guides[guideDrag.axis][guideDrag.index];
+    var limit = guideDrag.axis === 'x' ? size.width : size.height;
+    // dropped off the sheet: that is how a guide is thrown away
+    if (!(pos >= 0 && pos <= limit)) guides[guideDrag.axis].splice(guideDrag.index, 1);
+    guideDrag = null;
+    saveGuides();
+    renderGuides();
   });
 
   /** Floating quick actions above the selection's bounding box (§8A). */
@@ -1956,7 +2114,10 @@
       xs.push(el.bounds.x, el.bounds.x + el.bounds.width);
       ys.push(el.bounds.y, el.bounds.y + el.bounds.height);
     });
-    return { xs: xs, ys: ys };
+    // Manual guides snap like element edges do — first in the list, so a guide
+    // the author placed deliberately wins over an incidental alignment (2.2).
+    var manual = guideEdges(t);
+    return { xs: manual.xs.concat(xs), ys: manual.ys.concat(ys) };
   }
   var snapValue = U.snapValue;
   function showGuides(t, gx, gy) {
@@ -5988,6 +6149,9 @@
     var fitBtn = document.getElementById('zoomFit');
     if (fitBtn) fitBtn.click();
   }
+  // guides come back with the draft: they are scaffolding for a document, and
+  // losing them on refresh would make them not worth placing (2.2)
+  loadGuides();
   if (!tryLoadFromHash() && !restoreDraft()) {
     rerender();
     renderInspector();

@@ -1759,6 +1759,71 @@ try {
           ' expected with the real font',
       );
 
+    // --- rulers and manual guides (designer-ux ۲.۲) ---
+    const rulerH = doc.getElementById('rulerH');
+    const rulerV = doc.getElementById('rulerV');
+    if (!rulerH || !rulerV) fail('rulers missing');
+    if (!rulerH.querySelectorAll('.tick').length) fail('the top ruler has no ticks');
+    if (!rulerV.querySelectorAll('.tick').length) fail('the side ruler has no ticks');
+    // zero must sit at the content edge, not the paper edge
+    const zeroTick = Array.from(rulerH.querySelectorAll('.tick')).find(
+      (t) => t.textContent.trim() === '0',
+    );
+    if (!zeroTick) fail('the ruler never reaches zero');
+    {
+      const m = store.getState().page.margins;
+      const zoomNow = parseFloat(doc.getElementById('zoomLabel').textContent) / 100;
+      const want = Math.round(m.left * zoomNow);
+      if (Math.abs(parseFloat(zeroTick.style.left) - want) > 1)
+        fail('ruler zero is not at the left margin: ' + zeroTick.style.left + ' want ' + want);
+    }
+
+    // drag a guide off the top ruler
+    const guideCount = () => doc.querySelectorAll('#page .guide').length;
+    if (guideCount() !== 0) fail('guides present before any were drawn');
+    const pageRect = doc.getElementById('page').getBoundingClientRect();
+    rulerH.dispatchEvent(
+      new window.MouseEvent('mousedown', {
+        bubbles: true,
+        clientX: pageRect.left + 120,
+        clientY: pageRect.top,
+      }),
+    );
+    window.dispatchEvent(
+      new window.MouseEvent('mousemove', {
+        bubbles: true,
+        clientX: pageRect.left + 150,
+        clientY: pageRect.top + 40,
+      }),
+    );
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    if (guideCount() !== 1) fail('dragging off the ruler did not create a guide');
+
+    // it snaps: an element dragged near it lands on it
+    const stored = JSON.parse(mem.get('pdfstudio.guides') || '{}');
+    if (!stored.x || stored.x.length !== 1)
+      fail('the guide was not persisted: ' + mem.get('pdfstudio.guides'));
+    const guideX = stored.x[0];
+    if (!(guideX > 0)) fail('the guide landed at a nonsense position: ' + guideX);
+
+    // dropping one outside the sheet removes it again
+    rulerH.dispatchEvent(
+      new window.MouseEvent('mousedown', {
+        bubbles: true,
+        clientX: pageRect.left + 200,
+        clientY: pageRect.top,
+      }),
+    );
+    window.dispatchEvent(
+      new window.MouseEvent('mousemove', {
+        bubbles: true,
+        clientX: pageRect.left - 400,
+        clientY: pageRect.top,
+      }),
+    );
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    if (guideCount() !== 1) fail('a guide dropped off the sheet was kept: ' + guideCount());
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

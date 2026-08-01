@@ -201,6 +201,59 @@
     return { width: w, height: h };
   }
 
+  // --- rulers (designer-ux 2.2) ---------------------------------------------
+
+  /**
+   * Tick spacing for a ruler, in points.
+   *
+   * The step is chosen in the *display* unit so the labels read as round
+   * numbers a person would write — 10mm, not 28.35pt — and then converted back.
+   * `1/2/5 × 10ⁿ` is the standard ladder: it is the only progression where every
+   * step divides the next, so zooming never leaves labels at awkward multiples.
+   *
+   * `minGap` is in screen pixels: the smallest step whose labels still have room
+   * at this zoom wins, which is why zooming out thins the ruler out instead of
+   * crowding it into a smear.
+   */
+  function rulerStep(zoom, unit, minGap) {
+    var gap = minGap || 56;
+    var perPt = unitOf(unit).perPt;
+    var ladder = [1, 2, 5];
+    for (var power = -2; power <= 5; power++) {
+      for (var i = 0; i < ladder.length; i++) {
+        var stepInUnit = ladder[i] * Math.pow(10, power);
+        var stepInPt = stepInUnit / perPt;
+        if (stepInPt * zoom >= gap) return { pt: stepInPt, unit: stepInUnit };
+      }
+    }
+    return { pt: 100 / perPt, unit: 100 };
+  }
+
+  /**
+   * Ruler ticks across `lengthPt`, each with the label to print. `origin` is
+   * where zero sits — the content edge, so the numbers count from the margin
+   * the way a designer measures, not from the paper edge.
+   */
+  function rulerTicks(lengthPt, zoom, unit, origin) {
+    var step = rulerStep(zoom, unit);
+    var zero = origin || 0;
+    var ticks = [];
+    // start at the last whole step at or before the paper edge, so the run of
+    // labels stays aligned to zero however the origin falls
+    var first = Math.ceil((0 - zero) / step.pt) * step.pt + zero;
+    for (var pt = first; pt <= lengthPt + 0.001; pt += step.pt) {
+      var value = (pt - zero) * unitOf(unit).perPt;
+      // a step of 2.5mm needs a decimal; a step of 10mm does not
+      var decimals = step.unit < 1 ? 2 : step.unit < 10 ? 1 : 0;
+      var rounded = Math.round(value * 1000) / 1000;
+      ticks.push({
+        pt: pt,
+        label: Math.abs(rounded) < 1e-9 ? '0' : rounded.toFixed(decimals).replace(/\.0+$/, ''),
+      });
+    }
+    return ticks;
+  }
+
   // --- data paths (field picker) --------------------------------------------
 
   /**
@@ -245,5 +298,7 @@
     resizeBounds: resizeBounds,
     fitImageBox: fitImageBox,
     dataPaths: dataPaths,
+    rulerStep: rulerStep,
+    rulerTicks: rulerTicks,
   };
 });

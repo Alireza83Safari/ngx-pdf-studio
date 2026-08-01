@@ -215,6 +215,85 @@ describe('fitImageBox', () => {
   });
 });
 
+describe('rulerStep', () => {
+  it('picks a round number in the display unit, not in points', () => {
+    // 10mm is a step a person writes; 28.35pt is not
+    const mm = U.rulerStep(1, 'mm');
+    expect([1, 2, 5, 10, 20, 50, 100]).toContain(mm.unit);
+    const cm = U.rulerStep(1, 'cm');
+    expect([1, 2, 5, 10, 20, 50].map((n) => n / 10).concat([1, 2, 5, 10])).toContain(cm.unit);
+  });
+
+  it('only ever offers 1, 2 or 5 times a power of ten', () => {
+    for (const unit of ['pt', 'mm', 'cm']) {
+      for (const zoom of [0.1, 0.25, 0.5, 0.85, 1, 2, 4]) {
+        const { unit: step } = U.rulerStep(zoom, unit);
+        const mantissa = step / Math.pow(10, Math.floor(Math.log10(step)));
+        expect([1, 2, 5]).toContain(Math.round(mantissa));
+      }
+    }
+  });
+
+  it('always leaves room for the labels', () => {
+    const gap = 56;
+    for (const unit of ['pt', 'mm', 'cm']) {
+      for (const zoom of [0.1, 0.5, 1, 3]) {
+        expect(U.rulerStep(zoom, unit, gap).pt * zoom).toBeGreaterThanOrEqual(gap);
+      }
+    }
+  });
+
+  it('thins out as you zoom away, never the other way round', () => {
+    const far = U.rulerStep(0.25, 'mm').pt;
+    const near = U.rulerStep(2, 'mm').pt;
+    expect(far).toBeGreaterThan(near);
+  });
+});
+
+describe('rulerTicks', () => {
+  it('counts from the origin, so zero is the content edge', () => {
+    const ticks = U.rulerTicks(600, 1, 'pt', 30);
+    const zero = ticks.find((t) => t.label === '0');
+    expect(zero).toBeDefined();
+    expect(zero.pt).toBe(30);
+  });
+
+  it('still covers the paper before the origin', () => {
+    const ticks = U.rulerTicks(600, 1, 'pt', 200);
+    // the margin area is part of the sheet and gets negative numbers
+    expect(ticks.some((t) => t.pt < 200)).toBe(true);
+    expect(ticks.some((t) => t.label.startsWith('-'))).toBe(true);
+  });
+
+  it('stays inside the paper', () => {
+    const ticks = U.rulerTicks(595, 1, 'pt', 30);
+    for (const t of ticks) {
+      expect(t.pt).toBeGreaterThanOrEqual(0);
+      expect(t.pt).toBeLessThanOrEqual(595.001);
+    }
+  });
+
+  it('is evenly spaced', () => {
+    const ticks = U.rulerTicks(600, 1, 'mm', 0);
+    const gaps = ticks.slice(1).map((t, i) => t.pt - ticks[i].pt);
+    for (const g of gaps) expect(g).toBeCloseTo(gaps[0], 6);
+  });
+
+  it('labels in whole numbers where the step allows it', () => {
+    // a 10mm step must not print "10.0"
+    const ticks = U.rulerTicks(600, 1, 'mm', 0);
+    for (const t of ticks) expect(t.label).not.toMatch(/\.\d*0$/);
+  });
+
+  it('produces something at every zoom without running away', () => {
+    for (const zoom of [0.1, 0.5, 1, 4]) {
+      const ticks = U.rulerTicks(842, zoom, 'mm', 30);
+      expect(ticks.length).toBeGreaterThan(0);
+      expect(ticks.length).toBeLessThan(200); // a smear of labels helps nobody
+    }
+  });
+});
+
 describe('dataPaths', () => {
   it('walks nested objects into dotted paths', () => {
     expect(U.dataPaths({ customer: { name: 'x', city: 'y' } })).toEqual([
