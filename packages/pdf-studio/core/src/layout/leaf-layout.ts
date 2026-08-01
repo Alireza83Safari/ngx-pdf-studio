@@ -20,6 +20,7 @@ import type { Direction, LocaleSetup } from '../model/locale';
 import type { ImageResource } from '../model/resource';
 import type { BoxStyle, NamedStyle, Typography } from '../model/style';
 import type { Rect } from '../model/units';
+import { resolvePadding } from './box-padding';
 import { colorScaleColor, dataBarFraction, pickIcon } from './conditional-visuals';
 import { toPersianDigits } from '../expression/digits';
 import { justifyLineWithKashida } from '../i18n/kashida';
@@ -166,6 +167,10 @@ export function layoutLeaf(
 
   if (text !== undefined) {
     const fontSize = typography?.fontSize ?? DEFAULT_FONT_SIZE;
+    // Padding narrows the column text wraps in, and adds to the height an
+    // auto-growing box needs — so it belongs here, not only in the painters.
+    const pad = resolvePadding(box);
+    const innerWidth = Math.max(1, el.bounds.width - pad.left - pad.right);
     const measured = deps.measurer.measure(
       text,
       {
@@ -173,10 +178,13 @@ export function layoutLeaf(
         ...(typography?.lineHeight !== undefined ? { lineHeight: typography.lineHeight } : {}),
         ...(typography?.fontFamily !== undefined ? { fontFamily: typography.fontFamily } : {}),
       },
-      el.bounds.width,
+      innerWidth,
     );
     lines = measured.lines;
-    bounds = { ...el.bounds, height: Math.max(el.bounds.height, measured.height) };
+    bounds = {
+      ...el.bounds,
+      height: Math.max(el.bounds.height, measured.height + pad.top + pad.bottom),
+    };
 
     // Persian kashida justification (§11, ROADMAP ۱.۴): stretch every line
     // except the last to the element width by elongating letter joins.
@@ -189,7 +197,7 @@ export function layoutLeaf(
       const tatweelWidth = deps.measurer.measure('ـ', style).width;
       lines = lines.map((line, i) => {
         if (i === lines!.length - 1) return line;
-        const deficit = el.bounds.width - deps.measurer.measure(line, style).width;
+        const deficit = innerWidth - deps.measurer.measure(line, style).width;
         return justifyLineWithKashida(line, deficit, tatweelWidth);
       });
     }

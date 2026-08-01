@@ -58,6 +58,7 @@ import type {
 } from '../layout/page';
 import { chartOps } from './chart-ops';
 import { colorToRgb01 } from './color';
+import { paddedRect, resolvePadding } from '../layout/box-padding';
 import { qrRects } from './qr-geometry';
 import { FontProvider, type FontInput } from './font-provider';
 import {
@@ -770,18 +771,19 @@ async function paintText(
   const lines = el.lines ?? [el.text];
   const ascent = style.fontSize * 0.8;
   const color = toPdfColor(style.color);
-  const vShift = verticalOffset(style, el.bounds.height, lines.length);
+  // text sits inside the padding, not against the element edge (designer-ux 1.11)
+  const content = paddedRect(el.bounds, resolvePadding(el.box));
+  const vShift = verticalOffset(style, content.height, lines.length);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] as string;
-    const baselineY =
-      layoutPage.size.height - (el.bounds.y + vShift + i * style.lineHeight + ascent);
+    const baselineY = layoutPage.size.height - (content.y + vShift + i * style.lineHeight + ascent);
     // Split the line into directional runs in visual order; each run is drawn in
     // logical order so fontkit shapes (joins) it correctly (§7, §11, ADR-0003).
     const runs = getVisualRuns(line).map((run) => drawText(run));
     const widths = runs.map((run) => safeWidth(font, run, style.fontSize));
     const total = widths.reduce((a, b) => a + b, 0);
-    const lineX = lineStartX(el.bounds.x, el.bounds.width, style.align, total);
+    const lineX = lineStartX(content.x, content.width, style.align, total);
     let x = lineX;
 
     runs.forEach((run, idx) => {

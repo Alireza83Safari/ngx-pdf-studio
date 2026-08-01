@@ -1,15 +1,15 @@
 /**
  * Properties the SVG painter drew and the PDF painter dropped, so the preview
  * disagreed with the print. Both were found the same way — measuring real output
- * rather than reading the model — and both survived because their only tests
+ * rather than reading the model — and each survived because its only test
  * asserted the SVG side. These pin the two painters together (§7, designer-ux
- * 1.1 and 1.2).
+ * 1.1, 1.2, 1.10 and 1.11).
  */
 import { inflateSync } from 'zlib';
 import type { AnyElement } from '../model/elements';
 import type { LocaleSetup } from '../model/locale';
 import type { PdfTemplate } from '../model/template';
-import { renderToPdf, renderToSvg } from '../render';
+import { layoutDocument, renderToPdf, renderToSvg } from '../render';
 
 const EN: LocaleSetup = { language: 'en', digits: 'latn', calendar: 'gregorian' };
 
@@ -157,6 +157,87 @@ describe('strike-through and vertical alignment (designer-ux 1.10)', () => {
   it('leaves default text byte-identical', async () => {
     const a = await renderToPdf(template(boxed({})), { data: {} });
     const b = await renderToPdf(template(boxed({ verticalAlign: 'top', decoration: 'none' })), {
+      data: {},
+    });
+    expect(Buffer.from(a.bytes).equals(Buffer.from(b.bytes))).toBe(true);
+  });
+});
+
+describe('box padding insets the content (designer-ux 1.11)', () => {
+  const padded = (
+    padding?: { top: number; right: number; bottom: number; left: number },
+    text = 'Padded',
+    width = 200,
+  ): AnyElement =>
+    ({
+      id: 't',
+      type: 'staticText',
+      bounds: { x: 0, y: 0, width, height: 20 },
+      zIndex: 1,
+      text,
+      typography: { fontFamily: 'Helvetica', fontSize: 12 },
+      ...(padding ? { box: { padding } } : {}),
+    }) as AnyElement;
+  const pad = (n: number) => ({ top: n, right: n, bottom: n, left: n });
+
+  it('moves the text in from both edges in the SVG', () => {
+    const bare = renderToSvg(template(padded()), { data: {} }).pages[0] as string;
+    const inset = renderToSvg(template(padded(pad(10))), { data: {} }).pages[0] as string;
+    const xy = (svg: string) => {
+      const m = /<tspan x="([\d.]+)" y="([\d.]+)"/.exec(svg)!;
+      return { x: Number(m[1]), y: Number(m[2]) };
+    };
+    expect(xy(inset).x - xy(bare).x).toBeCloseTo(10, 1);
+    expect(xy(inset).y - xy(bare).y).toBeCloseTo(10, 1);
+  });
+
+  it('moves it by the same amount in the PDF', async () => {
+    const ops = async (p?: ReturnType<typeof pad>) =>
+      pdfOps((await renderToPdf(template(padded(p)), { data: {} })).bytes);
+    const at = (s: string) => {
+      const m = /1 0 0 1 ([\d.]+) ([\d.]+) Tm/.exec(s)!;
+      return { x: Number(m[1]), y: Number(m[2]) };
+    };
+    const bare = at(await ops());
+    const inset = at(await ops(pad(10)));
+    expect(inset.x - bare.x).toBeCloseTo(10, 1);
+    // PDF is bottom-up, so an inset from the top *lowers* the baseline
+    expect(bare.y - inset.y).toBeCloseTo(10, 1);
+  });
+
+  it('narrows the column text wraps in', () => {
+    // 200pt wide, 12pt font: the estimator gives 6pt per glyph, so ~33 fit.
+    // 80pt of horizontal padding must force an extra line.
+    const long = 'a'.repeat(30);
+    const bare = renderToSvg(template(padded(undefined, long)), { data: {} }).pages[0] as string;
+    const inset = renderToSvg(template(padded({ top: 0, right: 40, bottom: 0, left: 40 }, long)), {
+      data: {},
+    }).pages[0] as string;
+    const lineCount = (svg: string) => (svg.match(/<tspan/g) ?? []).length;
+    expect(lineCount(bare)).toBe(1);
+    expect(lineCount(inset)).toBeGreaterThan(1);
+  });
+
+  it('grows an auto-sized box by the vertical padding', () => {
+    const height = (p?: ReturnType<typeof pad>) =>
+      layoutDocument(template(padded(p)), { data: {} }).pages[0]!.elements[0]!.bounds.height;
+    // the box is 20pt and the text needs 14.4pt, so 10pt top+bottom pushes past it
+    expect(height(pad(10))).toBeCloseTo(12 * 1.2 + 20, 1);
+    expect(height()).toBe(20);
+  });
+
+  it('collapses rather than inverting when padded wider than the box', () => {
+    const doc = layoutDocument(template(padded({ top: 0, right: 500, bottom: 0, left: 500 })), {
+      data: {},
+    });
+    const el = doc.pages[0]!.elements[0]!;
+    expect(el.bounds.width).toBeGreaterThan(0);
+    expect(el.lines!.length).toBeGreaterThan(0);
+  });
+
+  it('leaves an unpadded element byte-identical', async () => {
+    const a = await renderToPdf(template(padded()), { data: {} });
+    const b = await renderToPdf(template(padded({ top: 0, right: 0, bottom: 0, left: 0 })), {
       data: {},
     });
     expect(Buffer.from(a.bytes).equals(Buffer.from(b.bytes))).toBe(true);

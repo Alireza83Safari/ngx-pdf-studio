@@ -3215,6 +3215,9 @@
       on: on,
       radius: bd.radius == null ? '' : bd.radius,
       opacityPct: Math.round((bx.opacity == null ? 1 : bx.opacity) * 100),
+      // the model carries four sides; the panel edits them together, and reads
+      // back the top as representative
+      padding: bx.padding ? toDisplay(bx.padding.top || 0) : '',
     };
   }
   function boxHtml(el) {
@@ -3283,6 +3286,15 @@
         'data-prop="boxOpacity" value="' +
         f.opacityPct +
         '">',
+    );
+    // 1.11 — held back from the 1.2 panel until the engine actually honoured it
+    s += field(
+      'بالشتک',
+      '<input type="number" min="0" step="any" ' +
+        'title="فاصلهٔ محتوا از لبهٔ جعبه — عرضِ شکستِ خط را هم کم می‌کند" ' +
+        'data-prop="boxPadding" value="' +
+        f.padding +
+        '" placeholder="0">',
     );
     return s;
   }
@@ -3613,6 +3625,8 @@
       });
       var radius = num('boxRadius');
       var opacity = num('boxOpacity');
+      var paddingRaw = num('boxPadding');
+      var padding = Number.isFinite(paddingRaw) ? fromDisplay(paddingRaw) : 0;
 
       updateSelected(function (e) {
         var box = Object.assign({}, e.box);
@@ -3639,6 +3653,11 @@
           box.opacity = Math.max(0, Math.min(100, opacity)) / 100;
         } else delete box.opacity;
 
+        // padding is no longer an unmanaged key — the engine honours it now (1.11)
+        if (padding > 0) {
+          box.padding = { top: padding, right: padding, bottom: padding, left: padding };
+        } else delete box.padding;
+
         if (!Object.keys(box).length) delete e.box;
         else e.box = box;
         return e;
@@ -3655,6 +3674,7 @@
         'boxBorderStyle',
         'boxRadius',
         'boxOpacity',
+        'boxPadding',
       ])
       .forEach(function (prop) {
         var inp = inspectorEl.querySelector('[data-prop="' + prop + '"]');

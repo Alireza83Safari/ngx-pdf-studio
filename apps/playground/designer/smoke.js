@@ -1310,9 +1310,7 @@ try {
         type: 'rectangle',
         bounds: { x: 0, y: 0, width: 120, height: 60 },
         zIndex: 1,
-        // padding is in the model but no painter reads it (filed as 1.11); it is
-        // here to prove the panel carries unknown keys through instead of
-        // dropping them from an imported template
+        // seeded so the panel has to round-trip it rather than drop it
         box: { padding: { top: 4, right: 4, bottom: 4, left: 4 } },
       }),
     );
@@ -1364,8 +1362,16 @@ try {
     setCtl('boxFillOn', false);
     if (boxOf().fill) fail('fill toggle did not remove the fill');
 
-    // the whole point of rebuilding from the panel: unmanaged keys survive
+    // rebuilding from the panel must not lose what the panel does not touch
     if (!boxOf().padding) fail('editing the box dropped padding from the element');
+
+    // designer-ux ۱.۱۱ — padding is a real control now, and reaches the engine
+    setCtl('boxPadding', 12);
+    const padNow = boxOf().padding;
+    if (!padNow || padNow.top !== 12 || padNow.left !== 12)
+      fail('padding control did not write all four sides: ' + JSON.stringify(padNow));
+    setCtl('boxPadding', 0);
+    if (boxOf().padding) fail('zero padding should clear the key, not store zeros');
 
     // zero width clears the border but keeps the radius the model allows
     setCtl('boxBorderWidth', 0);

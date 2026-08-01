@@ -4,6 +4,7 @@
  * Output is deterministic (coordinates rounded) for snapshot testing. The
  * designer canvas and live preview consume this; it never recomputes layout.
  */
+import { paddedRect, resolvePadding } from '../layout/box-padding';
 import { iconBox, iconTrianglePoints } from '../layout/conditional-visuals';
 import type { LaidOutElement, LayoutPage, PaginatedDocument, VectorOp } from '../layout/page';
 import { chartOps } from './chart-ops';
@@ -369,7 +370,8 @@ function textMarkup(el: LaidOutElement): string {
   if (el.text === undefined) return '';
   const style = resolveTextStyle(el);
   const lines = el.lines ?? [el.text];
-  const { x, y, width } = el.bounds;
+  // text sits inside the padding, not against the element edge (designer-ux 1.11)
+  const { x, y, width, height } = paddedRect(el.bounds, resolvePadding(el.box));
 
   // `style.align` is already *physical* (paint-style resolves start/end against
   // the direction), but SVG's `text-anchor` is *logical* — under
@@ -408,7 +410,7 @@ function textMarkup(el: LaidOutElement): string {
     .filter(Boolean)
     .join(' ');
 
-  const vShift = verticalOffset(style, el.bounds.height, lines.length);
+  const vShift = verticalOffset(style, height, lines.length);
   const tspans = lines
     .map((line, i) => {
       const lineY = y + vShift + style.fontSize + i * style.lineHeight;

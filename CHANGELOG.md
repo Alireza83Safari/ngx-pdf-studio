@@ -15,6 +15,14 @@ entries below into a released section.
 
 ### Added
 
+- **`BoxStyle.padding` is honoured.** It was accepted by the schema and read by
+  nothing: text sat against the element edge and wrapped at the full width
+  whatever the padding said. It now insets content in both painters _and_ in
+  layout — the wrap column narrows by the horizontal padding, and an
+  auto-growing box gains the vertical padding — so the preview, the print and
+  the measured height agree. Padding wider than its own box collapses to a
+  sliver instead of inverting. Unpadded elements are byte-identical.
+
 - **`decoration: 'line-through'` and `verticalAlign` now render.** Both sat in
   the model reaching neither painter: a struck-through element printed
   undecorated, and vertical alignment was accepted and ignored outright.
