@@ -17,9 +17,10 @@
 (function () {
   'use strict';
   var P = window.PdfStudio;
+  // The designer's pure logic, unit-tested on its own (designer-ux 4.1).
+  var U = window.DesignerUtil;
   var zoom = 0.85;
-  var GRID = 5;
-  var SNAP_EDGE = 4;
+  var GRID = U.GRID;
   var uid = 1;
   var dragSeq = 0;
   var addCascade = 0;
@@ -955,17 +956,8 @@
    * an `auto` band grows to its content, clamped by min/max. Anything painted
    * past this line still reaches the PDF — on top of the following band.
    */
-  function resolveBandHeight(band, contentBottom) {
-    var h = band.height || { mode: 'auto' };
-    if (h.mode === 'fixed') return h.value;
-    var min = h.min == null ? 0 : h.min;
-    var max = h.max == null ? Infinity : h.max;
-    return Math.min(max, Math.max(min, contentBottom));
-  }
-  /** Background/watermark bands span the page by contract — overflow means nothing. */
-  function isPageWideBand(band) {
-    return band.type === 'background' || band.type === 'watermark';
-  }
+  var resolveBandHeight = U.resolveBandHeight;
+  var isPageWideBand = U.isPageWideBand;
   /**
    * Element types the engine auto-grows past their declared box: it measures the
    * text, wraps it, and paints every line. That is deliberate engine behaviour,
@@ -1964,13 +1956,7 @@
     });
     return { xs: xs, ys: ys };
   }
-  function snapValue(v, edges, disabled) {
-    if (disabled) return { v: v, guide: null };
-    for (var i = 0; i < edges.length; i++) {
-      if (Math.abs(edges[i] - v) <= SNAP_EDGE) return { v: edges[i], guide: edges[i] };
-    }
-    return { v: Math.round(v / GRID) * GRID, guide: null };
-  }
+  var snapValue = U.snapValue;
   function showGuides(t, gx, gy) {
     var m = t.page.margins;
     if (gx !== null) {
@@ -1994,17 +1980,7 @@
    * so a corner does both and an edge handle does one.
    */
   var RESIZE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-  var RESIZE_EDGES = {
-    nw: { left: true, top: true },
-    n: { top: true },
-    ne: { right: true, top: true },
-    e: { right: true },
-    se: { right: true, bottom: true },
-    s: { bottom: true },
-    sw: { left: true, bottom: true },
-    w: { left: true },
-  };
-  var MIN_SIZE = 8;
+  var RESIZE_EDGES = U.RESIZE_EDGES;
   /**
    * Angle in degrees from an element's centre to the pointer. Screen y grows
    * downward, so `atan2` already increases clockwise — which is the direction
@@ -2170,70 +2146,19 @@
     var dy = (e.clientY - drag.sy) / zoom;
     if (drag.mode === 'resize') {
       var edges = snapEdges(t, [drag.id]);
-      // not `moves` — the move branch below already owns that name, and `var`
-      // is function-scoped
-      var pulls = RESIZE_EDGES[drag.dir] || RESIZE_EDGES.se;
-      var b = drag.b;
-      // Each grip drags only the edges it sits on; the opposite edges stay put,
-      // which is what makes a top/left handle grow the box upward/leftward
-      // instead of moving it.
-      var left = b.x;
-      var top = b.y;
-      var right = b.x + b.width;
-      var bottom = b.y + b.height;
-      var gx = null;
-      var gy = null;
-      if (pulls.left) {
-        var sl = snapValue(b.x + dx, edges.xs, e.altKey);
-        left = Math.min(sl.v, right - MIN_SIZE);
-        gx = sl.guide;
-      }
-      if (pulls.right) {
-        var sr = snapValue(right + dx, edges.xs, e.altKey);
-        right = Math.max(sr.v, left + MIN_SIZE);
-        gx = sr.guide;
-      }
-      if (pulls.top) {
-        var st = snapValue(b.y + dy, edges.ys, e.altKey);
-        top = Math.min(st.v, bottom - MIN_SIZE);
-        gy = st.guide;
-      }
-      if (pulls.bottom) {
-        var sb = snapValue(bottom + dy, edges.ys, e.altKey);
-        bottom = Math.max(sb.v, top + MIN_SIZE);
-        gy = sb.guide;
-      }
-      var w = right - left;
-      var h = bottom - top;
-      // Shift keeps the original proportions. The dominant axis wins so the box
-      // follows the pointer rather than fighting it, and an edge handle (which
-      // only drives one axis) derives the other.
-      if (e.shiftKey && b.width > 0 && b.height > 0) {
-        var ratio = b.width / b.height;
-        var drivesX = pulls.left || pulls.right;
-        var drivesY = pulls.top || pulls.bottom;
-        if (drivesX && drivesY) {
-          if (w / ratio > h) h = w / ratio;
-          else w = h * ratio;
-        } else if (drivesX) h = w / ratio;
-        else if (drivesY) w = h * ratio;
-        // re-anchor to whichever edges are NOT being dragged
-        if (pulls.left) left = right - w;
-        if (pulls.top) top = bottom - h;
-      }
-      showGuides(t, gx, gy);
-      store.dispatch(
-        P.setElementBounds(
-          drag.id,
-          {
-            x: left,
-            y: top,
-            width: Math.max(MIN_SIZE, w),
-            height: Math.max(MIN_SIZE, h),
-          },
-          true,
-        ),
-      );
+      // the geometry itself is pure and unit-tested; snapping is injected so
+      // the guide lines stay out of it (designer-ux 4.1)
+      var res = U.resizeBounds(drag.b, drag.dir, dx, dy, {
+        snapX: function (v) {
+          return snapValue(v, edges.xs, e.altKey);
+        },
+        snapY: function (v) {
+          return snapValue(v, edges.ys, e.altKey);
+        },
+        keepRatio: e.shiftKey,
+      });
+      showGuides(t, res.guideX, res.guideY);
+      store.dispatch(P.setElementBounds(drag.id, res.bounds, true));
       return;
     }
     // move: snap the primary element, translate the rest by the same delta
@@ -3197,28 +3122,19 @@
   // Deliberately NOT converted: font size, border width and corner radius. Those
   // are typographic measures that every design tool keeps in points whatever the
   // ruler says, and mixing them into a millimetre document would read as a bug.
-  var UNITS = {
-    pt: { perPt: 1, decimals: 0, label: 'pt' },
-    mm: { perPt: 25.4 / 72, decimals: 1, label: 'mm' },
-    cm: { perPt: 2.54 / 72, decimals: 2, label: 'cm' },
-  };
-  function unitOf(t) {
-    return UNITS[(t && t.page && t.page.unit) || 'pt'] || UNITS.pt;
+  /** The document's display unit; the conversions themselves live in the util. */
+  function currentUnit(t) {
+    var state = t || store.getState();
+    return (state && state.page && state.page.unit) || 'pt';
   }
-  /** Points → the document's display unit, rounded for a number input. */
   function toDisplay(pt, t) {
-    var u = unitOf(t || store.getState());
-    var v = pt * u.perPt;
-    var f = Math.pow(10, u.decimals);
-    return Math.round(v * f) / f;
+    return U.toDisplay(pt, currentUnit(t));
   }
-  /** A number typed in the display unit → points. */
   function fromDisplay(value, t) {
-    var u = unitOf(t || store.getState());
-    return Number(value) / u.perPt;
+    return U.fromDisplay(value, currentUnit(t));
   }
   function unitLabel(t) {
-    return unitOf(t || store.getState()).label;
+    return U.unitLabel(currentUnit(t));
   }
 
   var BOX_SIDES = [
