@@ -75,6 +75,102 @@ describe('pagination engine — additional bands & sources', () => {
     expect(ctx.diagnostics.some((d) => /not yet supported/.test(d.message))).toBe(true);
   });
 
+  describe('the flow reports where it put each band (designer-ux 2.1)', () => {
+    const at = (id: string, y: number): Band['elements'][number] => ({
+      ...text(id, id),
+      bounds: { x: 0, y, width: 100, height: 16 },
+    });
+    const band = (id: string, type: Band['type'], height: number, els: Band['elements'] = []) => ({
+      id,
+      type,
+      height: { mode: 'fixed' as const, value: height },
+      elements: els,
+    });
+
+    it('places each band once, in flow order, stacked without gaps', () => {
+      const doc = paginate(
+        template([
+          band('rh', 'reportHeader', 60, [at('a', 0)]),
+          band('rf', 'reportFooter', 40, [at('b', 0)]),
+        ]),
+        createRenderContext({ data: {} }),
+      );
+      const bands = doc.pages[0]!.bands;
+      expect(bands.map((b) => b.id)).toEqual(['rh', 'rf']);
+      // page margins are 20 in this fixture's template
+      expect(bands[0]!.bounds.y).toBe(20);
+      expect(bands[0]!.bounds.height).toBe(60);
+      // the next band starts exactly where the previous one ended
+      expect(bands[1]!.bounds.y).toBe(bands[0]!.bounds.y + bands[0]!.bounds.height);
+    });
+
+    it('agrees with where the elements actually landed', () => {
+      // the whole point: a strip that disagrees with its own content is worse
+      // than no strip at all
+      const doc = paginate(
+        template([
+          band('rh', 'reportHeader', 60, [at('a', 10)]),
+          band('rf', 'reportFooter', 40, [at('b', 5)]),
+        ]),
+        createRenderContext({ data: {} }),
+      );
+      const page = doc.pages[0]!;
+      for (const [bandId, elId, offset] of [
+        ['rh', 'a', 10],
+        ['rf', 'b', 5],
+      ] as const) {
+        const strip = page.bands.find((b) => b.id === bandId)!;
+        const el = page.elements.find((e) => e.id === elId)!;
+        expect(el.bounds.y).toBe(strip.bounds.y + offset);
+      }
+    });
+
+    it('repeats a page header on every page it appears on', () => {
+      const doc = paginate(
+        template([
+          band('ph', 'pageHeader', 30, [at('h', 0)]),
+          {
+            ...band('d', 'detail', 200, [at('r', 0)]),
+            dataset: 'rows',
+          },
+        ]),
+        createRenderContext({ data: { rows: Array.from({ length: 12 }, (_, n) => ({ n })) } }),
+      );
+      expect(doc.pageCount).toBeGreaterThan(1);
+      for (const page of doc.pages) {
+        expect(page.bands.filter((b) => b.id === 'ph')).toHaveLength(1);
+      }
+    });
+
+    it('marks the continuation chunks of a band that splits across pages', () => {
+      const doc = paginate(
+        template([
+          {
+            ...band('tall', 'detail', 0, []),
+            height: { mode: 'auto' },
+            dataset: 'rows',
+            elements: Array.from({ length: 60 }, (_, i) => at('e' + i, i * 30)),
+          },
+        ]),
+        createRenderContext({ data: { rows: [{ n: 1 }] } }),
+      );
+      const strips = doc.pages.flatMap((p) => p.bands.filter((b) => b.id === 'tall'));
+      expect(strips.length).toBeGreaterThan(1);
+      // exactly one of them is the original; the rest are continuations
+      expect(strips.filter((s) => !s.continued)).toHaveLength(1);
+      expect(strips[0]!.continued).toBeUndefined();
+    });
+
+    it('gives a background band the whole sheet, which is its contract', () => {
+      const doc = paginate(
+        template([band('wm', 'watermark', 0, [at('w', 300)]), band('rh', 'reportHeader', 40)]),
+        createRenderContext({ data: {} }),
+      );
+      const wm = doc.pages[0]!.bands.find((b) => b.id === 'wm')!;
+      expect(wm.bounds).toEqual({ x: 0, y: 0, ...doc.pages[0]!.size });
+    });
+  });
+
   describe('band overflow (designer-ux 0.1)', () => {
     const at = (id: string, y: number): Band['elements'][number] => ({
       ...text(id, id),

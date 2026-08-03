@@ -6,6 +6,7 @@
  */
 import type { ExpressionDiagnostic } from '../expression/errors';
 import type { ResolvedDirection } from '../binding/effective-locale';
+import type { Band } from '../model/band';
 import type { Color } from '../model/color';
 import type { ElementType, IconName } from '../model/element-base';
 import type { AnyElement, ChartKind, ImageFit } from '../model/elements';
@@ -163,6 +164,24 @@ export interface LaidOutElement {
   source: AnyElement;
 }
 
+/**
+ * Where one band ended up on a page (§6).
+ *
+ * The flow knows this while it is placing bands and used to throw it away, so
+ * anything that wanted to draw a band boundary — an editor showing which strip
+ * belongs to which band — had to re-derive the stack itself and drift out of
+ * step with the engine. A band that splits across pages, or a page header that
+ * repeats, appears once per page it occupies.
+ */
+export interface LaidBand {
+  id: string;
+  type: Band['type'];
+  /** Absolute page coordinates (pt, top-left origin). */
+  bounds: Rect;
+  /** True for a continuation chunk of a band split across pages. */
+  continued?: boolean;
+}
+
 export interface LayoutPage {
   /** 0-based page index. */
   index: number;
@@ -171,6 +190,8 @@ export interface LayoutPage {
   size: Size;
   /** Elements in paint order (ascending zIndex). */
   elements: LaidOutElement[];
+  /** Band strips as the flow placed them, in placement order (§6). */
+  bands: LaidBand[];
 }
 
 /** A flattened PDF outline entry, in document order (§11A-D). */

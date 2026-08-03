@@ -33,7 +33,13 @@ import { isVisible, layoutLeaf, type LeafDeps } from './leaf-layout';
 import { layoutList } from './list-layout';
 import { SimpleTextMeasurer, type TextMeasurer } from './measure';
 import { pageSizeProblem, resolvePageSize } from './page-size';
-import type { BookmarkEntry, LaidOutElement, LayoutPage, PaginatedDocument } from './page';
+import type {
+  BookmarkEntry,
+  LaidBand,
+  LaidOutElement,
+  LayoutPage,
+  PaginatedDocument,
+} from './page';
 import { layoutTable, type TableLayoutDeps } from './table-layout';
 
 const EPSILON = 0.01;
@@ -126,12 +132,20 @@ function paginatePass(
     const groupCount = group.reduce((sum, plan) => sum + plan.bodies.length, 0);
     let localNumber = 1;
     for (const plan of group) {
-      for (const bodyElements of plan.bodies) {
+      plan.bodies.forEach((bodyElements, i) => {
         pages.push(
-          finalizePage(plan, bodyElements, pages.length, localNumber, groupCount, rootScope),
+          finalizePage(
+            plan,
+            bodyElements,
+            plan.bodyBands[i] ?? [],
+            pages.length,
+            localNumber,
+            groupCount,
+            rootScope,
+          ),
         );
         localNumber += 1;
-      }
+      });
     }
   }
 
@@ -178,6 +192,8 @@ interface SectionPlan {
   availBottom: number;
   byType: BandBuckets;
   bodies: LaidOutElement[][];
+  /** Band strips per body page, one entry for each entry in `bodies` (§6). */
+  bodyBands: LaidBand[][];
   layoutBand: (band: Band, scope: Scope) => BandLayout;
 }
 
@@ -244,12 +260,18 @@ function planSection(page: PageSetup, bands: Band[], shared: SharedDeps): Sectio
   const colX = (i: number): number => content.x + i * (colWidth + colGap);
 
   const bodies: LaidOutElement[][] = [];
+  // Band strips, collected alongside the elements so the flow reports where it
+  // actually put each band instead of leaving callers to re-derive it (§6).
+  const bodyBands: LaidBand[][] = [];
   let current: LaidOutElement[] = [];
+  let currentBands: LaidBand[] = [];
   let col = 0;
   let cursorY = availTop;
   const newPage = (): void => {
     bodies.push(current);
+    bodyBands.push(currentBands);
     current = [];
+    currentBands = [];
     col = 0;
     cursorY = availTop;
   };
@@ -270,17 +292,27 @@ function planSection(page: PageSetup, bands: Band[], shared: SharedDeps): Sectio
     // `repeatOnSplit` elements (table headers) atop each continuation (§6).
     const pieces =
       laid.height > fullCapacity + EPSILON ? splitBandLayout(laid, fullCapacity) : [laid];
-    for (const piece of pieces) {
+    for (let p = 0; p < pieces.length; p++) {
+      const piece = pieces[p] as BandLayout;
       const colHasContent = cursorY > availTop + EPSILON;
       if (cursorY + piece.height > availBottom + EPSILON && colHasContent) nextColumn();
       for (const el of piece.elements) current.push(translate(el, colX(col), cursorY));
+      currentBands.push({
+        id: item.band.id,
+        type: item.band.type,
+        bounds: { x: colX(col), y: cursorY, width: colWidth, height: piece.height },
+        ...(p > 0 ? { continued: true } : {}),
+      });
       cursorY += piece.height;
     }
     if (breaksAfter(item.band)) newPage();
   }
-  if (current.length > 0 || bodies.length === 0) bodies.push(current);
+  if (current.length > 0 || bodies.length === 0) {
+    bodies.push(current);
+    bodyBands.push(currentBands);
+  }
 
-  return { size, content, availTop, availBottom, byType, bodies, layoutBand };
+  return { size, content, availTop, availBottom, byType, bodies, bodyBands, layoutBand };
 }
 
 /**
@@ -396,6 +428,7 @@ function buildBodyFlow(
 function finalizePage(
   plan: SectionPlan,
   bodyElements: LaidOutElement[],
+  bodyBands: LaidBand[],
   index: number,
   number: number,
   pageCount: number,
@@ -404,26 +437,43 @@ function finalizePage(
   const { byType, content, availBottom, layoutBand } = plan;
   const pageScope = rootScope.child({}, { $page: number, $pageCount: pageCount });
   const elements: LaidOutElement[] = [];
+  const bands: LaidBand[] = [];
 
   for (const bg of byType.background) {
-    for (const el of layoutBand(bg, pageScope).elements) elements.push(translate(el, 0, 0));
+    const laid = layoutBand(bg, pageScope);
+    for (const el of laid.elements) elements.push(translate(el, 0, 0));
+    // background/watermark span the sheet by contract, so that is their strip
+    bands.push({
+      id: bg.id,
+      type: bg.type,
+      bounds: { x: 0, y: 0, width: plan.size.width, height: plan.size.height },
+    });
   }
   const pageHeader = selectMaster(byType.pageHeaders, number);
   if (pageHeader) {
-    for (const el of layoutBand(pageHeader, pageScope).elements) {
-      elements.push(translate(el, content.x, content.y));
-    }
+    const laid = layoutBand(pageHeader, pageScope);
+    for (const el of laid.elements) elements.push(translate(el, content.x, content.y));
+    bands.push({
+      id: pageHeader.id,
+      type: pageHeader.type,
+      bounds: { x: content.x, y: content.y, width: content.width, height: laid.height },
+    });
   }
   elements.push(...bodyElements);
+  bands.push(...bodyBands);
   const pageFooter = selectMaster(byType.pageFooters, number);
   if (pageFooter) {
-    for (const el of layoutBand(pageFooter, pageScope).elements) {
-      elements.push(translate(el, content.x, availBottom));
-    }
+    const laid = layoutBand(pageFooter, pageScope);
+    for (const el of laid.elements) elements.push(translate(el, content.x, availBottom));
+    bands.push({
+      id: pageFooter.id,
+      type: pageFooter.type,
+      bounds: { x: content.x, y: availBottom, width: content.width, height: laid.height },
+    });
   }
 
   elements.sort((a, b) => a.zIndex - b.zIndex);
-  return { index, number, size: plan.size, elements };
+  return { index, number, size: plan.size, elements, bands };
 }
 
 /** Pick the most specific master band applicable to `pageNumber` (§11A-E). */
