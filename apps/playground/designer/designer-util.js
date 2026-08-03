@@ -204,6 +204,34 @@
     return { width: w, height: h };
   }
 
+  /**
+   * The zoom at which a page of `size` fits a viewport of `vw`×`vh` px.
+   *
+   * The canvas used to open at a flat 85% whatever it was showing, which is one
+   * size that fits nothing: an A4 filled the workspace while an 80mm receipt sat
+   * in the corner smaller than the read-only preview beside it — the editing
+   * surface being harder to see than the thing you cannot edit.
+   *
+   * `room` is the rulers plus breathing space. The result is clamped to the same
+   * 40–200% the zoom buttons use and rounded to 5% so the readout stays tidy.
+   *
+   * Returns `null` when the viewport has no size yet — before first paint, or in
+   * a DOM with no layout engine. The caller must then keep the zoom it has
+   * rather than collapse to the minimum, so "unmeasurable" never looks like
+   * "tiny".
+   */
+  function fitZoom(size, vw, vh, room) {
+    var pad = room == null ? 90 : room;
+    if (!size || !(size.width > 0) || !(size.height > 0)) return null;
+    // Covers every unusable viewport in one test: a width at or under `pad`
+    // makes the numerator negative, and a missing one makes it NaN. A separate
+    // `vw > pad` check reads like a second guard but no input can tell the two
+    // apart, so it would be weight rather than safety.
+    var z = Math.min((vw - pad) / size.width, (vh - pad) / size.height);
+    if (!(z > 0)) return null;
+    return Math.min(2, Math.max(0.4, Math.round(z * 20) / 20));
+  }
+
   // --- rulers (designer-ux 2.2) ---------------------------------------------
 
   /**
@@ -289,6 +317,7 @@
     GRID: GRID,
     SNAP_EDGE: SNAP_EDGE,
     snapValue: snapValue,
+    fitZoom: fitZoom,
     UNITS: UNITS,
     unitOf: unitOf,
     toDisplay: toDisplay,

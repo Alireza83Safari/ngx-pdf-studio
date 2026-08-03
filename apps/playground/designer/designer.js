@@ -21,7 +21,9 @@
   var U = window.DesignerUtil;
   // Its user-facing copy — help sections and tour steps (designer-ux 4.2).
   var C = window.DesignerContent;
-  var zoom = 0.85;
+  var zoom = 0.85; // a placeholder until the canvas has been measured (autoFit)
+  var zoomTouched = false; // the user set the zoom themselves — stop fitting
+  var fittedFor = null; // the page size the current fit was computed for
   var GRID = U.GRID;
   var uid = 1;
   var dragSeq = 0;
@@ -1150,10 +1152,32 @@
     renderLayers();
   }
 
+  /**
+   * Fit a page the first time it is seen at this size.
+   *
+   * Opening a document should show all of it — a receipt and an A4 cannot both
+   * be right at one fixed percentage. It runs once per page size and stops for
+   * good once the zoom has been set by hand, so it never fights the user; the
+   * "fit" button clears that and hands the canvas back to it.
+   */
+  function autoFit(size) {
+    if (zoomTouched) return;
+    var key = size.width + '×' + size.height;
+    if (key === fittedFor) return;
+    var wrap = document.querySelector('.canvas-wrap');
+    var z = U.fitZoom(size, wrap.clientWidth, wrap.clientHeight);
+    // no layout yet — leave the zoom alone and try again on the next render,
+    // rather than recording a fit that was never actually measured
+    if (z == null) return;
+    zoom = z;
+    fittedFor = key;
+  }
+
   function renderCanvas() {
     var t = store.getState();
     clampActiveBand(t);
     var size = pageSize(t);
+    autoFit(size);
     pageEl.style.width = size.width * zoom + 'px';
     pageEl.style.height = size.height * zoom + 'px';
     var m = t.page.margins;
@@ -2756,6 +2780,8 @@
   // --- zoom ----------------------------------------------------------------
   function setZoom(z) {
     zoom = Math.min(2, Math.max(0.4, z));
+    // set by hand, so the canvas stops re-fitting it out from under them
+    zoomTouched = true;
     renderCanvas();
   }
   document.getElementById('zoomIn').addEventListener('click', function () {
@@ -2768,9 +2794,11 @@
     setZoom(1);
   });
   document.getElementById('zoomFit').addEventListener('click', function () {
-    var wrap = document.querySelector('.canvas-wrap');
-    var size = pageSize(store.getState());
-    setZoom(Math.min((wrap.clientWidth - 90) / size.width, (wrap.clientHeight - 90) / size.height));
+    // asking to fit is asking for the automatic behaviour back, so this clears
+    // the manual flag instead of setting it the way the other buttons do
+    zoomTouched = false;
+    fittedFor = null;
+    renderCanvas();
   });
   document.querySelector('.canvas-wrap').addEventListener(
     'wheel',

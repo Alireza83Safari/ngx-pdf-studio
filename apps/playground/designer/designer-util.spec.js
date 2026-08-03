@@ -235,6 +235,45 @@ describe('fitImageBox', () => {
   });
 });
 
+describe('fitZoom', () => {
+  const A4 = { width: 595, height: 842 };
+  const RECEIPT = { width: 226, height: 430 };
+
+  it('fits by the tighter of the two axes', () => {
+    // a wide viewport still cannot make an A4 taller than it is
+    const z = U.fitZoom(A4, 2000, 700, 90);
+    expect(z).toBeCloseTo((700 - 90) / 842, 1);
+    expect(z * A4.height).toBeLessThanOrEqual(700 - 90);
+  });
+
+  it('scales a small page UP, which the old fixed 85% never did', () => {
+    // the bug the user saw: an 80mm receipt sat smaller than the read-only
+    // preview beside it, because 85% was applied to everything
+    const z = U.fitZoom(RECEIPT, 900, 800, 90);
+    expect(z).toBeGreaterThan(1);
+    expect(z).toBeGreaterThan(U.fitZoom(A4, 900, 800, 90));
+  });
+
+  it('never exceeds the range the zoom buttons allow', () => {
+    expect(U.fitZoom({ width: 10, height: 10 }, 4000, 4000, 90)).toBe(2);
+    expect(U.fitZoom({ width: 9000, height: 9000 }, 500, 500, 90)).toBe(0.4);
+  });
+
+  it('rounds to 5% so the readout stays legible', () => {
+    const z = U.fitZoom(RECEIPT, 823, 777, 90);
+    expect(Math.round(z * 1000) % 50).toBe(0);
+  });
+
+  it('returns null rather than a tiny zoom when nothing has been laid out', () => {
+    // jsdom reports 0 for every client dimension; collapsing to the 40% minimum
+    // would make "unmeasured" look exactly like "genuinely enormous"
+    expect(U.fitZoom(A4, 0, 0, 90)).toBeNull();
+    expect(U.fitZoom(A4, 80, 80, 90)).toBeNull();
+    expect(U.fitZoom(null, 900, 900, 90)).toBeNull();
+    expect(U.fitZoom({ width: 0, height: 0 }, 900, 900, 90)).toBeNull();
+  });
+});
+
 describe('rulerStep', () => {
   it('picks a round number in the display unit, not in points', () => {
     // 10mm is a step a person writes; 28.35pt is not

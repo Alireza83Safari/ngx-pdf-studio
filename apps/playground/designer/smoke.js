@@ -2173,6 +2173,69 @@ try {
     if (!doc.getElementById('bandBox').classList.contains('is-low'))
       fail('a band ending at the foot of the sheet did not move its chip inside');
 
+    // --- the canvas opens at a size you can work at (fit-to-page) ---
+    // jsdom reports 0 for every client dimension, which is exactly the case
+    // `fitZoom` refuses to act on — so give the wrap a measurable size to prove
+    // the wiring. Everything above this point ran at the unfitted default,
+    // which is the guard doing its job.
+    const wrap = doc.querySelector('.canvas-wrap');
+    const setViewport = (w, h) => {
+      Object.defineProperty(wrap, 'clientWidth', { value: w, configurable: true });
+      Object.defineProperty(wrap, 'clientHeight', { value: h, configurable: true });
+    };
+    const zoomNow2 = () => parseFloat(doc.getElementById('zoomLabel').textContent) / 100;
+    // fitting ON (that is what the fit button means) but nothing measurable:
+    // the zoom must stay put rather than collapse to the 40% floor
+    const beforeFit = zoomNow2();
+    doc.getElementById('zoomFit').dispatchEvent(clickEv());
+    await settle21();
+    if (Math.abs(zoomNow2() - beforeFit) > 0.001)
+      fail('an unmeasurable viewport changed the zoom: ' + zoomNow2());
+
+    // the receipt is still loaded: 226×430pt in a roomy viewport must scale UP,
+    // which is the whole complaint — the editable canvas was smaller than the
+    // read-only preview next to it
+    setViewport(900, 800);
+    doc.getElementById('zoomFit').dispatchEvent(clickEv());
+    await settle21();
+    const receiptZoom = zoomNow2();
+    if (!(receiptZoom > 1))
+      fail('an 80mm receipt did not scale up to fill the canvas: ' + receiptZoom);
+    if (parseFloat(doc.getElementById('page').style.width) > 900)
+      fail('the fitted page is wider than the viewport');
+
+    // a different page size re-fits on its own, without touching the button
+    store.dispatch(
+      P.replaceTemplate({
+        ...store.getState(),
+        page: { ...store.getState().page, size: { width: 595, height: 842 } },
+      }),
+    );
+    await settle21();
+    const a4Zoom = zoomNow2();
+    if (!(a4Zoom < receiptZoom)) fail('an A4 was not fitted smaller than a receipt: ' + a4Zoom);
+    if (parseFloat(doc.getElementById('page').style.height) > 800)
+      fail('the fitted A4 is taller than the viewport');
+
+    // but a zoom set by hand is never overridden — including by a page change
+    doc.getElementById('zoomIn').dispatchEvent(clickEv());
+    await settle21();
+    const manual = zoomNow2();
+    store.dispatch(
+      P.replaceTemplate({
+        ...store.getState(),
+        page: { ...store.getState().page, size: { width: 226, height: 430 } },
+      }),
+    );
+    await settle21();
+    if (Math.abs(zoomNow2() - manual) > 0.001)
+      fail('the canvas re-fitted over a zoom the user had set: ' + zoomNow2());
+    // and asking to fit hands it back
+    doc.getElementById('zoomFit').dispatchEvent(clickEv());
+    await settle21();
+    if (Math.abs(zoomNow2() - receiptZoom) > 0.001)
+      fail('the fit button did not restore automatic fitting: ' + zoomNow2());
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,
