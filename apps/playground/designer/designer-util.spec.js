@@ -29,6 +29,26 @@ describe('snapValue', () => {
     expect(U.snapValue(100, [101, 99], false).v).toBe(101);
   });
 
+  it('honours a custom grid step (designer-ux 2.3)', () => {
+    expect(U.snapValue(23, [], false, 10)).toEqual({ v: 20, guide: null });
+    expect(U.snapValue(26, [], false, 10)).toEqual({ v: 30, guide: null });
+    expect(U.snapValue(23, [], false, 1)).toEqual({ v: 23, guide: null });
+  });
+
+  it('treats a step of zero as "no grid" rather than dividing by it', () => {
+    expect(U.snapValue(23.7, [], false, 0)).toEqual({ v: 23.7, guide: null });
+  });
+
+  it('falls back to the default step for a nonsense one', () => {
+    // negative or non-numeric must not silently disable snapping
+    expect(U.snapValue(23, [], false, -5)).toEqual({ v: 25, guide: null });
+    expect(U.snapValue(23, [], false, undefined)).toEqual({ v: 25, guide: null });
+  });
+
+  it('still prefers an edge whatever the grid is', () => {
+    expect(U.snapValue(102, [100], false, 50)).toEqual({ v: 100, guide: 100 });
+  });
+
   it('passes the value straight through when snapping is held off', () => {
     expect(U.snapValue(23.4, [100], true)).toEqual({ v: 23.4, guide: null });
   });

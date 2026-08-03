@@ -1502,6 +1502,29 @@
    * template would mean a schema change, a migration, and every exported or
    * shared JSON carrying someone else's scaffolding.
    */
+  /**
+   * Grid step, in points. An editing preference like the guides, so it lives in
+   * localStorage rather than the document — two people editing the same
+   * template should not have to agree on a grid.
+   */
+  var GRID_KEY = 'pdfstudio.grid';
+  var gridStep = U.GRID;
+  function loadGrid() {
+    try {
+      var raw = Number(window.localStorage.getItem(GRID_KEY));
+      if (isFinite(raw) && raw >= 0 && raw <= 100) gridStep = raw;
+    } catch (err) {
+      /* ignore */
+    }
+  }
+  function saveGrid() {
+    try {
+      window.localStorage.setItem(GRID_KEY, String(gridStep));
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
   var GUIDES_KEY = 'pdfstudio.guides';
   var guides = { x: [], y: [] };
   function loadGuides() {
@@ -2134,6 +2157,36 @@
   function hideGuides() {
     guideV.style.display = 'none';
     guideH.style.display = 'none';
+    hideReadout();
+  }
+
+  /**
+   * Live numbers while dragging (designer-ux 2.3).
+   *
+   * Snap guides said "you are aligned with something" but never with what or how
+   * far, so placing an element to a measurement meant dragging, letting go,
+   * reading the inspector, and adjusting. The readout follows the pointer with
+   * the position or the size in the document's own unit.
+   */
+  var readoutEl = document.getElementById('dragReadout');
+  function showReadout(t, m, rect, kind) {
+    var unit = currentUnit(t);
+    var n = function (pt) {
+      return U.toDisplay(pt, unit);
+    };
+    readoutEl.textContent =
+      kind === 'size'
+        ? n(rect.width) + ' × ' + n(rect.height) + ' ' + U.unitLabel(unit)
+        : 'x ' + n(rect.x) + ' · y ' + n(rect.y) + ' ' + U.unitLabel(unit);
+    // pinned just above the element, clamped into the sheet so it never leaves
+    var left = (m.left + rect.x) * zoom;
+    var top = (m.top + rect.y) * zoom - 24;
+    readoutEl.style.left = Math.max(2, left) + 'px';
+    readoutEl.style.top = Math.max(2, top) + 'px';
+    readoutEl.classList.add('show');
+  }
+  function hideReadout() {
+    readoutEl.classList.remove('show');
   }
 
   // --- drag & resize -------------------------------------------------------
@@ -2313,14 +2366,15 @@
       // the guide lines stay out of it (designer-ux 4.1)
       var res = U.resizeBounds(drag.b, drag.dir, dx, dy, {
         snapX: function (v) {
-          return snapValue(v, edges.xs, e.altKey);
+          return snapValue(v, edges.xs, e.altKey, gridStep);
         },
         snapY: function (v) {
-          return snapValue(v, edges.ys, e.altKey);
+          return snapValue(v, edges.ys, e.altKey, gridStep);
         },
         keepRatio: e.shiftKey,
       });
       showGuides(t, res.guideX, res.guideY);
+      showReadout(t, t.page.margins, res.bounds, 'size');
       store.dispatch(P.setElementBounds(drag.id, res.bounds, true));
       return;
     }
@@ -2329,9 +2383,15 @@
     var pb = drag.starts[primary];
     if (!pb) return;
     var edges2 = snapEdges(t, drag.ids);
-    var sx = snapValue(pb.x + dx, edges2.xs, e.altKey);
-    var sy = snapValue(pb.y + dy, edges2.ys, e.altKey);
+    var sx = snapValue(pb.x + dx, edges2.xs, e.altKey, gridStep);
+    var sy = snapValue(pb.y + dy, edges2.ys, e.altKey, gridStep);
     showGuides(t, sx.guide, sy.guide);
+    showReadout(
+      t,
+      t.page.margins,
+      { x: sx.v, y: sy.v, width: pb.width, height: pb.height },
+      'move',
+    );
     var fx = sx.v - pb.x;
     var fy = sy.v - pb.y;
     drag.moved = true;
@@ -4001,6 +4061,14 @@
   document.getElementById('pageH').addEventListener('change', dispatchCustomSize);
   document.getElementById('pageOrient').addEventListener('change', function (e) {
     store.dispatch(P.patchPageSetup({ orientation: e.target.value }));
+  });
+  // grid step (2.3) — a preference, not document content, so it is not a command
+  var gridStepEl = document.getElementById('gridStep');
+  gridStepEl.addEventListener('change', function () {
+    var v = fromDisplay(gridStepEl.value);
+    gridStep = isFinite(v) && v >= 0 ? Math.min(100, v) : U.GRID;
+    saveGrid();
+    rerender();
   });
   // display unit (1.6) — stored on the page so it travels with the template,
   // but it changes nothing about the output, only what the number fields say
@@ -5972,6 +6040,7 @@
       if (document.activeElement !== wInp) wInp.value = toDisplay(pg.size.width);
       if (document.activeElement !== hInp) hInp.value = toDisplay(pg.size.height);
     }
+    if (document.activeElement !== gridStepEl) gridStepEl.value = toDisplay(gridStep);
     // never overwrite the box being typed into, or the caret jumps
     Object.keys(MARGIN_INPUTS).forEach(function (side) {
       var inp = MARGIN_INPUTS[side];
@@ -6152,6 +6221,7 @@
   // guides come back with the draft: they are scaffolding for a document, and
   // losing them on refresh would make them not worth placing (2.2)
   loadGuides();
+  loadGrid();
   if (!tryLoadFromHash() && !restoreDraft()) {
     rerender();
     renderInspector();

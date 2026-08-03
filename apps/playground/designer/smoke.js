@@ -1824,6 +1824,70 @@ try {
     window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
     if (guideCount() !== 1) fail('a guide dropped off the sheet was kept: ' + guideCount());
 
+    // --- configurable grid + live drag readout (designer-ux ۲.۳) ---
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    store.dispatch(
+      P.patchPageSetup({ unit: 'pt', margins: { top: 0, right: 0, bottom: 0, left: 0 } }),
+    );
+    store.dispatch(
+      P.addElement(band0().id, {
+        id: 'snapme',
+        type: 'rectangle',
+        bounds: { x: 0, y: 0, width: 40, height: 20 },
+        zIndex: 1,
+        box: { fill: { color: { space: 'rgb', r: 0.5, g: 0.5, b: 0.5 } } },
+      }),
+    );
+    const gridInput = doc.getElementById('gridStep');
+    if (!gridInput) fail('grid control missing');
+    const readout = doc.getElementById('dragReadout');
+    if (!readout) fail('drag readout missing');
+    if (readout.classList.contains('show')) fail('the readout is visible before any drag');
+
+    const dragTo = (x, y) => {
+      const node = doc.querySelector('.el[data-id="snapme"]');
+      node.dispatchEvent(
+        new window.MouseEvent('mousedown', { bubbles: true, clientX: 0, clientY: 0 }),
+      );
+      window.dispatchEvent(
+        new window.MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y }),
+      );
+      const shown = readout.classList.contains('show') ? readout.textContent : null;
+      window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+      return shown;
+    };
+    const snapX = () => P.findElement(store.getState(), 'snapme').element.bounds.x;
+
+    // default 5pt grid rounds a 23pt drag to 25
+    gridInput.value = '5';
+    gridInput.dispatchEvent(new window.Event('change', { bubbles: true }));
+    const text = dragTo(23, 0);
+    if (!text) fail('the readout did not appear during a drag');
+    if (!/x\s|y\s/.test(text)) fail('the readout does not show a position: ' + text);
+    if (!/pt/.test(text)) fail('the readout does not name the unit: ' + text);
+    if (Math.round(snapX()) !== 25) fail('default grid did not snap to 25: ' + snapX());
+    store.undo();
+
+    // a 20pt grid rounds the same drag to 20
+    gridInput.value = '20';
+    gridInput.dispatchEvent(new window.Event('change', { bubbles: true }));
+    dragTo(23, 0);
+    if (Math.round(snapX()) !== 20) fail('a 20pt grid did not snap to 20: ' + snapX());
+    store.undo();
+
+    // zero means no grid at all: the value passes straight through
+    gridInput.value = '0';
+    gridInput.dispatchEvent(new window.Event('change', { bubbles: true }));
+    dragTo(23, 0);
+    if (Math.round(snapX()) !== 23) fail('a zero grid still snapped: ' + snapX());
+    store.undo();
+    if (mem.get('pdfstudio.grid') !== '0') fail('the grid step was not persisted');
+
+    if (readout.classList.contains('show')) fail('the readout outlived the drag');
+    gridInput.value = '5';
+    gridInput.dispatchEvent(new window.Event('change', { bubbles: true }));
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

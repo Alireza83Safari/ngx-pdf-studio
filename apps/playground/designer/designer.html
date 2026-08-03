@@ -607,6 +607,25 @@
         right: 0;
         height: 1px;
       }
+      /* live drag readout (designer-ux 2.3) */
+      #dragReadout {
+        position: absolute;
+        z-index: 40;
+        display: none;
+        padding: 2px var(--sp-3);
+        border-radius: var(--r-sm);
+        background: var(--paper-accent);
+        color: #fff;
+        font-size: var(--fs-2xs);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        pointer-events: none;
+        direction: ltr;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      }
+      #dragReadout.show {
+        display: block;
+      }
       /* Manual guides: dragged off a ruler, snapped to, dragged back to remove. */
       .guide {
         position: absolute;
@@ -3601,6 +3620,9 @@
           <div id="guideH"></div>
           <div id="marquee"></div>
           <div id="quickbar"></div>
+          <!-- live position/size while dragging, so a measurement does not mean
+               drop-then-read-the-inspector (designer-ux 2.3) -->
+          <div id="dragReadout" aria-hidden="true"></div>
           <div id="canvasHint">
             <span>بوم خالیه ✨</span>
             یک ابزار را از ریل کناری بکش و همین‌جا رها کن،<br />
@@ -3669,6 +3691,11 @@
                 <option value="Legal">Legal</option>
                 <option value="__custom__">سفارشی…</option>
               </select>
+            </div>
+            <!-- an editing preference, kept out of the document (designer-ux 2.3) -->
+            <div class="row" data-tip="گام شبکه‌ای که الِمان‌ها به آن می‌چسبند — صفر یعنی بدون شبکه">
+              <label>شبکه <span class="unit-tag"></span></label>
+              <input type="number" id="gridStep" min="0" step="any" aria-label="گام شبکه" />
             </div>
             <div class="row" data-tip="واحد نمایش اعداد — ذخیره همیشه به پونت است">
               <label>واحد</label>

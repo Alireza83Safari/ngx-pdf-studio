@@ -29,12 +29,15 @@
    * value merely landed on the grid — the guide means "you are aligned with
    * something", so the grid must not claim one.
    */
-  function snapValue(v, edges, disabled) {
+  function snapValue(v, edges, disabled, grid) {
     if (disabled) return { v: v, guide: null };
     for (var i = 0; i < (edges || []).length; i++) {
       if (Math.abs(edges[i] - v) <= SNAP_EDGE) return { v: edges[i], guide: edges[i] };
     }
-    return { v: Math.round(v / GRID) * GRID, guide: null };
+    // a step of zero (or nonsense) means "no grid", not "divide by zero"
+    var step = typeof grid === 'number' && grid > 0 ? grid : grid === 0 ? 0 : GRID;
+    if (!step) return { v: v, guide: null };
+    return { v: Math.round(v / step) * step, guide: null };
   }
 
   // --- display units (designer-ux 1.6) --------------------------------------
