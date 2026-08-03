@@ -1887,6 +1887,28 @@
       .statusbar .sbtn.s-warn svg {
         flex: none;
       }
+      /* page navigation (designer-ux 2.4) */
+      #pageNav {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--sp-0);
+      }
+      #pageNav[hidden] {
+        display: none;
+      }
+      #pageNavLabel {
+        font-variant-numeric: tabular-nums;
+        direction: ltr;
+        min-width: 46px;
+      }
+      .statusbar .sbtn:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .statusbar .sbtn:disabled:hover {
+        background: transparent;
+        color: var(--muted);
+      }
       /* live diagnostics counter (designer-ux 0.3) — amber, distinct from the
          red band-overflow chip next to it */
       .statusbar .sbtn.s-diag {
@@ -3874,6 +3896,15 @@
       <span id="pageInfo" data-tip="اندازه و جهت کاغذ سند">A4 · عمودی</span>
       <span class="sdot"></span>
       <span id="selInfo" data-tip="وضعیت انتخاب فعلی روی بوم">چیزی انتخاب نشده</span>
+      <!-- how many pages the document really is, and a way to reach them (2.4) -->
+      <span id="pageNav" hidden>
+        <button id="pageNavPrev" class="sbtn" data-tip="صفحهٔ قبل" aria-label="صفحهٔ قبل">‹</button>
+        <button id="pageNavLabel" class="sbtn" data-tip="شمارهٔ صفحه در پیش‌نمایش — کلیک کن تا برود">
+          1 / 1
+        </button>
+        <button id="pageNavNext" class="sbtn" data-tip="صفحهٔ بعد" aria-label="صفحهٔ بعد">›</button>
+      </span>
+      <span class="sdot"></span>
       <!-- live engine diagnostics for the whole document (0.3) -->
       <button
         id="diagInfo"

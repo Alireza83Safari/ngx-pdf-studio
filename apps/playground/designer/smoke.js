@@ -1888,6 +1888,73 @@ try {
     gridInput.value = '5';
     gridInput.dispatchEvent(new window.Event('change', { bubbles: true }));
 
+    // --- page navigation (designer-ux ۲.۴) ---
+    const settle24 = () => new Promise((r) => setTimeout(r, 300));
+    const pageNav = doc.getElementById('pageNav');
+    const pageLabel = doc.getElementById('pageNavLabel');
+    if (!pageNav || !pageLabel) fail('page navigation missing');
+
+    // a one-page document has nothing to navigate
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    for (const el of band0().elements.slice()) store.dispatch(P.removeElementById(el.id));
+    await settle24();
+    if (!pageNav.hidden) fail('page navigation shown for a one-page document');
+
+    // a detail band over enough rows genuinely spills onto more pages
+    store.dispatch(
+      P.replaceTemplate({
+        ...store.getState(),
+        datasets: [{ name: 'rows', source: { kind: 'path', path: 'rows' } }],
+        bands: [
+          {
+            id: 'many',
+            type: 'detail',
+            height: { mode: 'fixed', value: 60 },
+            dataset: 'rows',
+            elements: [
+              {
+                id: 'row',
+                type: 'staticText',
+                bounds: { x: 0, y: 0, width: 200, height: 16 },
+                zIndex: 1,
+                text: 'ردیف',
+                typography: { fontFamily: 'Vazirmatn', fontSize: 11 },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const many = { rows: Array.from({ length: 40 }, (_, i) => ({ n: i })) };
+    doc.getElementById('sampleData').value = JSON.stringify(many);
+    doc.getElementById('sampleData').dispatchEvent(new window.Event('input', { bubbles: true }));
+    await settle24();
+
+    const realPages = P.layoutDocument(store.getState(), { data: many }, {}).pageCount;
+    if (realPages < 2) fail('the fixture did not produce a multi-page document: ' + realPages);
+    if (pageNav.hidden) fail('page navigation stayed hidden for a ' + realPages + '-page document');
+    if (pageLabel.textContent.trim() !== '1 / ' + realPages)
+      fail('wrong page count shown: ' + pageLabel.textContent.trim() + ' want 1 / ' + realPages);
+    if (!doc.getElementById('pageNavPrev').disabled) fail('previous is enabled on the first page');
+    if (doc.getElementById('pageNavNext').disabled)
+      fail('next is disabled while there are pages left');
+
+    // next opens the preview and moves the counter
+    doc.getElementById('pageNavNext').dispatchEvent(clickEv());
+    if (!doc.getElementById('preview').classList.contains('show'))
+      fail('going to a page did not open the preview');
+    if (pageLabel.textContent.trim() !== '2 / ' + realPages)
+      fail('the counter did not advance: ' + pageLabel.textContent.trim());
+    if (doc.getElementById('pageNavPrev').disabled) fail('previous is still disabled on page 2');
+
+    // and it clamps rather than running past the end
+    for (let i = 0; i < realPages + 5; i++) {
+      doc.getElementById('pageNavNext').dispatchEvent(clickEv());
+    }
+    if (pageLabel.textContent.trim() !== realPages + ' / ' + realPages)
+      fail('the counter ran past the last page: ' + pageLabel.textContent.trim());
+    doc.getElementById('togglePreview').dispatchEvent(clickEv());
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

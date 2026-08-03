@@ -1326,6 +1326,16 @@
    */
   var liveDiags = [];
   var diagTimer = null;
+  /**
+   * How many pages the document actually becomes (designer-ux 2.4).
+   *
+   * The canvas edits one band at a time, so it cannot show page 2 — that waits
+   * for the full-sheet canvas (2.1). What it *can* stop doing is hiding the
+   * number: until now the only way to learn a document ran to three pages was
+   * to open the preview and scroll it.
+   */
+  var docPageCount = 1;
+  var previewPage = 1;
   var DIAG_DEBOUNCE = 150;
   function scheduleDiagnostics() {
     clearTimeout(diagTimer);
@@ -1333,8 +1343,12 @@
   }
   function runDiagnostics() {
     try {
-      liveDiags =
-        P.layoutDocument(store.getState(), { data: sampleData }, renderOpts()).diagnostics || [];
+      // one pass, two answers: the whole-document layout already knows how many
+      // pages this will be, which nothing in the editor was telling anyone (2.4)
+      var whole = P.layoutDocument(store.getState(), { data: sampleData }, renderOpts());
+      docPageCount = whole.pageCount;
+      renderPageNav();
+      liveDiags = whole.diagnostics || [];
     } catch (err) {
       // a template layout cannot even complete — the canvas bar (0.2) explains
       // it in Persian; here it belongs in the list as an error too
@@ -1404,6 +1418,56 @@
     liveDiags = [{ severity: severity, message: message }];
     renderDiagnostics();
   }
+  // --- page navigation (designer-ux 2.4) ------------------------------------
+  var pageNavEl = document.getElementById('pageNav');
+  var pageNavLabelEl = document.getElementById('pageNavLabel');
+  var pageNavPrevEl = document.getElementById('pageNavPrev');
+  var pageNavNextEl = document.getElementById('pageNavNext');
+
+  function renderPageNav() {
+    if (previewPage > docPageCount) previewPage = docPageCount;
+    if (previewPage < 1) previewPage = 1;
+    // a one-page document has nothing to navigate, and the count would be noise
+    pageNavEl.hidden = docPageCount <= 1;
+    pageNavLabelEl.textContent = previewPage + ' / ' + docPageCount; // Latin (2.3)
+    pageNavPrevEl.disabled = previewPage <= 1;
+    pageNavNextEl.disabled = previewPage >= docPageCount;
+  }
+
+  /**
+   * Show a page. The preview pane is the only surface that paginates today, so
+   * "go to page N" opens it and scrolls that sheet into view rather than
+   * pretending the single-band canvas can do it.
+   */
+  function goToPage(n) {
+    // `renderPageNav` owns the clamping, so this does not repeat it — a second
+    // guard nothing can tell apart is weight, not safety
+    previewPage = n;
+    renderPageNav();
+    if (!previewEl.classList.contains('show')) {
+      previewEl.classList.add('show');
+      renderPreview();
+    }
+    // the preview redraws on a timer, so scroll after it has had a chance to
+    var scroll = function () {
+      var sheets = previewEl.querySelectorAll('.page-svg');
+      var target = sheets[previewPage - 1];
+      if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+    };
+    scroll();
+    setTimeout(scroll, 160);
+  }
+
+  pageNavPrevEl.addEventListener('click', function () {
+    goToPage(previewPage - 1);
+  });
+  pageNavNextEl.addEventListener('click', function () {
+    goToPage(previewPage + 1);
+  });
+  pageNavLabelEl.addEventListener('click', function () {
+    goToPage(previewPage);
+  });
+
   /** Jump to the list when the counter is clicked. */
   function revealDiagnostics() {
     setTab('data');
