@@ -1146,16 +1146,17 @@
     marginsEl.style.right = m.right * zoom + 'px';
     marginsEl.style.bottom = m.bottom * zoom + 'px';
 
-    // WYSIWYG layer: the engine's own SVG painting of just the active band,
-    // isolated at the top so band-relative overlays line up (§7). The Preview
-    // pane shows the full multi-band paginated document.
+    // WYSIWYG layer (designer-ux 2.1): the engine's painting of the WHOLE
+    // document's current page. The canvas used to isolate one band at the top of
+    // an empty sheet, so a footer's totals could never be lined up under the
+    // table above them and nothing showed how full the page was. Overlays are
+    // positioned from the band strips the engine reports, not from a stack this
+    // file re-derives — that duplication is what kept drifting.
+    var pageIndex = 0;
     try {
-      var doc = P.layoutDocument(
-        displayTemplate(activeBandTemplate(t)),
-        { data: activeBandData(t) },
-        renderOpts(),
-      );
-      pageSvgEl.innerHTML = doc.pages.length ? P.paintPageToSvg(doc.pages[0]) : '';
+      var doc = P.layoutDocument(displayTemplate(t), { data: sampleData }, renderOpts());
+      pageIndex = Math.min(Math.max(0, previewPage - 1), Math.max(0, doc.pages.length - 1));
+      pageSvgEl.innerHTML = doc.pages.length ? P.paintPageToSvg(doc.pages[pageIndex]) : '';
       var svgNode = pageSvgEl.querySelector('svg');
       if (svgNode) {
         svgNode.setAttribute('width', size.width * zoom);
@@ -1176,39 +1177,60 @@
       n.remove();
     });
     var band = getActiveBand(t);
+    var laidPage = (doc && doc.pages && doc.pages[pageIndex]) || null;
+    var laidEls = (laidPage && laidPage.elements) || [];
     // what each element actually rendered — used to flag empty ones with a hint
     var renderedText = {};
-    try {
-      var laid = doc && doc.pages && doc.pages[0] ? doc.pages[0].elements : [];
-      laid.forEach(function (le) {
-        if (le && le.id != null)
-          renderedText[le.id] = le.text != null ? le.text : le.lines ? le.lines.join('') : '';
-      });
-    } catch (e) {
-      /* ignore */
-    }
+    laidEls.forEach(function (le) {
+      if (le && le.id != null && renderedText[le.id] === undefined)
+        renderedText[le.id] = le.text != null ? le.text : le.lines ? le.lines.join('') : '';
+    });
+
+    /**
+     * Where each band sits on this page, straight from the flow (2.1).
+     *
+     * A detail band appears once per row, but the *source* elements exist once,
+     * so only the first strip of each band carries overlays. The repeats are
+     * drawn as strips you can see but not edit — editing row 7 of a repeater
+     * would be editing the same element as row 1.
+     */
+    var strips = (laidPage && laidPage.bands) || [];
+    var firstStrip = {};
+    var repeatCount = {};
+    strips.forEach(function (s) {
+      repeatCount[s.id] = (repeatCount[s.id] || 0) + 1;
+      if (!firstStrip[s.id]) firstStrip[s.id] = s;
+    });
     // Band extent + overflow (designer-ux 0.1). The canvas paints only the
     // active band, so without this a 60pt band looks like it owns the whole
     // sheet and content spilling past its height silently lands on top of the
     // band that follows. `laidBottom` keys off the painted pieces, so a text
     // element that wrapped to six lines counts at its real height, not its
     // declared one.
+    // Overflow is measured against the ACTIVE band's own strip now, not against
+    // a lone band at the top of the sheet. `laidBottom` is band-relative, so
+    // everything downstream (0.1's overflow flag, 0.4's clip ghost) is unchanged.
+    var activeStrip = firstStrip[band.id] || null;
+    var stripTop = activeStrip ? activeStrip.bounds.y : m.top;
+    var stripLeft = activeStrip ? activeStrip.bounds.x : m.left;
     var laidBottom = {};
     var contentBottom = 0;
-    try {
-      (doc && doc.pages && doc.pages[0] ? doc.pages[0].elements : []).forEach(function (le) {
-        if (!le || le.id == null || !le.bounds) return;
-        var bottom = le.bounds.y + le.bounds.height - m.top;
+    laidEls.forEach(function (le) {
+      if (!le || le.id == null || !le.bounds) return;
+      // a repeated band paints the same id many times; only the copy inside this
+      // strip describes the source element the overlays represent
+      if (le.bounds.y + le.bounds.height < stripTop - 0.01) return;
+      var bottom = le.bounds.y + le.bounds.height - stripTop;
+      if (laidBottom[le.id] === undefined) {
+        laidBottom[le.id] = bottom;
         contentBottom = Math.max(contentBottom, bottom);
-        laidBottom[le.id] = Math.max(laidBottom[le.id] || 0, bottom);
-      });
-    } catch (e) {
-      /* ignore */
-    }
+      }
+    });
     var pageWide = isPageWideBand(band);
-    var bandH = resolveBandHeight(band, contentBottom);
+    var bandH = activeStrip ? activeStrip.bounds.height : resolveBandHeight(band, contentBottom);
     var overflowBy = pageWide ? 0 : Math.max(0, contentBottom - bandH);
-    renderBandExtent(m, size, bandH, overflowBy, pageWide);
+    renderBandExtent(m, size, bandH, overflowBy, pageWide, stripTop, stripLeft);
+    renderBandStrips(strips, band.id, repeatCount);
     // Which elements get overlays: normally the band's own, but after
     // double-clicking a group we "enter" it and expose its children instead, so
     // they can be selected and dragged directly on the canvas (Figma-style).
@@ -1242,8 +1264,10 @@
       node.setAttribute('aria-label', faName(el.type));
       node.setAttribute('aria-pressed', isSelected(el.id) ? 'true' : 'false');
       var b = el.bounds;
-      node.style.left = (m.left + offX + b.x) * zoom + 'px';
-      node.style.top = (m.top + offY + b.y) * zoom + 'px';
+      // the band's own origin on this page, so an element sits where the engine
+      // actually painted it rather than where a lone-band preview would (2.1)
+      node.style.left = (stripLeft + offX + b.x) * zoom + 'px';
+      node.style.top = (stripTop + offY + b.y) * zoom + 'px';
       node.style.width = Math.max(4, b.width * zoom) + 'px';
       node.style.height = Math.max(4, b.height * zoom) + 'px';
       // an element that paints nothing is invisible on the canvas — give it a
@@ -1444,6 +1468,10 @@
     // guard nothing can tell apart is weight, not safety
     previewPage = n;
     renderPageNav();
+    // the canvas draws page `previewPage` too (2.1), so moving pages has to
+    // redraw it — otherwise it silently keeps showing whichever page it last
+    // happened to render, which is worse than not following at all
+    renderCanvas();
     if (!previewEl.classList.contains('show')) {
       previewEl.classList.add('show');
       renderPreview();
@@ -1496,7 +1524,41 @@
    * Draw the active band's own strip on the canvas and hatch the rest of the
    * sheet, so the band stops looking like it owns the whole page (0.1).
    */
-  function renderBandExtent(m, size, bandH, overflowBy, pageWide) {
+  /**
+   * Every band's strip on this page (2.1). The active one is outlined by
+   * `renderBandExtent`; the rest are labelled so the page reads as a stack of
+   * named sections, and clicking one starts editing it.
+   *
+   * A repeated band (a detail row) shows every repetition, but only the first
+   * is editable — the others are the same source elements drawn again.
+   */
+  function renderBandStrips(strips, activeId, repeatCount) {
+    Array.prototype.slice.call(pageEl.querySelectorAll('.band-strip')).forEach(function (n) {
+      n.remove();
+    });
+    var seen = {};
+    strips.forEach(function (s) {
+      seen[s.id] = (seen[s.id] || 0) + 1;
+      if (s.id === activeId && seen[s.id] === 1) return; // renderBandExtent owns it
+      var node = document.createElement('div');
+      node.className = 'band-strip' + (seen[s.id] > 1 ? ' is-repeat' : '');
+      node.dataset.bandStrip = s.id;
+      node.style.left = s.bounds.x * zoom + 'px';
+      node.style.top = s.bounds.y * zoom + 'px';
+      node.style.width = Math.max(0, s.bounds.width) * zoom + 'px';
+      node.style.height = Math.max(0, s.bounds.height) * zoom + 'px';
+      if (seen[s.id] === 1) {
+        var tag = document.createElement('span');
+        tag.className = 'band-strip-tag';
+        tag.textContent =
+          bandTypeName(s.type) + (repeatCount[s.id] > 1 ? ' ×' + repeatCount[s.id] : '');
+        node.appendChild(tag);
+      }
+      pageEl.appendChild(node);
+    });
+  }
+
+  function renderBandExtent(m, size, bandH, overflowBy, pageWide, stripTop, stripLeft) {
     if (pageWide) {
       // painted across the page by contract — a boundary would be a lie
       bandBoxEl.style.display = 'none';
@@ -1505,22 +1567,19 @@
       return;
     }
     var left = m.left * zoom;
-    var top = m.top * zoom;
+    var top = stripTop * zoom;
     var height = Math.max(0, bandH) * zoom;
     bandBoxEl.style.display = '';
-    bandBoxEl.style.left = left + 'px';
+    bandBoxEl.style.left = stripLeft * zoom + 'px';
     bandBoxEl.style.top = top + 'px';
     bandBoxEl.style.width = Math.max(0, size.width - m.left - m.right) * zoom + 'px';
     bandBoxEl.style.height = height + 'px';
     bandBoxEl.classList.toggle('is-overflow', overflowBy > 0);
     bandBoxLabelEl.textContent = Math.round(bandH) + 'pt';
-    var restTop = top + height;
-    var restH = size.height * zoom - restTop;
-    bandRestEl.style.display = restH > 1 ? '' : 'none';
-    bandRestEl.style.left = '0px';
-    bandRestEl.style.top = restTop + 'px';
-    bandRestEl.style.width = size.width * zoom + 'px';
-    bandRestEl.style.height = Math.max(0, restH) + 'px';
+    // The page is a stack of bands now, so dimming "everything below the active
+    // one" would grey out the rest of the document. Only what falls outside
+    // every band still is not anyone's to draw on.
+    bandRestEl.style.display = 'none';
     setOverflowInfo(overflowBy);
   }
   var WARN_ICON =
@@ -1710,6 +1769,20 @@
       renderGuides();
       e.preventDefault();
     });
+  });
+  // clicking another band's strip starts editing that band (2.1)
+  pageEl.addEventListener('mousedown', function (e) {
+    var stripId = e.target.dataset && e.target.dataset.bandStrip;
+    if (!stripId) return;
+    var idx = store.getState().bands.findIndex(function (b) {
+      return b.id === stripId;
+    });
+    if (idx >= 0) {
+      setActiveBand(idx);
+      setTab('design');
+    }
+    e.preventDefault();
+    e.stopPropagation();
   });
   pageEl.addEventListener('mousedown', function (e) {
     var g = e.target.dataset && e.target.dataset.guide;

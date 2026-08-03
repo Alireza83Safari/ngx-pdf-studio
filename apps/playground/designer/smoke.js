@@ -999,7 +999,11 @@ try {
       fail('band box height is not the band height: ' + bandBox.style.height);
     if (!/^\d+pt$/.test(bandLabel.textContent))
       fail('band label is not a Latin-digit pt readout: ' + bandLabel.textContent);
-    if (bandRest.style.display === 'none') fail('the rest of the sheet is not hatched');
+    // 0.1 hatched everything below the active band, because the canvas showed
+    // one band on an empty sheet. Since 2.1 the sheet carries the whole stack,
+    // so hatching "the rest" would grey out the document itself.
+    if (bandRest.style.display !== 'none')
+      fail('the rest of the sheet is still hatched now that every band is drawn');
 
     // now push an element past the band edge — the silent bug from the review
     store.dispatch(P.addElement(band0().id, mkText('ov-out', 200)));
@@ -1748,16 +1752,31 @@ try {
     if (withFonts.lines.length === withoutFonts.lines.length)
       fail('the fixture no longer distinguishes the two measurers — pick a narrower box');
 
-    // the canvas SVG must show the *real* line count, not the estimate
+    // The canvas paints the whole page now (2.1), so compare against every line
+    // that page lays out, not just this element's — and against the real-font
+    // layout, since that is what the canvas is claimed to use.
+    const linesOn = (d) =>
+      d.pages[0].elements.reduce((n, e) => n + (e.lines ? e.lines.length : 0), 0);
+    const withFontsDoc = P.layoutDocument(
+      store.getState(),
+      { data: {} },
+      {
+        pdf: {
+          fonts: [{ family: 'Vazirmatn', bytes: Buffer.from(window.VAZIRMATN_BASE64, 'base64') }],
+        },
+      },
+    );
     const tspans = (doc.querySelector('#pageSvg').innerHTML.match(/<tspan/g) || []).length;
-    if (tspans !== withFonts.lines.length)
+    if (tspans !== linesOn(withFontsDoc))
       fail(
         'the canvas measured with the estimator: ' +
           tspans +
           ' lines drawn, ' +
-          withFonts.lines.length +
+          linesOn(withFontsDoc) +
           ' expected with the real font',
       );
+    if (linesOn(withFontsDoc) === linesOn(P.layoutDocument(store.getState(), { data: {} }, {})))
+      fail('the fixture no longer distinguishes the two measurers at page level');
 
     // --- rulers and manual guides (designer-ux ۲.۲) ---
     const rulerH = doc.getElementById('rulerH');
@@ -1953,6 +1972,153 @@ try {
     }
     if (pageLabel.textContent.trim() !== realPages + ' / ' + realPages)
       fail('the counter ran past the last page: ' + pageLabel.textContent.trim());
+    doc.getElementById('togglePreview').dispatchEvent(clickEv());
+
+    // --- the whole page on the canvas (designer-ux ۲.۱) ---
+    // The canvas used to draw the active band alone at the top margin, so an
+    // element's overlay and the place the engine actually painted it agreed only
+    // for the first band on the page. That is the one thing worth asserting: the
+    // overlay must land on the painted element, whatever the band stack above it.
+    const settle21 = () => new Promise((r) => setTimeout(r, 300));
+    store.dispatch(
+      P.replaceTemplate({
+        ...store.getState(),
+        datasets: [{ name: 'rows', source: { kind: 'path', path: 'rows' } }],
+        bands: [
+          {
+            id: 'ph',
+            type: 'pageHeader',
+            height: { mode: 'fixed', value: 50 },
+            elements: [
+              {
+                id: 'title',
+                type: 'staticText',
+                bounds: { x: 0, y: 4, width: 200, height: 16 },
+                zIndex: 1,
+                text: 'سربرگ',
+                typography: { fontFamily: 'Vazirmatn', fontSize: 11 },
+              },
+            ],
+          },
+          {
+            id: 'body',
+            type: 'detail',
+            height: { mode: 'fixed', value: 40 },
+            dataset: 'rows',
+            elements: [
+              {
+                id: 'cell',
+                type: 'staticText',
+                bounds: { x: 12, y: 6, width: 200, height: 16 },
+                zIndex: 1,
+                text: 'خانه',
+                typography: { fontFamily: 'Vazirmatn', fontSize: 11 },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const threeRows = { rows: [{ n: 1 }, { n: 2 }, { n: 3 }] };
+    doc.getElementById('sampleData').value = JSON.stringify(threeRows);
+    doc.getElementById('sampleData').dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.querySelector('#inspector [data-band="1"]').dispatchEvent(clickEv());
+    await settle21();
+
+    const laid21 = P.layoutDocument(store.getState(), { data: threeRows }, {}).pages[0];
+    if (!laid21.bands || !laid21.bands.length) fail('the engine reported no band strips');
+    const headerStrip = laid21.bands.find((b) => b.id === 'ph');
+    const bodyStrips = laid21.bands.filter((b) => b.id === 'body');
+    if (!headerStrip || bodyStrips.length !== 3)
+      fail('fixture did not produce a header + three detail strips');
+    // the fixture is only discriminating if the detail does NOT start at the top
+    // margin — otherwise the old lone-band positioning would pass unchanged
+    if (bodyStrips[0].bounds.y <= headerStrip.bounds.y + 1)
+      fail('the detail band starts at the top margin — the fixture proves nothing');
+
+    const painted21 = laid21.elements.find((e) => e.id === 'cell');
+    const overlay21 = doc.querySelector('#page .el[data-id="cell"]');
+    if (!overlay21) fail('the detail element has no overlay');
+    const z21 = parseFloat(doc.getElementById('zoomLabel').textContent) / 100;
+    if (Math.abs(parseFloat(overlay21.style.top) - painted21.bounds.y * z21) > 0.5)
+      fail(
+        'the overlay is not where the engine painted it: top ' +
+          overlay21.style.top +
+          ' want ' +
+          painted21.bounds.y * z21 +
+          'px',
+      );
+    if (Math.abs(parseFloat(overlay21.style.left) - painted21.bounds.x * z21) > 0.5)
+      fail('the overlay is not where the engine painted it horizontally: ' + overlay21.style.left);
+
+    // the bands you are not editing are still drawn, so the page reads as a
+    // document; the repeats are marked, because editing row 3 edits row 1
+    const phStrip = doc.querySelector('#page .band-strip[data-band-strip="ph"]');
+    if (!phStrip) fail('the page header band is not drawn on the canvas');
+    if (Math.abs(parseFloat(phStrip.style.top) - headerStrip.bounds.y * z21) > 0.5)
+      fail('the page header strip is not where the flow placed it: ' + phStrip.style.top);
+    const repeats = doc.querySelectorAll('#page .band-strip[data-band-strip="body"]');
+    if (repeats.length !== 2)
+      fail('want 2 repeat strips for the active band, got ' + repeats.length);
+    for (const r of repeats)
+      if (!r.classList.contains('is-repeat')) fail('a repeated band strip is not marked as one');
+    // and the active band's own first strip stays the editable one
+    if (doc.querySelector('#page .band-strip[data-band-strip="body"]:not(.is-repeat)'))
+      fail('the active band was drawn twice — as a strip and as the band box');
+
+    // clicking a band on the page starts editing it — the reason the whole
+    // document is on screen at all, rather than just being prettier
+    phStrip.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
+    await settle21();
+    if (!doc.querySelector('#inspector [data-band="0"]').classList.contains('active'))
+      fail('clicking the page header strip did not select that band');
+    if (!doc.querySelector('#page .el[data-id="title"]'))
+      fail('selecting a band by its strip did not move the overlays to it');
+    // a repeat belongs to the same band, so it selects that band too
+    doc
+      .querySelector('#page .band-strip[data-band-strip="body"]')
+      .dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
+    await settle21();
+    if (!doc.querySelector('#inspector [data-band="1"]').classList.contains('active'))
+      fail('clicking a repeated strip did not select the band it repeats');
+
+    // The canvas draws page `previewPage`, so the page navigation has to redraw
+    // it — otherwise it keeps showing whichever page it last happened to render.
+    // A report header makes page 1 genuinely differ from page 2: the rows start
+    // lower on the first page, so a canvas that did not follow would be caught.
+    store.dispatch(
+      P.replaceTemplate({
+        ...store.getState(),
+        bands: [
+          {
+            id: 'rh',
+            type: 'reportHeader',
+            height: { mode: 'fixed', value: 120 },
+            elements: [],
+          },
+          store.getState().bands.find((b) => b.id === 'body'),
+        ],
+      }),
+    );
+    const manyRows = { rows: Array.from({ length: 40 }, (_, i) => ({ n: i })) };
+    doc.getElementById('sampleData').value = JSON.stringify(manyRows);
+    doc.getElementById('sampleData').dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.querySelector('#inspector [data-band="1"]').dispatchEvent(clickEv());
+    await settle21();
+
+    const paged = P.layoutDocument(store.getState(), { data: manyRows }, {});
+    if (paged.pageCount < 2) fail('the page-follow fixture is not multi-page');
+    const topOn = (p) => paged.pages[p].bands.find((b) => b.id === 'body').bounds.y;
+    if (topOn(0) === topOn(1))
+      fail('the fixture pages are identical — a canvas that ignored the page would pass');
+    // the band box is where the active band is drawn, so it tracks the page
+    const boxTop = () => parseFloat(doc.getElementById('bandBox').style.top);
+    if (Math.abs(boxTop() - topOn(0) * z21) > 0.5)
+      fail('the canvas is not showing page 1: band box at ' + boxTop());
+    doc.getElementById('pageNavNext').dispatchEvent(clickEv());
+    await settle21();
+    if (Math.abs(boxTop() - topOn(1) * z21) > 0.5)
+      fail('the canvas did not follow the page navigation: band box at ' + boxTop());
     doc.getElementById('togglePreview').dispatchEvent(clickEv());
 
     console.log(

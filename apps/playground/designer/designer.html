@@ -662,6 +662,35 @@
         pointer-events: none;
         z-index: 12;
       }
+      /* every other band's strip on the page (designer-ux 2.1) — the sheet reads
+         as a stack of named sections, and a click starts editing one */
+      .band-strip {
+        position: absolute;
+        z-index: 11;
+        border-block-end: 1px dashed color-mix(in srgb, var(--paper-accent) 30%, transparent);
+        cursor: pointer;
+      }
+      .band-strip:hover {
+        background: color-mix(in srgb, var(--paper-accent) 5%, transparent);
+      }
+      /* a repeated band (a detail row) is the same source drawn again: only the
+         first strip carries the label and the overlays, but clicking any of them
+         selects the band they all come from, so they stay clickable */
+      .band-strip.is-repeat {
+        border-block-end-style: dotted;
+      }
+      .band-strip-tag {
+        position: absolute;
+        inset-inline-start: 0;
+        top: 0;
+        padding: 0 var(--sp-1);
+        background: color-mix(in srgb, var(--paper-accent) 12%, #fff);
+        color: var(--paper-accent);
+        font-size: var(--fs-2xs);
+        line-height: 1.6;
+        white-space: nowrap;
+        pointer-events: none;
+      }
       /* the page past the band's own strip: not this band's to draw on */
       #bandRest {
         background: repeating-linear-gradient(
@@ -3616,8 +3645,8 @@
           <div class="ce-body">
             <b>این باند رندر نشد</b>
             <span class="ce-hint"
-              >احتمالاً یکی از الِمان‌ها ناقص است. آخرین تغییر را واگرد کن یا الِمان مشکل‌دار را
-              حذف کن.</span
+              >احتمالاً یکی از الِمان‌ها ناقص است. آخرین تغییر را واگرد کن یا الِمان مشکل‌دار را حذف
+              کن.</span
             >
             <code id="canvasErrorDetail" dir="ltr"></code>
           </div>
@@ -3630,26 +3659,26 @@
           <div id="rulerH" class="ruler" aria-hidden="true"></div>
           <div id="rulerV" class="ruler" aria-hidden="true"></div>
           <div id="page">
-          <div id="pageSvg"></div>
-          <div id="margins"></div>
-          <!-- the strip this band actually owns. Everything past #bandBox's
+            <div id="pageSvg"></div>
+            <div id="margins"></div>
+            <!-- the strip this band actually owns. Everything past #bandBox's
                bottom edge is still painted into the PDF, but on top of whichever
                band follows — so the rest of the page is dimmed and the edge is
                labelled with the band height (designer-ux 0.1). -->
-          <div id="bandRest" aria-hidden="true"></div>
-          <div id="bandBox" aria-hidden="true"><span id="bandBoxLabel"></span></div>
-          <div id="guideV"></div>
-          <div id="guideH"></div>
-          <div id="marquee"></div>
-          <div id="quickbar"></div>
-          <!-- live position/size while dragging, so a measurement does not mean
+            <div id="bandRest" aria-hidden="true"></div>
+            <div id="bandBox" aria-hidden="true"><span id="bandBoxLabel"></span></div>
+            <div id="guideV"></div>
+            <div id="guideH"></div>
+            <div id="marquee"></div>
+            <div id="quickbar"></div>
+            <!-- live position/size while dragging, so a measurement does not mean
                drop-then-read-the-inspector (designer-ux 2.3) -->
-          <div id="dragReadout" aria-hidden="true"></div>
-          <div id="canvasHint">
-            <span>بوم خالیه ✨</span>
-            یک ابزار را از ریل کناری بکش و همین‌جا رها کن،<br />
-            یا از دکمهٔ «قالب‌ها» یک طرح آماده لود کن.
-          </div>
+            <div id="dragReadout" aria-hidden="true"></div>
+            <div id="canvasHint">
+              <span>بوم خالیه ✨</span>
+              یک ابزار را از ریل کناری بکش و همین‌جا رها کن،<br />
+              یا از دکمهٔ «قالب‌ها» یک طرح آماده لود کن.
+            </div>
           </div>
         </div>
       </div>
@@ -3715,7 +3744,10 @@
               </select>
             </div>
             <!-- an editing preference, kept out of the document (designer-ux 2.3) -->
-            <div class="row" data-tip="گام شبکه‌ای که الِمان‌ها به آن می‌چسبند — صفر یعنی بدون شبکه">
+            <div
+              class="row"
+              data-tip="گام شبکه‌ای که الِمان‌ها به آن می‌چسبند — صفر یعنی بدون شبکه"
+            >
               <label>شبکه <span class="unit-tag"></span></label>
               <input type="number" id="gridStep" min="0" step="any" aria-label="گام شبکه" />
             </div>
@@ -3823,8 +3855,8 @@
             <div id="fontList"></div>
             <button id="addFont" class="btn" type="button">افزودن فونت (TTF/OTF)</button>
             <div class="hint">
-              فونت داخلِ خودِ قالب جاسازی می‌شود، پس هرجا باز شود همان‌طور چاپ می‌شود — بدون
-              نصبِ فونت روی سیستم.
+              فونت داخلِ خودِ قالب جاسازی می‌شود، پس هرجا باز شود همان‌طور چاپ می‌شود — بدون نصبِ
+              فونت روی سیستم.
             </div>
           </div>
           <div class="sec">
@@ -3899,7 +3931,11 @@
       <!-- how many pages the document really is, and a way to reach them (2.4) -->
       <span id="pageNav" hidden>
         <button id="pageNavPrev" class="sbtn" data-tip="صفحهٔ قبل" aria-label="صفحهٔ قبل">‹</button>
-        <button id="pageNavLabel" class="sbtn" data-tip="شمارهٔ صفحه در پیش‌نمایش — کلیک کن تا برود">
+        <button
+          id="pageNavLabel"
+          class="sbtn"
+          data-tip="شمارهٔ صفحه در پیش‌نمایش — کلیک کن تا برود"
+        >
           1 / 1
         </button>
         <button id="pageNavNext" class="sbtn" data-tip="صفحهٔ بعد" aria-label="صفحهٔ بعد">›</button>
