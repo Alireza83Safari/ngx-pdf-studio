@@ -89,6 +89,22 @@
     return renderFonts.length ? { pdf: { fonts: renderFonts } } : {};
   }
 
+  /**
+   * The render input for anything drawn on screen.
+   *
+   * `now` defaults to `null` in the engine so output stays byte-deterministic,
+   * which means a `currentDate` field renders as nothing. The PDF export already
+   * pins it to the real clock; the canvas and the preview did not, so the date
+   * on screen was blank while the exported file had it. A canvas that disagrees
+   * with the paper is the one thing this tool may not do.
+   *
+   * The verification stamp is the deliberate exception — it hashes a
+   * reproducible input, so it keeps using `verifyInput()`.
+   */
+  function renderInput(data) {
+    return { data: data === undefined ? sampleData : data, now: Date.now() };
+  }
+
   function lastSelected() {
     return selected.length ? selected[selected.length - 1] : null;
   }
@@ -977,7 +993,7 @@
     try {
       var doc = P.layoutDocument(
         displayTemplate(activeBandTemplate(t)),
-        { data: activeBandData(t) },
+        renderInput(activeBandData(t)),
         renderOpts(),
       );
       var h = 0;
@@ -1070,7 +1086,7 @@
     try {
       var doc = P.layoutDocument(
         displayTemplate(activeBandTemplate(t)),
-        { data: activeBandData(t) },
+        renderInput(activeBandData(t)),
         renderOpts(),
       );
       return laidContentBottom(doc.pages[0], t.page.margins);
@@ -1154,7 +1170,7 @@
     // file re-derives — that duplication is what kept drifting.
     var pageIndex = 0;
     try {
-      var doc = P.layoutDocument(displayTemplate(t), { data: sampleData }, renderOpts());
+      var doc = P.layoutDocument(displayTemplate(t), renderInput(), renderOpts());
       pageIndex = Math.min(Math.max(0, previewPage - 1), Math.max(0, doc.pages.length - 1));
       pageSvgEl.innerHTML = doc.pages.length ? P.paintPageToSvg(doc.pages[pageIndex]) : '';
       var svgNode = pageSvgEl.querySelector('svg');
@@ -1214,6 +1230,7 @@
     var stripTop = activeStrip ? activeStrip.bounds.y : m.top;
     var stripLeft = activeStrip ? activeStrip.bounds.x : m.left;
     var laidBottom = {};
+    var laidLines = {};
     var contentBottom = 0;
     laidEls.forEach(function (le) {
       if (!le || le.id == null || !le.bounds) return;
@@ -1223,6 +1240,7 @@
       var bottom = le.bounds.y + le.bounds.height - stripTop;
       if (laidBottom[le.id] === undefined) {
         laidBottom[le.id] = bottom;
+        laidLines[le.id] = le.lines ? le.lines.length : 1;
         contentBottom = Math.max(contentBottom, bottom);
       }
     });
@@ -1284,7 +1302,14 @@
       // about which rectangle the handles control.
       if (TEXT_AUTOGROW[el.type] && laidBottom[el.id] != null) {
         var spill = laidBottom[el.id] - (offY + b.y) - b.height;
-        if (spill > 0.5) {
+        // A single line is exactly as tall as the font makes it: Vazirmatn's
+        // line box at 11pt is 14.1pt, so every 12pt box in the gallery spilled
+        // by 2pt and the canvas filled with warnings nobody could act on —
+        // making the box taller does not change one line of paint. Auto-grow is
+        // about text that *wrapped* past the room drawn for it, which is
+        // actionable (widen the box, shorten the text). Nothing is lost either
+        // way: the painters never clip text to the box.
+        if (spill > 0.5 && (laidLines[el.id] || 1) > 1) {
           node.classList.add('is-clipped');
           var ghost = document.createElement('div');
           ghost.className = 'el-clip-ghost';
@@ -1369,7 +1394,7 @@
     try {
       // one pass, two answers: the whole-document layout already knows how many
       // pages this will be, which nothing in the editor was telling anyone (2.4)
-      var whole = P.layoutDocument(store.getState(), { data: sampleData }, renderOpts());
+      var whole = P.layoutDocument(store.getState(), renderInput(), renderOpts());
       docPageCount = whole.pageCount;
       renderPageNav();
       liveDiags = whole.diagnostics || [];
@@ -1566,7 +1591,6 @@
       setOverflowInfo(0);
       return;
     }
-    var left = m.left * zoom;
     var top = stripTop * zoom;
     var height = Math.max(0, bandH) * zoom;
     bandBoxEl.style.display = '';
@@ -1575,6 +1599,11 @@
     bandBoxEl.style.width = Math.max(0, size.width - m.left - m.right) * zoom + 'px';
     bandBoxEl.style.height = height + 'px';
     bandBoxEl.classList.toggle('is-overflow', overflowBy > 0);
+    // The chip hangs below the band's bottom edge, which falls off the sheet
+    // when the band nearly fills the page — a 398pt band on a 430pt receipt put
+    // it past the paper. The chip is ~17px tall whatever the zoom, so the room
+    // left has to be measured in px, not pt: at 85% a 16pt gap is only 13.6px.
+    bandBoxEl.classList.toggle('is-low', (size.height - (stripTop + bandH)) * zoom < 20);
     bandBoxLabelEl.textContent = Math.round(bandH) + 'pt';
     // The page is a stack of bands now, so dimming "everything below the active
     // one" would grey out the rest of the document. Only what falls outside
@@ -4144,7 +4173,7 @@
     clearTimeout(previewTimer);
     previewTimer = setTimeout(function () {
       try {
-        var res = P.renderToSvg(store.getState(), { data: sampleData }, renderOpts());
+        var res = P.renderToSvg(store.getState(), renderInput(), renderOpts());
         previewEl.innerHTML = res.pages
           .map(function (svg) {
             return '<div class="page-svg">' + svg + '</div>';
@@ -4791,7 +4820,7 @@
       // With the verification stamp on, render from the reproducible input
       // (no volatile `now`) so the printed code matches verify.html; otherwise
       // pin `now` to the current clock so date/now fields render as today.
-      var input = verifyOn ? verifyInput() : { data: sampleData, now: Date.now() };
+      var input = verifyOn ? verifyInput() : renderInput();
       var opts = Object.assign({}, renderOpts());
       if (verifyOn) opts.verify = true;
       var res = await P.renderToPdf(store.getState(), input, opts);
@@ -5332,8 +5361,8 @@
       try {
         // live WYSIWYG thumbnail: the engine renders page 1 of the template
         svg =
-          P.renderToSvg(tplThemed(entry.template), { data: entry.data }, renderOpts()).pages[0] ||
-          '';
+          P.renderToSvg(tplThemed(entry.template), renderInput(entry.data), renderOpts())
+            .pages[0] || '';
       } catch (err) {
         svg = '';
       }

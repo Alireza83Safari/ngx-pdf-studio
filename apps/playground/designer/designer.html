@@ -719,6 +719,14 @@
         white-space: nowrap;
         direction: ltr;
       }
+      /* the band ends near the foot of the sheet, so the chip goes above its
+         bottom edge instead of hanging off the paper */
+      #bandBox.is-low #bandBoxLabel {
+        top: auto;
+        bottom: 0;
+        margin-top: 0;
+        margin-bottom: 3px;
+      }
       /* content reaches past the band edge → it will collide with the next band */
       #bandBox.is-overflow {
         border-bottom-color: var(--paper-danger);

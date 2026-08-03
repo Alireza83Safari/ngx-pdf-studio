@@ -2121,6 +2121,58 @@ try {
       fail('the canvas did not follow the page navigation: band box at ' + boxTop());
     doc.getElementById('togglePreview').dispatchEvent(clickEv());
 
+    // --- a gallery template must load without a wall of false warnings ---
+    // Vazirmatn's line box at 11pt is 14.1pt, so every 12pt box in the gallery
+    // "spilled" by 2pt and the canvas lit up with clip ghosts nobody could act
+    // on: a single line is as tall as the font makes it, and no painter clips
+    // text to its box. Auto-grow is about text that *wrapped*.
+    const receipt = window.PDFSTUDIO_TEMPLATES.find((g) => g.id === 'receipt');
+    if (!receipt) fail('the receipt template is gone from the gallery');
+    store.dispatch(P.replaceTemplate(JSON.parse(JSON.stringify(receipt.template))));
+    doc.getElementById('sampleData').value = JSON.stringify(receipt.data || {});
+    doc.getElementById('sampleData').dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    await settle21();
+
+    const els = Array.prototype.slice.call(doc.querySelectorAll('#page .el'));
+    if (els.length < 15) fail('the receipt did not load: ' + els.length + ' overlays');
+    const clipped = els.filter((n) => n.classList.contains('is-clipped')).map((n) => n.dataset.id);
+    if (clipped.length) fail('single-line text flagged as auto-grown: ' + clipped.join(', '));
+    // and the ghost is what the flag draws, so it must be gone too
+    if (doc.querySelector('#page .el-clip-ghost'))
+      fail('a clip ghost was drawn for text that never wrapped');
+    // but genuine wrapping must still be caught — the whole point of 0.4.
+    // Squeezing an existing line of text into a narrow box makes it wrap without
+    // inventing new content.
+    const thanks = band0().elements.find((e) => e.id === 'r-thanks');
+    if (!thanks) fail('the receipt thank-you line is gone');
+    store.dispatch(P.setElementBounds(thanks.id, { ...thanks.bounds, width: 40 }));
+    await settle21();
+    const wrapped = doc.querySelector('#page .el[data-id="r-thanks"]');
+    if (!wrapped.classList.contains('is-clipped'))
+      fail('text that wrapped past its box was not flagged');
+    if (!wrapped.querySelector('.el-clip-ghost')) fail('wrapped text got no clip ghost');
+    store.undo();
+    await settle21();
+    if (doc.querySelector('#page .el[data-id="r-thanks"]').classList.contains('is-clipped'))
+      fail('undo did not clear the wrap');
+
+    // a `currentDate` field renders as today. The engine returns null from
+    // `now()` for byte-determinism, so the screen paths have to pin the clock —
+    // the PDF export already did, and a canvas that disagrees with the paper is
+    // the one thing this tool may not do.
+    const dateEl = doc.querySelector('#page .el[data-id="r-date"]');
+    if (!dateEl) fail('the receipt date field is gone');
+    if (dateEl.classList.contains('is-empty'))
+      fail('the date field renders blank on the canvas but not in the PDF');
+    if (!/\d|[۰-۹]/.test(doc.querySelector('#pageSvg').textContent))
+      fail('no digits painted at all — the date probably did not render');
+
+    // the band fills this 430pt sheet, so its size chip must not hang off the
+    // paper — it flips above the band's bottom edge instead
+    if (!doc.getElementById('bandBox').classList.contains('is-low'))
+      fail('a band ending at the foot of the sheet did not move its chip inside');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,
