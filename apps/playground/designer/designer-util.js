@@ -232,6 +232,94 @@
     return Math.min(2, Math.max(0.4, Math.round(z * 20) / 20));
   }
 
+  // --- template gallery (designer-ux 4.2) -----------------------------------
+
+  /** Latin digits → Persian, for numbers that read as prose rather than data. */
+  function faDigits(n) {
+    return String(n).replace(/[0-9]/g, function (d) {
+      return '۰۱۲۳۴۵۶۷۸۹'.charAt(Number(d));
+    });
+  }
+
+  /**
+   * Fold a string until two spellings of the same Persian word compare equal.
+   *
+   * Arabic yeh and alef-maksura both arrive as ی, Arabic kaf as ک, and the
+   * zero-width non-joiner becomes a space so "پیش‌فاکتور" is found by typing
+   * "پیش فاکتور" — which is what a keyboard without ZWNJ produces, i.e. most of
+   * them. Without this the gallery search silently misses templates whose names
+   * were authored with different code points than the user types.
+   */
+  function tplNorm(s) {
+    return String(s == null ? '' : s)
+      .toLowerCase()
+      .replace(/[يى]/g, 'ی')
+      .replace(/ك/g, 'ک')
+      .replace(/‌/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /** A query as normalised words; every one must match (AND, not OR). */
+  function tplTerms(query) {
+    return tplNorm(query).split(' ').filter(Boolean);
+  }
+
+  /**
+   * Does a gallery entry survive the current category and search terms?
+   *
+   * An entry declaring `cat: 'all'` — the blank canvas — stays reachable from
+   * every filter, because "start from nothing" is not a kind of document.
+   */
+  function tplMatches(entry, terms, cat) {
+    if (!entry) return false;
+    if (cat && cat !== 'all' && entry.cat !== 'all' && entry.cat !== cat) return false;
+    if (!terms || !terms.length) return true;
+    var hay = tplNorm([entry.name, entry.desc, entry.id].concat(entry.tags || []).join(' '));
+    return terms.every(function (t) {
+      return hay.indexOf(t) >= 0;
+    });
+  }
+
+  /**
+   * What to say about a template's page format, without saying it.
+   *
+   * The copy stays in the designer; this decides only *which* fact is worth
+   * reporting. A portrait A4 returns `null`: badging the format everyone already
+   * assumes turns the chip into noise on almost every card instead of a marker
+   * of the exceptions. Custom sizes report short side first, the way the engine
+   * resolves them, unless the page is landscape.
+   */
+  function pageFormat(template) {
+    var pg = (template && template.page) || {};
+    var landscape = pg.orientation === 'landscape';
+    if (typeof pg.size === 'string') {
+      if (pg.size === 'A4' && !landscape) return null;
+      return { kind: 'named', name: pg.size, landscape: landscape };
+    }
+    if (pg.size && pg.size.width) {
+      var long = Math.round(Math.max(pg.size.width, pg.size.height));
+      var short = Math.round(Math.min(pg.size.width, pg.size.height));
+      return {
+        kind: 'custom',
+        landscape: landscape,
+        width: landscape ? long : short,
+        height: landscape ? short : long,
+      };
+    }
+    return { kind: 'plain', landscape: landscape };
+  }
+
+  /**
+   * The scale at which a `w`×`h` page fits a `boxW`×`boxH` card, never cropped,
+   * so a portrait A4 and a landscape ticket read as the same kind of object.
+   * Returns null when nothing is measurable, leaving the caller its fallback.
+   */
+  function fitScale(boxW, boxH, w, h) {
+    if (!(boxW > 0) || !(boxH > 0) || !(w > 0) || !(h > 0)) return null;
+    return Math.min(boxW / w, boxH / h);
+  }
+
   // --- rulers (designer-ux 2.2) ---------------------------------------------
 
   /**
@@ -318,6 +406,12 @@
     SNAP_EDGE: SNAP_EDGE,
     snapValue: snapValue,
     fitZoom: fitZoom,
+    faDigits: faDigits,
+    tplNorm: tplNorm,
+    tplTerms: tplTerms,
+    tplMatches: tplMatches,
+    pageFormat: pageFormat,
+    fitScale: fitScale,
     UNITS: UNITS,
     unitOf: unitOf,
     toDisplay: toDisplay,

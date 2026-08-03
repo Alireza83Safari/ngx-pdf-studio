@@ -31,7 +31,6 @@
   var clipboard = [];
   var pasteSeq = 0;
   var activeBand = 0; // which band the canvas edits (index into template.bands)
-  var enteredGroup = null; // id of the container we "entered" (see renderCanvas)
   var selected = []; // ids, last item drives the inspector
   var enteredGroup = null; // container id whose children the canvas exposes, or null
   var sampleData = {
@@ -5332,21 +5331,8 @@
   var thumbCache = {}; // 'templateId|themeId' → rendered SVG string
   var tplZoomEntry = null;
 
-  function faDigits(n) {
-    return String(n).replace(/[0-9]/g, function (d) {
-      return '۰۱۲۳۴۵۶۷۸۹'.charAt(Number(d));
-    });
-  }
-  /** Fold the Arabic/Persian letter variants and ZWNJ so search is forgiving. */
-  function tplNorm(s) {
-    return String(s == null ? '' : s)
-      .toLowerCase()
-      .replace(/[يى]/g, 'ی')
-      .replace(/ك/g, 'ک')
-      .replace(/‌/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
+  var faDigits = U.faDigits;
+  var tplNorm = U.tplNorm;
   function tplEntries() {
     return window.PDFSTUDIO_TEMPLATES || [];
   }
@@ -5362,25 +5348,14 @@
     var fn = window.PDFSTUDIO_THEME_TEMPLATE;
     return fn ? fn(template, tplTheme) : JSON.parse(JSON.stringify(template));
   }
-  /**
-   * Badge the page format — but stay quiet for the plain A4 portrait everyone
-   * already assumes, so the chip marks the exceptions instead of repeating
-   * itself on almost every card. Custom sizes are reported the way the engine
-   * will actually resolve them (short side first unless landscape).
-   */
+  /** Word the page-format chip. `U.pageFormat` decides what is worth saying. */
   function tplSizeLabel(template) {
-    var pg = (template && template.page) || {};
-    var landscape = pg.orientation === 'landscape';
-    if (typeof pg.size === 'string')
-      return pg.size === 'A4' && !landscape ? '' : pg.size + (landscape ? ' افقی' : ' عمودی');
-    if (pg.size && pg.size.width) {
-      var long = Math.round(Math.max(pg.size.width, pg.size.height));
-      var short = Math.round(Math.min(pg.size.width, pg.size.height));
-      return landscape
-        ? faDigits(long) + '×' + faDigits(short) + ' pt'
-        : faDigits(short) + '×' + faDigits(long) + ' pt';
-    }
-    return landscape ? 'افقی' : 'عمودی';
+    var f = U.pageFormat(template);
+    if (!f) return '';
+    var way = f.landscape ? 'افقی' : 'عمودی';
+    if (f.kind === 'named') return f.name + ' ' + way;
+    if (f.kind === 'custom') return faDigits(f.width) + '×' + faDigits(f.height) + ' pt';
+    return way;
   }
   function tplThumb(entry) {
     var key = entry.id + '|' + tplTheme;
@@ -5399,13 +5374,7 @@
     return thumbCache[key];
   }
   function tplMatches(entry, terms) {
-    // `cat: 'all'` entries (the blank canvas) stay reachable from every filter
-    if (tplCat !== 'all' && entry.cat !== 'all' && entry.cat !== tplCat) return false;
-    if (!terms.length) return true;
-    var hay = tplNorm([entry.name, entry.desc, entry.id].concat(entry.tags || []).join(' '));
-    return terms.every(function (t) {
-      return hay.indexOf(t) >= 0;
-    });
+    return U.tplMatches(entry, terms, tplCat);
   }
 
   /**
@@ -5418,15 +5387,15 @@
     var svg = card.querySelector('.tpl-thumb svg');
     var paper = card.querySelector('.tpl-paper');
     if (!thumb || !svg || !paper) return;
-    var boxW = (thumb.clientWidth || 0) - THUMB_INSET * 2;
-    var boxH = (thumb.clientHeight || 0) - THUMB_INSET * 2;
-    if (boxW <= 0 || boxH <= 0) {
-      boxW = THUMB_W;
-      boxH = THUMB_H;
-    }
     var w = Number(svg.getAttribute('width')) || 595;
     var h = Number(svg.getAttribute('height')) || 842;
-    var k = Math.min(boxW / w, boxH / h);
+    var k =
+      U.fitScale(
+        (thumb.clientWidth || 0) - THUMB_INSET * 2,
+        (thumb.clientHeight || 0) - THUMB_INSET * 2,
+        w,
+        h,
+      ) || U.fitScale(THUMB_W, THUMB_H, w, h);
     paper.style.width = Math.round(w * k) + 'px';
     paper.style.height = Math.round(h * k) + 'px';
     svg.style.transform = 'scale(' + k + ')';

@@ -274,6 +274,135 @@ describe('fitZoom', () => {
   });
 });
 
+describe('tplNorm / tplTerms', () => {
+  it('folds the Arabic letter variants onto the Persian ones', () => {
+    // the same word, authored with Arabic code points and typed with Persian
+    expect(U.tplNorm('فاكتور')).toBe(U.tplNorm('فاکتور'));
+    expect(U.tplNorm('مالياتي')).toBe(U.tplNorm('مالیاتی'));
+  });
+
+  it('treats a ZWNJ as a space, because most keyboards cannot type one', () => {
+    expect(U.tplNorm('پیش‌فاکتور')).toBe('پیش فاکتور');
+  });
+
+  it('collapses whitespace and case', () => {
+    expect(U.tplNorm('  Sales   REPORT ')).toBe('sales report');
+  });
+
+  it('survives the empty cases instead of throwing', () => {
+    expect(U.tplNorm(null)).toBe('');
+    expect(U.tplNorm(undefined)).toBe('');
+    expect(U.tplTerms('   ')).toEqual([]);
+  });
+
+  it('splits a query into words', () => {
+    expect(U.tplTerms('فاکتور رسمی')).toEqual(['فاکتور', 'رسمی']);
+  });
+});
+
+describe('tplMatches', () => {
+  const invoice = {
+    id: 'invoice',
+    cat: 'finance',
+    name: 'فاکتور فروش',
+    desc: 'سند فروش',
+    tags: ['invoice', 'فروش'],
+  };
+  const blank = { id: 'blank', cat: 'all', name: 'سند خالی', tags: [] };
+
+  it('requires every term, not any of them', () => {
+    expect(U.tplMatches(invoice, U.tplTerms('فاکتور فروش'), 'all')).toBe(true);
+    expect(U.tplMatches(invoice, U.tplTerms('فاکتور قرارداد'), 'all')).toBe(false);
+  });
+
+  it('searches the id and tags, not only the visible name', () => {
+    expect(U.tplMatches(invoice, U.tplTerms('invoice'), 'all')).toBe(true);
+  });
+
+  it('finds a template typed with the other spelling', () => {
+    expect(U.tplMatches(invoice, U.tplTerms('فاكتور'), 'all')).toBe(true);
+  });
+
+  it('applies the category filter', () => {
+    expect(U.tplMatches(invoice, [], 'finance')).toBe(true);
+    expect(U.tplMatches(invoice, [], 'office')).toBe(false);
+  });
+
+  it('keeps the blank canvas reachable from every category', () => {
+    // "start from nothing" is not a kind of document, so it never filters out
+    expect(U.tplMatches(blank, [], 'office')).toBe(true);
+    expect(U.tplMatches(blank, [], 'finance')).toBe(true);
+  });
+
+  it('an empty query matches everything in the category', () => {
+    expect(U.tplMatches(invoice, [], 'all')).toBe(true);
+  });
+});
+
+describe('pageFormat', () => {
+  it('stays quiet about the portrait A4 everyone already assumes', () => {
+    expect(U.pageFormat({ page: { size: 'A4' } })).toBeNull();
+    expect(U.pageFormat({ page: { size: 'A4', orientation: 'portrait' } })).toBeNull();
+  });
+
+  it('but reports an A4 that was turned on its side', () => {
+    expect(U.pageFormat({ page: { size: 'A4', orientation: 'landscape' } })).toEqual({
+      kind: 'named',
+      name: 'A4',
+      landscape: true,
+    });
+  });
+
+  it('reports a custom size short side first, as the engine resolves it', () => {
+    expect(U.pageFormat({ page: { size: { width: 430, height: 226 } } })).toEqual({
+      kind: 'custom',
+      landscape: false,
+      width: 226,
+      height: 430,
+    });
+  });
+
+  it('and long side first when the page is landscape', () => {
+    const f = U.pageFormat({
+      page: { size: { width: 226, height: 430 }, orientation: 'landscape' },
+    });
+    expect(f.width).toBe(430);
+    expect(f.height).toBe(226);
+  });
+
+  it('falls back to orientation alone when there is no size', () => {
+    expect(U.pageFormat({ page: {} })).toEqual({ kind: 'plain', landscape: false });
+    expect(U.pageFormat({})).toEqual({ kind: 'plain', landscape: false });
+    expect(U.pageFormat(null)).toEqual({ kind: 'plain', landscape: false });
+  });
+});
+
+describe('fitScale', () => {
+  it('fits by the tighter axis so nothing is cropped', () => {
+    expect(U.fitScale(100, 100, 200, 400)).toBe(0.25);
+    expect(U.fitScale(100, 100, 400, 200)).toBe(0.25);
+  });
+
+  it('returns null when nothing is measurable, leaving the fallback to caller', () => {
+    expect(U.fitScale(0, 100, 200, 400)).toBeNull();
+    expect(U.fitScale(-24, 100, 200, 400)).toBeNull();
+    expect(U.fitScale(100, 100, 0, 0)).toBeNull();
+  });
+});
+
+describe('faDigits', () => {
+  it('converts Latin digits to Persian', () => {
+    expect(U.faDigits(226)).toBe('۲۲۶');
+    expect(U.faDigits(0)).toBe('۰');
+  });
+
+  it('converts every digit it is given, paper names included', () => {
+    // it is only ever handed numbers, so this is a caveat rather than a bug —
+    // the paper-name branch of the size chip must not be routed through it
+    expect(U.faDigits('A4')).toBe('A۴');
+  });
+});
+
 describe('rulerStep', () => {
   it('picks a round number in the display unit, not in points', () => {
     // 10mm is a step a person writes; 28.35pt is not

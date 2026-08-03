@@ -140,6 +140,57 @@ try {
   if (cards.length < 13) fail('expected 13+ template cards, got ' + cards.length);
   const thumbs = doc.querySelectorAll('.tpl-thumb svg');
   if (thumbs.length < 13) fail('template thumbnails missing: ' + thumbs.length);
+  // Search, filter and re-theme (designer-ux 4.2). None of this was covered
+  // before, which is why the section could not safely be moved out of the
+  // 6,000-line shell — the logic is unit-tested now, this proves it is wired.
+  const shown = () => Array.from(doc.querySelectorAll('.tpl-card')).map((c) => c.dataset.template);
+  const search = doc.getElementById('tplSearch');
+  const typeSearch = (v) => {
+    search.value = v;
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+  };
+  typeSearch('فاکتور');
+  if (!shown().includes('invoice')) fail('searching for فاکتور did not find the invoice');
+  if (shown().includes('menu')) fail('the search matched a template it should not have');
+  // the same word spelled with Arabic code points must find it too — the exact
+  // case tplNorm exists for, and the one a Persian keyboard produces
+  typeSearch('فاكتور');
+  if (!shown().includes('invoice')) fail('the Arabic spelling of فاکتور found nothing');
+  // and a tag that never appears on screen
+  typeSearch('invoice');
+  if (!shown().includes('invoice')) fail('searching a latin tag found nothing');
+  const emptyShown = () => doc.getElementById('tplEmpty').classList.contains('show');
+  typeSearch('قطعاً‌چنین‌قالبی‌نیست');
+  if (shown().length) fail('a nonsense query still matched ' + shown().length + ' templates');
+  if (!emptyShown()) fail('no empty state for a query that matched nothing');
+  if (doc.getElementById('tplCount').textContent.trim() !== 'بدون نتیجه')
+    fail('the count did not report an empty result: ' + doc.getElementById('tplCount').textContent);
+  typeSearch('');
+  if (emptyShown()) fail('the empty state stayed up after the query was cleared');
+
+  // a category filter, and the blank canvas surviving it
+  const financeBtn = doc.querySelector('#tplCats [data-cat="finance"]');
+  if (!financeBtn) fail('the finance category filter is missing');
+  financeBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+  const financeCards = shown();
+  if (!financeCards.includes('invoice')) fail('the finance filter hid the invoice');
+  if (!financeCards.includes('blank')) fail('the blank canvas was filtered out of a category');
+  if (financeCards.includes('menu')) fail('the finance filter kept a non-finance template');
+  doc.querySelector('#tplCats [data-cat="all"]').dispatchEvent(
+    new window.Event('click', {
+      bubbles: true,
+    }),
+  );
+  if (shown().length <= financeCards.length) fail('clearing the category filter showed no more');
+
+  // re-theming redraws the thumbnails rather than serving the cached ones
+  const beforeTheme = doc.querySelector('.tpl-card[data-template="invoice"] .tpl-thumb').innerHTML;
+  const otherTheme = doc.querySelector('#tplThemes [data-theme][aria-checked="false"]');
+  if (!otherTheme) fail('there is no second palette to switch to');
+  otherTheme.dispatchEvent(new window.Event('click', { bubbles: true }));
+  if (doc.querySelector('.tpl-card[data-template="invoice"] .tpl-thumb').innerHTML === beforeTheme)
+    fail('switching palette did not redraw the thumbnails');
+
   // load the invoice template → canvas shows its title, sample data swapped
   const invoiceCard = doc.querySelector('.tpl-card[data-template="invoice"]');
   if (!invoiceCard) fail('invoice card missing');
