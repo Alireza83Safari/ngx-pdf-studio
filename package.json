@@ -33,7 +33,9 @@
     "designer:smoke": "npm run designer:build && node apps/playground/designer/smoke.js",
     "smoke:angular": "node tools/smoke-angular-consumer.mjs",
     "smoke:angular-linker": "node tools/smoke-angular-linker.mjs",
-    "smoke:docs": "node tools/smoke-docs.mjs"
+    "smoke:docs": "node tools/smoke-docs.mjs",
+    "render:serve": "node apps/render-service/server.js",
+    "smoke:render-service": "node tools/smoke-render-service.mjs"
   },
   "devDependencies": {
     "@angular/common": "^17.3.12",

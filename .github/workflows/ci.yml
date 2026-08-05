@@ -33,6 +33,50 @@ jobs:
       - run: npm run build:angular
       - run: npm run smoke:tarball
 
+  # The render service (designer-ux 5.3), in its own job because it needs the
+  # built dist and Docker, and neither should slow the main gate down.
+  #
+  # Two layers, failing for different reasons: the e2e installs the packed
+  # tarball and talks HTTP to the server — proving the service works against the
+  # artifact consumers get — while the Docker build proves the image that ships
+  # it is buildable and its own healthcheck passes.
+  render-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build:core
+      - run: npm run smoke:render-service
+      - run: docker build -f apps/render-service/Dockerfile -t pdfstudio/render .
+      - name: The container serves a PDF
+        run: |
+          docker run -d --name render -p 3000:3000 pdfstudio/render
+          # Wait for the healthcheck the image declares, rather than sleeping a
+          # guessed interval and calling a slow start a failure.
+          for i in $(seq 1 30); do
+            state=$(docker inspect -f '{{.State.Health.Status}}' render 2>/dev/null || echo starting)
+            [ "$state" = "healthy" ] && break
+            sleep 2
+          done
+          if [ "$(docker inspect -f '{{.State.Health.Status}}' render)" != "healthy" ]; then
+            echo "::error::the container never became healthy"
+            docker logs render
+            exit 1
+          fi
+          curl -sS -X POST localhost:3000/render \
+            -H 'content-type: application/json' \
+            -d @tools/fixtures/render-request.json -o out.pdf -w '%{http_code}' > code.txt
+          test "$(cat code.txt)" = "200" || { echo "::error::expected 200, got $(cat code.txt)"; cat out.pdf; exit 1; }
+          # A 200 with an HTML error page would pass a status check; insist on
+          # the magic bytes and a plausible size.
+          head -c 5 out.pdf | grep -q '%PDF-' || { echo "::error::response is not a PDF"; exit 1; }
+          test "$(stat -c%s out.pdf)" -gt 2000 || { echo "::error::PDF is suspiciously small"; exit 1; }
+          docker rm -f render
+
   # Compatibility of the built packages against every supported Angular major
   # (§2.1), in two layers that fail for different reasons:
   #

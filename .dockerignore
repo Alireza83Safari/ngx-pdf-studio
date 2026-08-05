@@ -1,0 +1,23 @@
+# Keep the build context small. The render service image needs exactly one
+# thing from the repo — the built core dist — plus two service files, so
+# everything else is transfer time and cache invalidation for nothing.
+#
+# `dist/` is deliberately NOT ignored: `packages/pdf-studio/core/dist` is the
+# whole input to the image.
+node_modules
+**/node_modules
+.git
+.github
+.nx
+coverage
+tmp
+release
+*.log
+*.tsbuildinfo
+
+# The browser designer and its generated bundles: unrelated to server rendering.
+apps/playground
+
+# Docs and task files.
+docs
+*.md

@@ -13,6 +13,7 @@ const config: Config = {
     '<rootDir>/packages/pdf-studio/core/jest.config.ts',
     '<rootDir>/packages/pdf-studio/angular/jest.config.ts',
     '<rootDir>/apps/playground/designer/jest.config.ts',
+    '<rootDir>/apps/render-service/jest.config.ts',
   ],
 };
 

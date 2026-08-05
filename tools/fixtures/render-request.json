@@ -1,0 +1,36 @@
+{
+  "template": {
+    "schemaVersion": "1.0.0",
+    "metadata": { "name": "render-service-fixture" },
+    "page": {
+      "size": "A4",
+      "orientation": "portrait",
+      "margins": { "top": 40, "right": 40, "bottom": 40, "left": 40 },
+      "direction": "rtl",
+      "locale": { "language": "fa", "digits": "persian", "calendar": "jalali" },
+      "unit": "pt"
+    },
+    "styles": [],
+    "datasets": [],
+    "parameters": [],
+    "resources": { "fonts": [], "images": [] },
+    "bands": [
+      {
+        "id": "main",
+        "type": "reportHeader",
+        "height": { "mode": "fixed", "value": 200 },
+        "elements": [
+          {
+            "id": "title",
+            "type": "staticText",
+            "bounds": { "x": 0, "y": 0, "width": 300, "height": 30 },
+            "zIndex": 1,
+            "text": "فاکتور فروش",
+            "typography": { "fontFamily": "Vazirmatn", "fontSize": 18 }
+          }
+        ]
+      }
+    ]
+  },
+  "data": {}
+}
