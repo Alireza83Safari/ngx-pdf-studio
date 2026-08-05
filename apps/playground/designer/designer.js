@@ -6072,18 +6072,7 @@
   });
 
   // --- share as link (ROADMAP ۲.۱) --------------------------------------------
-  function toBase64Url(str) {
-    return window
-      .btoa(unescape(encodeURIComponent(str)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-  }
-  function fromBase64Url(b64) {
-    var s = b64.replace(/-/g, '+').replace(/_/g, '/');
-    while (s.length % 4) s += '=';
-    return decodeURIComponent(escape(window.atob(s)));
-  }
+  var toBase64Url = U.toBase64Url;
   document.getElementById('shareLink').addEventListener('click', function () {
     var payload = toBase64Url(P.serializeTemplate(store.getState()));
     var url = window.location.href.split('#')[0] + '#t=' + payload;
@@ -6103,9 +6092,21 @@
     var hash = window.location.hash || '';
     if (hash.indexOf('#t=') !== 0) return false;
     try {
-      var res = P.importTemplate(fromBase64Url(hash.slice(3)));
+      var res = P.importTemplate(U.fromBase64Url(hash.slice(3)));
       if (!res.success) return false;
-      loadTemplate(res.value);
+      if (currentDocId) {
+        // Arriving at a share link with a document already open (a pasted URL
+        // fires `hashchange`) must not land on top of it. Before the document
+        // library this only cost the undo history; now the next autosave would
+        // write the shared template over the open document's own entry and the
+        // user's work would be gone. A shared template becomes a document of
+        // its own, exactly as a gallery template does.
+        createDoc(res.value, (res.value.metadata && res.value.metadata.name) || 'سند اشتراکی');
+      } else {
+        // First load: nothing is open yet, and the boot sequence below files
+        // whatever we end up with into the library.
+        loadTemplate(res.value);
+      }
       toast('قالب از لینک اشتراک لود شد', { type: 'success' });
       return true;
     } catch (err) {

@@ -2471,6 +2471,82 @@ try {
       fail('deleting the open document also wiped the canvas');
     docsPanel.classList.remove('show');
 
+    // --- share links vs. the document library (designer-ux ۴.۲) ---
+    // Pasting a share link into an open designer fires `hashchange`. That used
+    // to swap the template in place, which cost only the undo history — until
+    // 2.5 gave the open document a library entry, at which point the next
+    // autosave wrote the shared template straight over the user's own work.
+    // Start from a document that is genuinely open. The delete test above left
+    // none, and with no current document the guarded path is never reached —
+    // the first version of this test passed for that reason rather than on merit.
+    doc.getElementById('docsNew').dispatchEvent(clickEv());
+    await settle25();
+    const shareBand = JSON.parse(JSON.stringify(store.getState()));
+    shareBand.metadata = { name: 'سندِ خودم' };
+    store.dispatch(P.replaceTemplate(shareBand));
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    store.dispatch(P.addElement(band0().id, mkText('mine-only', 30)));
+    await settle25();
+
+    // a template that is plainly not the open one
+    const shared = JSON.parse(P.serializeTemplate(store.getState()));
+    shared.metadata = { name: 'سندِ اشتراکی' };
+    shared.bands[0].elements = [
+      {
+        id: 'shared-only',
+        type: 'staticText',
+        bounds: { x: 0, y: 0, width: 200, height: 16 },
+        zIndex: 1,
+        text: 'از لینک آمده',
+        typography: { fontFamily: 'Vazirmatn', fontSize: 11 },
+      },
+    ];
+    const payload = window.DesignerUtil.toBase64Url(JSON.stringify(shared));
+    // `location.hash = …` fires hashchange by itself, so setting it *and*
+    // dispatching ran the handler twice and created two documents. replaceState
+    // changes the URL silently, leaving exactly one event — which is what
+    // pasting a link into the address bar actually produces.
+    window.history.replaceState(null, '', '#t=' + payload);
+    window.dispatchEvent(new window.HashChangeEvent('hashchange'));
+    await settle25();
+
+    if (!P.findElement(store.getState(), 'shared-only')) fail('the shared template did not open');
+    if (store.getState().metadata.name !== 'سندِ اشتراکی')
+      fail('the shared document has the wrong name: ' + store.getState().metadata.name);
+
+    // the user's document must still be there, with its element
+    doc.getElementById('openDocs').dispatchEvent(clickEv());
+    await settle25();
+    const namesAfterShare = docNames();
+    if (!namesAfterShare.includes('سندِ خودم'))
+      fail('a share link destroyed the open document: ' + namesAfterShare.join(' | '));
+    if (!namesAfterShare.includes('سندِ اشتراکی'))
+      fail('the shared template did not become a document of its own');
+    docRows()
+      .find((r) => r.querySelector('b').textContent === 'سندِ خودم')
+      .dispatchEvent(clickEv());
+    await settle25();
+    if (!P.findElement(store.getState(), 'mine-only'))
+      fail('the user’s work was overwritten by the shared template');
+    if (P.findElement(store.getState(), 'shared-only'))
+      fail('the shared template leaked into the user’s document');
+
+    // The link the share BUTTON produces must be one the app can read back.
+    // Encoding the payload here instead would test the codec twice and the
+    // button not at all — which is exactly what the first version did.
+    window.history.replaceState(null, '', window.location.pathname);
+    doc.getElementById('shareLink').dispatchEvent(clickEv());
+    await settle25();
+    const madeHash = window.location.hash;
+    if (madeHash.indexOf('#t=') !== 0) fail('the share button produced no link: ' + madeHash);
+    const roundTrip = P.importTemplate(window.DesignerUtil.fromBase64Url(madeHash.slice(3)));
+    if (!roundTrip.success) fail('the link the share button produced does not import back');
+    if (!P.findElement(roundTrip.value, 'mine-only'))
+      fail('the shared link does not carry the open document’s content');
+    if (roundTrip.value.metadata.name !== store.getState().metadata.name)
+      fail('the shared link names a different document than the one open');
+    window.history.replaceState(null, '', window.location.pathname);
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

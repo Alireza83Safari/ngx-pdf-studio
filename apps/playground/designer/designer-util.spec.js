@@ -403,6 +403,53 @@ describe('faDigits', () => {
   });
 });
 
+describe('share-link encoding', () => {
+  it('round-trips Persian, which is the only kind of template this app has', () => {
+    const s = '{"name":"فاکتور فروش","note":"مبلغ: ۴,۸۵۰,۰۰۰ ریال"}';
+    expect(U.fromBase64Url(U.toBase64Url(s))).toBe(s);
+  });
+
+  it('produces a payload safe to put in a URL fragment', () => {
+    // +, / and = would be re-encoded or truncated by something along the way
+    const payload = U.toBase64Url('؟?/+=&#'.repeat(50));
+    expect(payload).toMatch(/^[A-Za-z0-9_-]*$/);
+  });
+
+  it('matches the encoding it replaced, so existing links still open', () => {
+    // the previous implementation was btoa(unescape(encodeURIComponent(s))).
+    // Both produce the UTF-8 bytes of the string, so the payloads must be
+    // identical — otherwise every link already shared would break.
+    const legacy = (s) =>
+      btoa(unescape(encodeURIComponent(s)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    for (const s of ['فاکتور', 'plain ascii', '{"a":"ب","c":[1,2]}', '🧾 emoji too']) {
+      expect(U.toBase64Url(s)).toBe(legacy(s));
+    }
+  });
+
+  it('survives a template far larger than one chunk', () => {
+    // `String.fromCharCode.apply` on the whole array overflows the stack, and it
+    // would do it on exactly the big documents most worth sharing
+    const big = JSON.stringify({ text: 'متن فارسی '.repeat(20000) });
+    expect(big.length).toBeGreaterThan(0x2000);
+    expect(U.fromBase64Url(U.toBase64Url(big))).toBe(big);
+  });
+
+  it('handles the empty string without producing padding', () => {
+    expect(U.toBase64Url('')).toBe('');
+    expect(U.fromBase64Url('')).toBe('');
+  });
+
+  it('accepts a payload whose padding was stripped, at every length', () => {
+    // one, two and zero `=` are all reachable depending on byte count
+    for (const s of ['a', 'ab', 'abc', 'abcd', 'ابج']) {
+      expect(U.fromBase64Url(U.toBase64Url(s))).toBe(s);
+    }
+  });
+});
+
 describe('the document library (designer-ux 2.5)', () => {
   const doc = (id, name, ts) => ({ id, name, ts, json: '{}' });
 

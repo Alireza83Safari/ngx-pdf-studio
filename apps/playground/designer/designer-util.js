@@ -320,6 +320,37 @@
     return Math.min(boxW / w, boxH / h);
   }
 
+  // --- share links (designer-ux 4.2) ----------------------------------------
+
+  // `btoa` only speaks Latin-1, and every template in this app is full of
+  // Persian, so the string has to become UTF-8 bytes first. Chunked because
+  // `String.fromCharCode.apply` on a 100 KB template overflows the call stack —
+  // which would fail on exactly the large documents most worth sharing.
+  var B64_CHUNK = 0x2000;
+
+  /** URL-safe base64 of a UTF-8 string: the payload of a `#t=` share link. */
+  function toBase64Url(str) {
+    var bytes = new TextEncoder().encode(String(str));
+    var bin = '';
+    for (var i = 0; i < bytes.length; i += B64_CHUNK) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + B64_CHUNK));
+    }
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  /**
+   * The inverse. Padding is restored because `toBase64Url` strips it — `=` is
+   * legal in a fragment but noisy, and `atob` refuses a string without it.
+   */
+  function fromBase64Url(b64) {
+    var s = String(b64).replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    var bin = atob(s);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
   // --- the document library (designer-ux 2.5) -------------------------------
 
   /** Most recently touched first — the order a home screen wants to show. */
@@ -469,6 +500,8 @@
     tplMatches: tplMatches,
     pageFormat: pageFormat,
     fitScale: fitScale,
+    toBase64Url: toBase64Url,
+    fromBase64Url: fromBase64Url,
     sortDocs: sortDocs,
     upsertDoc: upsertDoc,
     docMatches: docMatches,
