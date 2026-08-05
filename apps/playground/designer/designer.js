@@ -5509,7 +5509,9 @@
     sampleData = JSON.parse(JSON.stringify(entry.data || {}));
     sampleEl.value = JSON.stringify(sampleData, null, 2);
     renderFieldPicker();
-    loadTemplate(tplThemed(entry.template));
+    // a template starts a document of its own rather than landing on top of the
+    // one already open — picking a template is not a request to discard work
+    createDoc(tplThemed(entry.template), entry.name);
     galleryEl.classList.remove('show');
     tplZoomEl.classList.remove('show');
     setTab('design');
@@ -5636,6 +5638,7 @@
       try {
         var json = P.serializeTemplate(store.getState());
         window.localStorage.setItem(DRAFT_KEY, json);
+        saveCurrentDoc(json); // the library entry for whichever document is open
         recordHistory(json);
         stateEl.textContent = 'ذخیره شد ✓';
         stateEl.classList.add('saved');
@@ -5643,6 +5646,97 @@
         stateEl.textContent = '';
       }
     }, 400);
+  }
+
+  // --- the document library (designer-ux 2.5) --------------------------------
+  //
+  // Until now there was one draft. "New document" wiped it behind a confirm(),
+  // so the only way to start something else was to destroy what you had. The
+  // library keeps every document under its own key and makes switching an
+  // *open*, not a replacement — the current one is written out first, always.
+  var DOCS_KEY = 'pdfstudio.docs.v1';
+  var CURRENT_KEY = 'pdfstudio.currentDoc';
+  var DOCS_MAX = 40;
+  var currentDocId = null;
+
+  function readDocs() {
+    try {
+      var raw = JSON.parse(window.localStorage.getItem(DOCS_KEY) || '[]');
+      return Array.isArray(raw) ? raw.filter(Boolean) : [];
+    } catch (err) {
+      return [];
+    }
+  }
+  function writeDocs(docs) {
+    try {
+      window.localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+    } catch (err) {
+      /* storage full or unavailable — the in-memory document is unaffected */
+    }
+  }
+  function docName() {
+    return (store.getState().metadata && store.getState().metadata.name) || 'سند بی‌نام';
+  }
+  /** Element count across every band — what the row reports, not band 0 alone. */
+  function docElementCount(t) {
+    return (t.bands || []).reduce(function (n, b) {
+      return n + ((b.elements && b.elements.length) || 0);
+    }, 0);
+  }
+  /** Write the open document into the library under its own id. */
+  function saveCurrentDoc(json) {
+    if (!currentDocId) return;
+    writeDocs(
+      U.upsertDoc(
+        readDocs(),
+        {
+          id: currentDocId,
+          name: docName(),
+          ts: Date.now(),
+          count: docElementCount(store.getState()),
+          json: json,
+        },
+        DOCS_MAX,
+      ),
+    );
+  }
+  function rememberCurrentId() {
+    try {
+      window.localStorage.setItem(CURRENT_KEY, currentDocId);
+    } catch (err) {
+      /* the id just won't survive a reload */
+    }
+  }
+  /**
+   * Adopt the pre-2.5 single draft as the first library entry.
+   *
+   * Anyone who had work in progress when this shipped keeps it — silently
+   * dropping it would be the exact data loss the whole item exists to stop. The
+   * old key is left where it is: it costs nothing and an older build of the page
+   * can still read it.
+   */
+  function migrateLegacyDraft() {
+    var docs = readDocs();
+    if (docs.length) return docs;
+    var legacy = null;
+    try {
+      legacy = window.localStorage.getItem(DRAFT_KEY);
+    } catch (err) {
+      legacy = null;
+    }
+    if (!legacy) return docs;
+    var name = 'سند بی‌نام';
+    var count = 0;
+    try {
+      var t = JSON.parse(legacy);
+      name = (t.metadata && t.metadata.name) || name;
+      count = docElementCount(t);
+    } catch (err) {
+      /* keep the defaults — an unreadable draft is still worth carrying over */
+    }
+    docs = [{ id: 'doc-legacy', name: name, ts: Date.now(), count: count, json: legacy }];
+    writeDocs(docs);
+    return docs;
   }
 
   // --- version history (ROADMAP ۲.۴) -----------------------------------------
@@ -6052,12 +6146,33 @@
         setLoading(btn, false);
       });
   });
+  /**
+   * Work out which document is open, and load it (designer-ux 2.5).
+   *
+   * The order matters: adopt any pre-2.5 draft into the library first, then
+   * prefer the document that was last open, then the most recent one. Only a
+   * genuinely empty library starts a new document — otherwise reloading the
+   * page would quietly add an untitled entry every time.
+   */
   function restoreDraft() {
     try {
-      var raw = window.localStorage.getItem(DRAFT_KEY);
-      if (!raw) return false;
-      var res = P.importTemplate(raw);
+      var docs = migrateLegacyDraft();
+      var wanted = null;
+      try {
+        wanted = window.localStorage.getItem(CURRENT_KEY);
+      } catch (err) {
+        wanted = null;
+      }
+      var entry = null;
+      docs.forEach(function (d) {
+        if (d.id === wanted) entry = d;
+      });
+      if (!entry) entry = U.sortDocs(docs)[0] || null;
+      if (!entry) return false;
+      var res = P.importTemplate(entry.json);
       if (!res.success) return false;
+      currentDocId = entry.id;
+      rememberCurrentId();
       loadTemplate(res.value);
       return true;
     } catch (err) {
@@ -6076,15 +6191,280 @@
     fileMenu.classList.remove('open');
   });
 
-  document.getElementById('newDoc').addEventListener('click', function () {
-    if (!window.confirm('سند جدید؟ طرح فعلی پاک می‌شود (پیش‌نویس هم).')) return;
+  // --- the document library, wired (designer-ux 2.5) -------------------------
+  var docsEl = document.getElementById('docs');
+  var docsListEl = document.getElementById('docsList');
+  var docsSearchEl = document.getElementById('docsSearch');
+  var docsEmptyEl = document.getElementById('docsEmpty');
+  var docsQuery = '';
+
+  /** Flush the open document to storage now, rather than on the save timer. */
+  function flushCurrentDoc() {
     try {
-      window.localStorage.removeItem(DRAFT_KEY);
+      var json = P.serializeTemplate(store.getState());
+      window.localStorage.setItem(DRAFT_KEY, json);
+      saveCurrentDoc(json);
     } catch (err) {
-      /* ignore */
+      /* nothing to do — the document stays in memory either way */
     }
-    loadTemplate(blankTemplate());
-    toast('سند خالی آماده است — از جعبه‌ابزار شروع کن');
+  }
+
+  /**
+   * Switch to another document.
+   *
+   * The open one is written out first. That single line is the whole acceptance
+   * criterion for 2.5: leaving a document must never be how you lose it.
+   */
+  function openDoc(id) {
+    if (id === currentDocId) {
+      docsEl.classList.remove('show');
+      return;
+    }
+    flushCurrentDoc();
+    var entry = null;
+    readDocs().forEach(function (d) {
+      if (d.id === id) entry = d;
+    });
+    if (!entry) return;
+    // same reader the draft restore uses: it validates rather than trusting
+    // whatever is in storage, so a corrupted entry reports instead of throwing
+    var res = P.importTemplate(entry.json);
+    if (!res || !res.success) {
+      toast('این سند خوانده نشد — شاید با نسخهٔ دیگری ذخیره شده', { type: 'error' });
+      return;
+    }
+    var t = res.value;
+    currentDocId = id;
+    rememberCurrentId();
+    loadTemplate(t);
+    docsEl.classList.remove('show');
+    setTab('design');
+    toast('«' + entry.name + '» باز شد', { type: 'success' });
+  }
+
+  /** Start a fresh document beside the others, never on top of one. */
+  function createDoc(template, name) {
+    flushCurrentDoc();
+    currentDocId = 'doc-' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
+    rememberCurrentId();
+    var t = template || blankTemplate();
+    t.metadata = t.metadata || {};
+    t.metadata.name = U.uniqueDocName(
+      name || t.metadata.name || 'سند بی‌نام',
+      readDocs().map(function (d) {
+        return d.name;
+      }),
+    );
+    loadTemplate(t);
+    flushCurrentDoc();
+    return t.metadata.name;
+  }
+
+  /**
+   * The library as it should be *shown*: storage, plus the live name and element
+   * count of the document on screen.
+   *
+   * Reading those from the store means opening the panel never has to write to
+   * be accurate. That matters beyond tidiness: if the panel saved on open, it
+   * would mask whether `openDoc` saves the document you are leaving — and that
+   * is the one guarantee this whole item exists to make.
+   */
+  function docsForDisplay() {
+    var docs = readDocs();
+    if (!currentDocId) return U.sortDocs(docs);
+    var live = {
+      id: currentDocId,
+      name: docName(),
+      count: docElementCount(store.getState()),
+    };
+    var found = null;
+    docs.forEach(function (d) {
+      if (d.id === currentDocId) found = d;
+    });
+    if (!found)
+      return U.upsertDoc(docs, Object.assign({ ts: Date.now(), json: '' }, live), DOCS_MAX);
+    found.name = live.name;
+    found.count = live.count;
+    return U.sortDocs(docs);
+  }
+
+  function renderDocs() {
+    var terms = U.tplTerms(docsQuery);
+    var visible = docsForDisplay().filter(function (d) {
+      return U.docMatches(d, terms);
+    });
+    docsListEl.innerHTML = '';
+    visible.forEach(function (d) {
+      var row = document.createElement('div');
+      row.className = 'doc-row' + (d.id === currentDocId ? ' is-current' : '');
+      row.dataset.doc = d.id;
+      row.setAttribute('role', 'button');
+      row.tabIndex = 0;
+      var when = new Date(d.ts || 0);
+      var stamp =
+        String(when.getFullYear()) +
+        '-' +
+        String(when.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(when.getDate()).padStart(2, '0') +
+        ' ' +
+        String(when.getHours()).padStart(2, '0') +
+        ':' +
+        String(when.getMinutes()).padStart(2, '0');
+      var name = document.createElement('div');
+      name.className = 'doc-name';
+      var strong = document.createElement('b');
+      strong.textContent = d.name || 'سند بی‌نام';
+      name.appendChild(strong);
+      if (d.id === currentDocId) {
+        var badge = document.createElement('span');
+        badge.className = 'doc-badge';
+        badge.textContent = 'باز';
+        name.appendChild(badge);
+      }
+      var meta = document.createElement('div');
+      meta.className = 'doc-meta';
+      meta.textContent = stamp + ' · ' + (d.count || 0);
+      var col = document.createElement('div');
+      col.style.minWidth = '0';
+      col.appendChild(name);
+      col.appendChild(meta);
+      var spacer = document.createElement('span');
+      spacer.className = 'spacer';
+      var acts = document.createElement('div');
+      acts.className = 'doc-acts';
+      acts.innerHTML =
+        '<button data-act="rename" aria-label="تغییر نام" data-tip="تغییر نام">✎</button>' +
+        '<button data-act="dup" aria-label="یک نسخهٔ دیگر" data-tip="یک نسخهٔ دیگر">⧉</button>' +
+        '<button data-act="del" aria-label="حذف سند" data-tip="حذف سند">🗑</button>';
+      row.appendChild(col);
+      row.appendChild(spacer);
+      row.appendChild(acts);
+      docsListEl.appendChild(row);
+    });
+    docsEmptyEl.classList.toggle('show', visible.length === 0);
+  }
+
+  function openDocsPanel() {
+    // deliberately does not save: `docsForDisplay` reads the live document, so
+    // saving is left to `openDoc`, where leaving a document actually happens
+    renderDocs();
+    docsEl.classList.add('show');
+    if (docsSearchEl.focus) docsSearchEl.focus();
+  }
+
+  docsListEl.addEventListener('click', function (e) {
+    var row = e.target.closest ? e.target.closest('.doc-row') : null;
+    if (!row) return;
+    var id = row.dataset.doc;
+    var act = e.target.dataset && e.target.dataset.act;
+    if (!act) {
+      openDoc(id);
+      return;
+    }
+    e.stopPropagation();
+    var docs = readDocs();
+    var entry = null;
+    docs.forEach(function (d) {
+      if (d.id === id) entry = d;
+    });
+    if (!entry) return;
+    if (act === 'rename') {
+      var next = window.prompt('نام تازهٔ سند:', entry.name);
+      if (next == null || !next.trim()) return;
+      var taken = docs
+        .filter(function (d) {
+          return d.id !== id;
+        })
+        .map(function (d) {
+          return d.name;
+        });
+      entry.name = U.uniqueDocName(next.trim(), taken);
+      writeDocs(U.upsertDoc(docs, entry, DOCS_MAX));
+      // renaming the open document must move the store too, or the next
+      // autosave writes the old name straight back over it
+      if (id === currentDocId) {
+        var t = JSON.parse(JSON.stringify(store.getState()));
+        t.metadata = t.metadata || {};
+        t.metadata.name = entry.name;
+        store.dispatch(P.replaceTemplate(t));
+      }
+      renderDocs();
+      return;
+    }
+    if (act === 'dup') {
+      var copyName = U.uniqueDocName(
+        entry.name,
+        docs.map(function (d) {
+          return d.name;
+        }),
+      );
+      writeDocs(
+        U.upsertDoc(
+          docs,
+          {
+            id: 'doc-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
+            name: copyName,
+            ts: Date.now(),
+            count: entry.count || 0,
+            json: entry.json,
+          },
+          DOCS_MAX,
+        ),
+      );
+      renderDocs();
+      toast('«' + copyName + '» ساخته شد');
+      return;
+    }
+    if (act === 'del') {
+      if (!window.confirm('«' + entry.name + '» حذف شود؟ این کار برگشت‌پذیر نیست.')) return;
+      writeDocs(
+        docs.filter(function (d) {
+          return d.id !== id;
+        }),
+      );
+      // deleting what you are editing leaves the document on screen: it is not
+      // gone until you leave it, and silently blanking the canvas would be a
+      // second, unasked-for destruction
+      if (id === currentDocId) currentDocId = null;
+      renderDocs();
+      toast('«' + entry.name + '» حذف شد');
+    }
+  });
+  docsListEl.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var row = e.target.classList && e.target.classList.contains('doc-row') ? e.target : null;
+    if (!row) return;
+    e.preventDefault();
+    openDoc(row.dataset.doc);
+  });
+  docsSearchEl.addEventListener('input', function () {
+    docsQuery = docsSearchEl.value;
+    renderDocs();
+  });
+  document.getElementById('closeDocs').addEventListener('click', function () {
+    docsEl.classList.remove('show');
+  });
+  docsEl.addEventListener('click', function (e) {
+    if (e.target === docsEl) docsEl.classList.remove('show');
+  });
+  document.getElementById('docsNew').addEventListener('click', function () {
+    var name = createDoc(blankTemplate(), 'سند بی‌نام');
+    docsEl.classList.remove('show');
+    setTab('design');
+    toast('«' + name + '» ساخته شد — از جعبه‌ابزار شروع کن');
+  });
+  document.getElementById('docsFromTpl').addEventListener('click', function () {
+    docsEl.classList.remove('show');
+    document.getElementById('openGallery').click();
+  });
+  document.getElementById('openDocs').addEventListener('click', openDocsPanel);
+
+  // "New document" no longer destroys the open one — it puts a new document
+  // beside it, which is the whole point of having a library.
+  document.getElementById('newDoc').addEventListener('click', function () {
+    var name = createDoc(blankTemplate(), 'سند بی‌نام');
+    toast('«' + name + '» ساخته شد — سندِ قبلی در «سندهای من» محفوظ است');
   });
 
   // --- keyboard ------------------------------------------------------------
@@ -6147,6 +6527,9 @@
       if (helpEl.classList.contains('show')) return helpEl.classList.remove('show');
       if (historyEl.classList.contains('show')) return historyEl.classList.remove('show');
       if (copilotEl.classList.contains('show')) return copilotEl.classList.remove('show');
+      if (docsEl.classList.contains('show')) return docsEl.classList.remove('show');
+      // never had an Escape route at all, which the modal audit caught
+      if (cloneReviewEl.classList.contains('show')) return closeCloneReview();
       // the big preview sits on top of the gallery, so it closes first
       if (tplZoomEl.classList.contains('show')) return tplZoomEl.classList.remove('show');
       if (galleryEl.classList.contains('show')) return galleryEl.classList.remove('show');
@@ -6269,46 +6652,48 @@
         return el.offsetWidth > 0 || el.offsetHeight > 0;
       });
     }
-    ['help', 'gallery', 'copilot', 'history', 'palette'].forEach(function (id) {
-      var modal = document.getElementById(id);
-      if (!modal) return;
-      var restoreTo = null;
-      function onKey(e) {
-        if (e.key !== 'Tab') return;
-        var f = visibleFocusables(modal);
-        if (!f.length) return;
-        var first = f[0];
-        var last = f[f.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-      new MutationObserver(function () {
-        var open = modal.classList.contains('show');
-        if (open && !modal.__trap) {
-          modal.__trap = true;
-          restoreTo = lastOutside;
-          modal.addEventListener('keydown', onKey);
-          if (!modal.contains(document.activeElement)) {
-            var f = visibleFocusables(modal);
-            if (f.length) f[0].focus();
+    ['help', 'gallery', 'copilot', 'history', 'palette', 'docs', 'cloneReview'].forEach(
+      function (id) {
+        var modal = document.getElementById(id);
+        if (!modal) return;
+        var restoreTo = null;
+        function onKey(e) {
+          if (e.key !== 'Tab') return;
+          var f = visibleFocusables(modal);
+          if (!f.length) return;
+          var first = f[0];
+          var last = f[f.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
           }
-        } else if (!open && modal.__trap) {
-          modal.__trap = false;
-          modal.removeEventListener('keydown', onKey);
-          var active = document.activeElement;
-          var stillHere = !active || active === document.body || modal.contains(active);
-          if (stillHere && restoreTo && document.contains(restoreTo) && restoreTo.focus) {
-            restoreTo.focus();
-          }
-          restoreTo = null;
         }
-      }).observe(modal, { attributes: true, attributeFilter: ['class'] });
-    });
+        new MutationObserver(function () {
+          var open = modal.classList.contains('show');
+          if (open && !modal.__trap) {
+            modal.__trap = true;
+            restoreTo = lastOutside;
+            modal.addEventListener('keydown', onKey);
+            if (!modal.contains(document.activeElement)) {
+              var f = visibleFocusables(modal);
+              if (f.length) f[0].focus();
+            }
+          } else if (!open && modal.__trap) {
+            modal.__trap = false;
+            modal.removeEventListener('keydown', onKey);
+            var active = document.activeElement;
+            var stillHere = !active || active === document.body || modal.contains(active);
+            if (stillHere && restoreTo && document.contains(restoreTo) && restoreTo.focus) {
+              restoreTo.focus();
+            }
+            restoreTo = null;
+          }
+        }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+      },
+    );
   }
   // --- inspector drawer on narrow layouts (design-review ۲.۱) ---------------
   // Below the tablet breakpoint the inspector floats over the canvas instead of
@@ -6388,5 +6773,13 @@
   if (!tryLoadFromHash() && !restoreDraft()) {
     rerender();
     renderInspector();
+  }
+  // Whatever we ended up with — a shared link, a restored document, or the seed
+  // template — belongs to the library, or the first autosave would have no
+  // entry to write to and the document would exist only until the next reload.
+  if (!currentDocId) {
+    currentDocId = 'doc-' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
+    rememberCurrentId();
+    flushCurrentDoc();
   }
 })();

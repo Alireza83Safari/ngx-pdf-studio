@@ -320,6 +320,63 @@
     return Math.min(boxW / w, boxH / h);
   }
 
+  // --- the document library (designer-ux 2.5) -------------------------------
+
+  /** Most recently touched first — the order a home screen wants to show. */
+  function sortDocs(docs) {
+    return (docs || []).slice().sort(function (a, b) {
+      return (b && b.ts ? b.ts : 0) - (a && a.ts ? a.ts : 0);
+    });
+  }
+
+  /**
+   * Record a document in the library: replace any earlier copy of the same one,
+   * order by recency, then cap.
+   *
+   * Replacing by id rather than appending is what makes saving idempotent — a
+   * document autosaved forty times is one entry, not forty. The cap drops the
+   * oldest, never the one just written, because that is the one being edited.
+   */
+  function upsertDoc(docs, entry, max) {
+    if (!entry || entry.id == null) return (docs || []).slice();
+    var rest = (docs || []).filter(function (d) {
+      return d && d.id !== entry.id;
+    });
+    var next = sortDocs([entry].concat(rest));
+    return max > 0 ? next.slice(0, max) : next;
+  }
+
+  /** Search the library by name, folded the same way the gallery folds. */
+  function docMatches(doc, terms) {
+    if (!doc) return false;
+    if (!terms || !terms.length) return true;
+    var hay = tplNorm(doc.name);
+    return terms.every(function (t) {
+      return hay.indexOf(t) >= 0;
+    });
+  }
+
+  /**
+   * A name no other document has taken: `سند`, then `سند ۲`, `سند ۳`…
+   *
+   * Two documents with the same name are not an error, but they are unusable on
+   * a home screen — the whole point of which is telling them apart. Compared
+   * folded, so a name differing only in Arabic vs Persian letters still counts
+   * as taken rather than producing two entries that look identical.
+   */
+  function uniqueDocName(base, taken) {
+    var used = {};
+    (taken || []).forEach(function (n) {
+      used[tplNorm(n)] = true;
+    });
+    if (!used[tplNorm(base)]) return base;
+    for (var i = 2; i <= 999; i++) {
+      var candidate = base + ' ' + faDigits(i);
+      if (!used[tplNorm(candidate)]) return candidate;
+    }
+    return base + ' ' + faDigits(Date.now());
+  }
+
   // --- rulers (designer-ux 2.2) ---------------------------------------------
 
   /**
@@ -412,6 +469,10 @@
     tplMatches: tplMatches,
     pageFormat: pageFormat,
     fitScale: fitScale,
+    sortDocs: sortDocs,
+    upsertDoc: upsertDoc,
+    docMatches: docMatches,
+    uniqueDocName: uniqueDocName,
     UNITS: UNITS,
     unitOf: unitOf,
     toDisplay: toDisplay,

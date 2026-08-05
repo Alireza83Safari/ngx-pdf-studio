@@ -2287,6 +2287,190 @@ try {
     if (Math.abs(zoomNow2() - receiptZoom) > 0.001)
       fail('the fit button did not restore automatic fitting: ' + zoomNow2());
 
+    // Every backdrop modal must be in the focus trap and the Escape chain. Both
+    // are hand-written id lists in designer.js, so a new modal joins them only
+    // if someone remembers — this is the thing that remembers.
+    const backdrops = Array.from(
+      doc.querySelectorAll('.help-backdrop, .gallery-backdrop, .palette-backdrop'),
+    ).filter((n) => n.id);
+    for (const modal of backdrops) {
+      const panel = modal.querySelector('[role="dialog"]');
+      if (!panel) fail('modal #' + modal.id + ' has no role="dialog" panel');
+      if (panel.getAttribute('aria-modal') !== 'true')
+        fail('modal #' + modal.id + ' is not aria-modal');
+      modal.classList.add('show');
+      // fire from inside the modal, the way a real key press does: some modals
+      // (the command palette) listen on their own input rather than on document
+      const from = panel.querySelector('input, button') || modal;
+      from.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      if (modal.classList.contains('show')) {
+        modal.classList.remove('show');
+        fail('modal #' + modal.id + ' does not close on Escape');
+      }
+    }
+
+    // --- the document library (designer-ux ۲.۵) ---
+    // The promise is one sentence: leaving a document is never how you lose it.
+    // "New document" used to wipe the draft behind a confirm(), so the only way
+    // to start something else was to destroy what you had.
+    const settle25 = () => new Promise((r) => setTimeout(r, 500));
+    const docsPanel = doc.getElementById('docs');
+    const docRows = () => Array.from(doc.querySelectorAll('#docsList .doc-row'));
+    const docNames = () => docRows().map((r) => r.querySelector('b').textContent);
+    if (!docsPanel) fail('the document library is missing');
+
+    // give the open document a name we can find again, and something in it
+    const named = { ...store.getState(), metadata: { name: 'سند الف' } };
+    store.dispatch(P.replaceTemplate(named));
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    store.dispatch(P.addElement(band0().id, mkText('keep-me', 40)));
+    await settle25();
+
+    doc.getElementById('openDocs').dispatchEvent(clickEv());
+    await settle25();
+    if (!docsPanel.classList.contains('show')) fail('the library did not open');
+    if (!docNames().includes('سند الف')) fail('the open document is not in its own library');
+    const current = docRows().find((r) => r.classList.contains('is-current'));
+    if (!current) fail('nothing is marked as the document being edited');
+    if (current.querySelector('b').textContent !== 'سند الف')
+      fail('the wrong row is marked as current');
+
+    // a new document must appear BESIDE the old one, not on top of it
+    doc.getElementById('docsNew').dispatchEvent(clickEv());
+    await settle25();
+    if (P.findElement(store.getState(), 'keep-me'))
+      fail('the new document inherited the previous one’s elements');
+    doc.getElementById('openDocs').dispatchEvent(clickEv());
+    await settle25();
+    if (!docNames().includes('سند الف')) fail('creating a document destroyed the previous one');
+    if (docRows().length < 2) fail('the new document was not added to the library');
+
+    // and going back gets the work back — the acceptance criterion
+    const backRow = docRows().find((r) => r.querySelector('b').textContent === 'سند الف');
+    backRow.dispatchEvent(clickEv());
+    await settle25();
+    if (!P.findElement(store.getState(), 'keep-me'))
+      fail('switching back did not restore the document’s elements');
+    if (store.getState().metadata.name !== 'سند الف')
+      fail('switching back opened the wrong document: ' + store.getState().metadata.name);
+
+    // An edit abandoned INSIDE the autosave window still survives. Without this
+    // the test proves nothing: waiting 500ms lets the 400ms autosave save the
+    // document anyway, so leaving it could skip saving and nothing would notice.
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    store.dispatch(P.addElement(band0().id, mkText('unsaved-yet', 60)));
+    doc.getElementById('openDocs').dispatchEvent(clickEv()); // no await: autosave has not fired
+    const away = docRows().find((r) => r.querySelector('b').textContent !== 'سند الف');
+    if (!away) fail('there is no second document to leave for');
+    away.dispatchEvent(clickEv());
+    await settle25();
+    if (P.findElement(store.getState(), 'unsaved-yet'))
+      fail('leaving a document did not actually leave it');
+    doc.getElementById('openDocs').dispatchEvent(clickEv());
+    await settle25();
+    docRows()
+      .find((r) => r.querySelector('b').textContent === 'سند الف')
+      .dispatchEvent(clickEv());
+    await settle25();
+    if (!P.findElement(store.getState(), 'unsaved-yet'))
+      fail('an edit made just before switching away was lost');
+
+    // two documents may not share a name — a home screen exists to tell them apart
+    doc.getElementById('openDocs').dispatchEvent(clickEv());
+    await settle25();
+    const uniqueNames = new Set(docNames());
+    if (uniqueNames.size !== docNames().length)
+      fail('two documents ended up with the same name: ' + docNames().join(' | '));
+    // and two new documents in a row must not both be "سند بی‌نام"
+    doc.getElementById('docsNew').dispatchEvent(clickEv());
+    await settle25();
+    doc.getElementById('openDocs').dispatchEvent(clickEv());
+    await settle25();
+    doc.getElementById('docsNew').dispatchEvent(clickEv());
+    await settle25();
+    doc.getElementById('openDocs').dispatchEvent(clickEv());
+    await settle25();
+    if (new Set(docNames()).size !== docNames().length)
+      fail('two fresh documents share a name: ' + docNames().join(' | '));
+
+    // search filters the library with the gallery's folding
+    const docsSearch = doc.getElementById('docsSearch');
+    docsSearch.value = 'الف';
+    docsSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
+    if (!docNames().includes('سند الف')) fail('searching the library lost the matching document');
+    if (docNames().length !== 1) fail('the library search matched too much: ' + docNames().length);
+    docsSearch.value = 'قطعاً‌نیست';
+    docsSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
+    if (docRows().length) fail('a nonsense query still matched documents');
+    if (!doc.getElementById('docsEmpty').classList.contains('show'))
+      fail('no empty state for a library search that matched nothing');
+    docsSearch.value = '';
+    docsSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
+
+    // duplicating gives a second, independently named copy
+    const before25 = docRows().length;
+    const openedBeforeDup = store.getState().metadata.name;
+    const dupRow = docRows().find((r) => r.querySelector('b').textContent === 'سند الف');
+    dupRow.querySelector('[data-act="dup"]').dispatchEvent(clickEv());
+    await settle25();
+    if (docRows().length !== before25 + 1) fail('duplicating did not add a document');
+    if (new Set(docNames()).size !== docNames().length)
+      fail('the duplicate reused the original’s name');
+    if (store.getState().metadata.name !== openedBeforeDup)
+      fail('duplicating switched the open document out from under the editor');
+
+    // picking a template also starts its own document rather than overwriting
+    const openBefore = store.getState().metadata.name;
+    const libBefore = docRows().length;
+    docsPanel.classList.remove('show');
+    doc.getElementById('openGallery').dispatchEvent(clickEv());
+    doc.querySelector('.tpl-card[data-template="receipt"]').dispatchEvent(clickEv());
+    await settle25();
+    doc.getElementById('openDocs').dispatchEvent(clickEv());
+    await settle25();
+    if (docRows().length !== libBefore + 1)
+      fail('loading a template did not create a document of its own');
+    if (!docNames().includes(openBefore))
+      fail('loading a template overwrote the document that was open');
+    docsPanel.classList.remove('show');
+
+    // The panel reports the LIVE name of the document on screen, without saving
+    // first. That is what lets opening the panel be read-only, which in turn is
+    // what makes the "leaving a document saves it" test above mean anything.
+    const liveNamed = JSON.parse(JSON.stringify(store.getState()));
+    liveNamed.metadata = { name: 'نامِ تازه' };
+    store.dispatch(P.replaceTemplate(liveNamed));
+    doc.querySelector('#inspector [data-band="0"]').dispatchEvent(clickEv());
+    await settle25(); // let that much reach storage, so the next edit is unsaved
+    store.dispatch(P.addElement(band0().id, mkText('live-count', 90)));
+    const liveCount = store
+      .getState()
+      .bands.reduce((n, b) => n + ((b.elements && b.elements.length) || 0), 0);
+    doc.getElementById('openDocs').dispatchEvent(clickEv()); // no await: nothing saved yet
+    if (!docNames().includes('نامِ تازه'))
+      fail('the library showed a stale name for the document on screen');
+    const currentRow = docRows().find((r) => r.classList.contains('is-current'));
+    const shownCount = Number(currentRow.querySelector('.doc-meta').textContent.split('·').pop());
+    if (shownCount !== liveCount)
+      fail('the library showed a stale element count: ' + shownCount + ' want ' + liveCount);
+
+    // Deleting the document you are editing removes it from the library but
+    // leaves it on screen: it is not gone until you leave it, and blanking the
+    // canvas would be a second destruction nobody asked for.
+    store.dispatch(P.addElement(band0().id, mkText('still-here', 80)));
+    doc.getElementById('openDocs').dispatchEvent(clickEv());
+    await settle25();
+    window.confirm = () => true;
+    const victim = docRows().find((r) => r.classList.contains('is-current'));
+    if (!victim) fail('the open document is not marked, so it cannot be the delete target');
+    const libSizeBeforeDelete = docRows().length;
+    victim.querySelector('[data-act="del"]').dispatchEvent(clickEv());
+    await settle25();
+    if (docRows().length !== libSizeBeforeDelete - 1) fail('deleting did not remove the document');
+    if (!P.findElement(store.getState(), 'still-here'))
+      fail('deleting the open document also wiped the canvas');
+    docsPanel.classList.remove('show');
+
     console.log(
       'designer smoke OK — overlays:',
       overlays.length,

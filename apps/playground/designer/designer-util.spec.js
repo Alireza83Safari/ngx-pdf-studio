@@ -403,6 +403,66 @@ describe('faDigits', () => {
   });
 });
 
+describe('the document library (designer-ux 2.5)', () => {
+  const doc = (id, name, ts) => ({ id, name, ts, json: '{}' });
+
+  it('keeps one entry per document however often it is saved', () => {
+    let docs = [];
+    docs = U.upsertDoc(docs, doc('a', 'سند', 100), 20);
+    docs = U.upsertDoc(docs, doc('a', 'سند', 200), 20);
+    docs = U.upsertDoc(docs, doc('a', 'سند', 300), 20);
+    expect(docs).toHaveLength(1);
+    expect(docs[0].ts).toBe(300);
+  });
+
+  it('orders by recency, so the home screen leads with what you just left', () => {
+    let docs = [doc('a', 'الف', 100), doc('b', 'ب', 300), doc('c', 'ج', 200)];
+    expect(U.sortDocs(docs).map((d) => d.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('drops the oldest at the cap, never the document just written', () => {
+    let docs = [doc('old', 'قدیمی', 1), doc('mid', 'میانه', 2)];
+    docs = U.upsertDoc(docs, doc('new', 'تازه', 3), 2);
+    expect(docs.map((d) => d.id)).toEqual(['new', 'mid']);
+  });
+
+  it('refuses to record an entry with no id rather than storing a stray', () => {
+    const docs = [doc('a', 'الف', 1)];
+    expect(U.upsertDoc(docs, { name: 'بی‌شناسه' }, 20)).toEqual(docs);
+    expect(U.upsertDoc(docs, null, 20)).toEqual(docs);
+  });
+
+  it('does not mutate the list it was given', () => {
+    const docs = [doc('a', 'الف', 1)];
+    U.upsertDoc(docs, doc('b', 'ب', 2), 20);
+    U.sortDocs(docs);
+    expect(docs).toHaveLength(1);
+  });
+
+  it('searches names with the same folding as the gallery', () => {
+    const d = doc('a', 'فاکتور مهر', 1);
+    expect(U.docMatches(d, U.tplTerms('فاكتور'))).toBe(true);
+    expect(U.docMatches(d, U.tplTerms('مهر فاکتور'))).toBe(true);
+    expect(U.docMatches(d, U.tplTerms('قرارداد'))).toBe(false);
+    expect(U.docMatches(d, [])).toBe(true);
+  });
+
+  it('names a new document without colliding with an existing one', () => {
+    expect(U.uniqueDocName('سند', [])).toBe('سند');
+    expect(U.uniqueDocName('سند', ['سند'])).toBe('سند ۲');
+    expect(U.uniqueDocName('سند', ['سند', 'سند ۲'])).toBe('سند ۳');
+  });
+
+  it('treats a name that differs only in letter form as taken', () => {
+    // otherwise the home screen shows two rows that look identical
+    expect(U.uniqueDocName('فاکتور', ['فاكتور'])).toBe('فاکتور ۲');
+  });
+
+  it('fills a gap rather than always counting to the end', () => {
+    expect(U.uniqueDocName('سند', ['سند', 'سند ۳'])).toBe('سند ۲');
+  });
+});
+
 describe('rulerStep', () => {
   it('picks a round number in the display unit, not in points', () => {
     // 10mm is a step a person writes; 28.35pt is not

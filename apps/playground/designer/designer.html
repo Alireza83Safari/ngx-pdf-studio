@@ -2796,6 +2796,146 @@
         background: var(--accent-weak);
       }
 
+      /* --- the document library (designer-ux 2.5) --- */
+      .docs-bar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-4);
+        padding: 0 var(--sp-2) var(--sp-5);
+        flex-wrap: wrap;
+      }
+      .docs-bar .spacer {
+        flex: 1 1 auto;
+      }
+      .docs-bar input {
+        flex: 1 1 200px;
+        min-width: 0;
+        height: var(--h-md);
+        padding: 0 var(--sp-5);
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        background: var(--field);
+        color: inherit;
+        font: inherit;
+        font-size: var(--fs-sm);
+      }
+      .docs-bar input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .docs-list {
+        display: grid;
+        gap: var(--sp-3);
+        max-height: min(52vh, 460px);
+        overflow: auto;
+        padding: var(--sp-1) var(--sp-2);
+      }
+      .doc-row {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-4);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        padding: var(--sp-4) var(--sp-5);
+        background: var(--raised);
+        cursor: pointer;
+        text-align: start;
+        font: inherit;
+        color: inherit;
+        width: 100%;
+        transition: border-color var(--dur-fast) var(--ease);
+      }
+      .doc-row:hover,
+      .doc-row:focus-visible {
+        border-color: var(--accent);
+      }
+      .doc-row:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      /* the one you are editing: marked, and it opens as a no-op rather than
+         pretending to be a different document */
+      .doc-row.is-current {
+        border-color: var(--accent);
+        background: var(--accent-weak);
+      }
+      .doc-name {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        min-width: 0;
+      }
+      .doc-name b {
+        font-size: var(--fs-sm);
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .doc-badge {
+        flex: none;
+        padding: 1px var(--sp-3);
+        border-radius: var(--r-pill);
+        background: var(--accent);
+        color: #fff;
+        font-size: var(--fs-2xs);
+        font-weight: 600;
+      }
+      .doc-meta {
+        color: var(--muted);
+        font-size: var(--fs-2xs);
+        /* Latin digits by decision (design-review 2.3) — dates and counts are
+           readouts, so they stay LTR whatever the surrounding paragraph does */
+        direction: ltr;
+        text-align: start;
+      }
+      .doc-row .spacer {
+        flex: 1 1 auto;
+      }
+      .doc-acts {
+        display: flex;
+        gap: var(--sp-2);
+        flex: none;
+      }
+      .doc-acts button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--h-sm);
+        height: var(--h-sm);
+        border-radius: var(--r-md);
+        border: 1px solid transparent;
+        background: none;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .doc-acts button:hover {
+        border-color: var(--border);
+        background: var(--field);
+        color: var(--accent);
+      }
+      .doc-acts button[data-act='del']:hover {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+      .docs-empty {
+        display: none;
+        flex-direction: column;
+        gap: var(--sp-2);
+        align-items: center;
+        padding: var(--sp-10) var(--sp-6);
+        color: var(--muted);
+        font-size: var(--fs-xs);
+        text-align: center;
+      }
+      .docs-empty.show {
+        display: flex;
+      }
+      .docs-empty strong {
+        color: var(--ink);
+        font-size: var(--fs-sm);
+      }
+
       /* ================= command palette ================= */
       .palette-backdrop {
         position: fixed;
@@ -3304,6 +3444,9 @@
           </svg>
         </button>
         <div id="fileMenu" class="menu">
+          <button id="openDocs" class="btn quiet" data-tip="همهٔ سندهایت — بین‌شان جابه‌جا شو">
+            سندهای من
+          </button>
           <button id="newDoc" class="btn quiet">سند نو</button>
           <button id="importJson" class="btn quiet">بارگذاری طرح (JSON)</button>
           <button
@@ -4204,6 +4347,37 @@
         <div class="sec">
           <div class="sec-title">نسخه‌های ذخیره‌شده</div>
           <div id="historyList" class="gallery-cards" style="grid-template-columns: 1fr"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- the document library (designer-ux 2.5): every saved document, so
+         switching between them is opening one rather than losing the last -->
+    <div id="docs" class="gallery-backdrop">
+      <div
+        class="gallery-panel"
+        style="width: min(720px, 94vw)"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="docsTitle"
+      >
+        <div class="gallery-head">
+          <div>
+            <strong id="docsTitle">سندهای من</strong>
+            <p>هرچه ساخته‌ای این‌جاست — روی هرکدام بزن تا بازش کنی</p>
+          </div>
+          <button id="closeDocs" aria-label="بستن">✕</button>
+        </div>
+        <div class="docs-bar">
+          <input id="docsSearch" type="search" placeholder="جست‌وجو در سندها…" />
+          <span class="spacer"></span>
+          <button id="docsNew" class="btn">سند نو</button>
+          <button id="docsFromTpl" class="btn outline">شروع از قالب</button>
+        </div>
+        <div id="docsList" class="docs-list"></div>
+        <div id="docsEmpty" class="docs-empty">
+          <strong>هنوز سندی نداری</strong>
+          <span>با «سند نو» از صفر شروع کن، یا یکی از قالب‌های آماده را بردار.</span>
         </div>
       </div>
     </div>
