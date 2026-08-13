@@ -39,10 +39,23 @@ application lets users upload or author templates, validate with
 `DomSanitizer.bypassSecurityTrustHtml`, because Angular's sanitizer strips the
 SVG the painter emits. The painter XML-escapes every text value it writes.
 
-The one value that is **not** interpreted — only escaped — is an image
-element's `source` URL, which lands in an SVG `href`. If you preview templates
-authored by untrusted users, restrict image sources to schemes you accept
-(`data:` and `https:` are the usual answer) before rendering.
+Two template values are **acted on** rather than displayed, and both are
+scheme-allowlisted by the painters themselves:
+
+| value                  | lands in          | allowed                                     |
+| ---------------------- | ----------------- | ------------------------------------------- |
+| image element `source` | SVG `href`        | `http:`, `https:`, `data:image/*`, relative |
+| element `link`         | PDF `/URI` action | `http:`, `https:`, `mailto:`, relative      |
+
+Anything else is dropped and reported as a diagnostic — the element is not
+painted and the annotation is not written, so there is nothing to click. The
+check strips the whitespace and control characters a URL parser discards before
+reading the scheme, so `java\tscript:` is refused alongside the plain spelling.
+
+This is a default, not a boundary you can lean on for arbitrary input: it stops
+scheme-driven execution, not a hostile `https:` host. If you preview templates
+from untrusted users, you may still want to restrict image sources to hosts you
+control.
 
 ### The engine performs no network I/O
 

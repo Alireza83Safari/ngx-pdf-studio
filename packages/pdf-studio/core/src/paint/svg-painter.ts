@@ -17,6 +17,7 @@ import {
   resolveTextStyle,
   verticalOffset,
 } from './paint-style';
+import { isSafeImageUrl, refusedUrlDiagnostic } from './url-safety';
 import type { BorderSide } from '../model/style';
 
 const rgb01ToCss = (c: { r: number; g: number; b: number }): string =>
@@ -42,7 +43,23 @@ export function paintPageToSvg(page: LayoutPage): string {
 
 /** Render every page; returns one SVG string per page. */
 export function paintToSvg(doc: PaginatedDocument): string[] {
+  // `paintPageToSvg` is a pure string function with nowhere to report to — it is
+  // called on its own by the designer for a single page — so the diagnostic for
+  // a refused URL is raised here, where the document (and its sink) exists.
+  reportRefusedUrls(doc);
   return doc.pages.map(paintPageToSvg);
+}
+
+/** Record every image URL the painter will drop, once per element. */
+function reportRefusedUrls(doc: PaginatedDocument): void {
+  for (const page of doc.pages) {
+    for (const el of page.elements) {
+      const url = el.image && !el.image.base64 ? el.image.url : undefined;
+      if (url && !isSafeImageUrl(url)) {
+        doc.diagnostics.push(refusedUrlDiagnostic('image', url, el.id));
+      }
+    }
+  }
 }
 
 function paintElement(el: LaidOutElement): string {
@@ -196,6 +213,11 @@ function imageMarkup(el: LaidOutElement): string {
   if (!img) return '';
   const href = img.base64 ? `data:${img.mime};base64,${img.base64}` : (img.url ?? '');
   if (!href) return '';
+  // The one value in the painter's output that is acted on rather than
+  // displayed, and this SVG goes to `innerHTML` in the designer and through
+  // `bypassSecurityTrustHtml` in the Angular preview. Dropping the element is
+  // the safe failure: a missing logo beats an executable href.
+  if (!isSafeImageUrl(href)) return '';
   const { x, y, width, height } = el.bounds;
   return (
     `<image x="${r2(x)}" y="${r2(y)}" width="${r2(width)}" height="${r2(height)}" ` +

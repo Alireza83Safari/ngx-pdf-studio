@@ -63,6 +63,7 @@ import { paddedRect, resolvePadding } from '../layout/box-padding';
 import { spacingWidth } from '../layout/measure';
 import { qrRects } from './qr-geometry';
 import { FontProvider, type FontInput } from './font-provider';
+import { isSafeLinkUrl, refusedUrlDiagnostic } from './url-safety';
 import {
   dashPattern,
   resolveBorderEdges,
@@ -184,6 +185,14 @@ function buildLinks(pdf: PDFDocument, doc: PaginatedDocument, pdfPages: PDFPage[
     const pageHeight = page.size.height;
     for (const el of page.elements) {
       if (!el.link) continue;
+      // A `/URI` action is executed by the viewer, not displayed by it, so the
+      // scheme decides what a click does. `javascript:` and `file:` in a link
+      // annotation are longstanding viewer vectors; an annotation that is never
+      // written cannot be clicked.
+      if (el.link.kind === 'url' && !isSafeLinkUrl(el.link.url)) {
+        doc.diagnostics.push(refusedUrlDiagnostic('link', el.link.url, el.id));
+        continue;
+      }
       const { x, y, width, height } = el.bounds;
       const rect = ctx.obj([x, pageHeight - (y + height), x + width, pageHeight - y]);
       const action =
