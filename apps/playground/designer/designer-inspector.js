@@ -1,19 +1,22 @@
 /**
  * The inspector's HTML, for the parts that are a function of the model alone.
  *
- * The sixth cut of designer-ux 4.2. `renderInspector` is ~500 lines that read
- * `store`, `selected`, `activeBand` and the DOM as it goes, so it does not move
- * as one piece — but two whole panels inside it are pure: the band bar and
- * settings (a function of the template plus which band is active) and the box
- * panel (a function of one element). Those come out here.
+ * designer-ux 4.2, cuts six and seven. `renderInspector` does not move as one
+ * piece — it is ~500 lines that read `store`, `selected` and the DOM as they go
+ * — but four whole panels inside it are pure functions of the model:
  *
- * Why these two first, and why now: `model-coverage.spec.js` already fails the
+ *  - the band bar and the active band's settings;
+ *  - the box panel (fill, border, sides, radius, opacity, padding);
+ *  - appearance (a line's stroke, or the full typography panel);
+ *  - conditions (`visibleWhen` plus one conditional style rule).
+ *
+ * Why these, and why in this order: `model-coverage.spec.js` already fails the
  * build when a style property has no control in the inspector, so every field
  * below is guaranteed to *exist*. Nothing guaranteed it was **built right** —
- * the smoke test drives 10 of the inspector's 44 controls, and none of the box
- * panel's nine. A checkbox rendered without `checked`, a `<select>` with no
- * `selected` option, a number field showing points in a millimetre document:
- * all of those pass a coverage grep and are wrong on screen.
+ * the smoke test drives 10 of the inspector's 44 controls. A checkbox rendered
+ * without `checked`, a `<select>` with no `selected` option, a number field
+ * showing points in a millimetre document: all pass a coverage grep and are
+ * wrong on screen.
  *
  * Every function takes what it reads. That is the whole point — the reason the
  * rest of `renderInspector` has never been testable is that it reads state it
@@ -32,6 +35,8 @@
   'use strict';
 
   var esc = M.esc;
+  var rgb = M.rgb;
+  var rgbToHex = M.rgbToHex;
 
   // --- shared builders ------------------------------------------------------
 
@@ -291,6 +296,177 @@
     return s;
   }
 
+  // --- appearance -----------------------------------------------------------
+
+  /** Element types that carry typography, and so get the full text panel. */
+  var TEXTUAL = ['staticText', 'dataField', 'richText', 'pageField'];
+
+  /**
+   * The inner HTML of the "ظاهر" section: a stroke colour for a line, the full
+   * typography panel for anything that carries text, nothing for the rest.
+   *
+   * Returns the controls only. The section heading stays with the caller,
+   * because it counts the *selection* ("روی هر ۳ الِمان") and the selection is
+   * not part of the model — which is exactly the line this whole file draws.
+   *
+   * `deps.families` is what the document can actually embed, and
+   * `deps.defaultFamily` the one assumed when an element names none.
+   */
+  function appearanceHtml(el, deps) {
+    var ty = el.typography || {};
+    var looks = '';
+    if (el.type === 'line') {
+      looks += field(
+        'رنگ خط',
+        '<input type="color" data-prop="stroke" value="' +
+          rgbToHex(el.stroke ? el.stroke.color : rgb(51, 65, 85)) +
+          '">',
+      );
+    }
+    if (
+      el.type === 'staticText' ||
+      el.type === 'dataField' ||
+      el.type === 'richText' ||
+      el.type === 'pageField'
+    ) {
+      looks += field(
+        'فونت',
+        '<select title="فونت‌های جاسازی‌شده در همین قالب — از تبِ لایه‌ها اضافه کن" data-prop="fontFamily">' +
+          deps.families
+            .map(function (fam) {
+              return (
+                '<option value="' +
+                esc(fam) +
+                '"' +
+                ((ty.fontFamily || deps.defaultFamily) === fam ? ' selected' : '') +
+                '>' +
+                esc(fam) +
+                '</option>'
+              );
+            })
+            .join('') +
+          '</select>',
+      );
+      looks += field(
+        'اندازه',
+        '<input type="number" data-prop="fontSize" value="' + (ty.fontSize || 12) + '">',
+      );
+      looks += field(
+        'رنگ',
+        '<input type="color" data-prop="color" value="' +
+          rgbToHex(ty.color || rgb(15, 23, 42)) +
+          '">',
+      );
+      // Style toggles share one row: three independent switches, each cheap.
+      looks +=
+        '<div class="row"><label>سبک</label><div class="tog-group">' +
+        '<label class="tog" title="ضخیم"><input type="checkbox" data-prop="bold"' +
+        (ty.fontWeight === 'bold' ? ' checked' : '') +
+        '><b>ض</b></label>' +
+        '<label class="tog" title="کج (ایتالیک)"><input type="checkbox" data-prop="italic"' +
+        (ty.fontStyle === 'italic' ? ' checked' : '') +
+        '><i>ک</i></label>' +
+        '<label class="tog" title="زیرخط"><input type="checkbox" data-prop="underline"' +
+        (ty.decoration === 'underline' ? ' checked' : '') +
+        '><u>ز</u></label>' +
+        '<label class="tog" title="خط‌خورده"><input type="checkbox" data-prop="strike"' +
+        (ty.decoration === 'line-through' ? ' checked' : '') +
+        '><s>خ</s></label>' +
+        '</div></div>';
+      looks += field(
+        'تراز عمودی',
+        '<select title="وقتی جعبه از متن بلندتر است، متن کجا بنشیند" data-prop="verticalAlign">' +
+          '<option value="top"' +
+          ((ty.verticalAlign || 'top') === 'top' ? ' selected' : '') +
+          '>بالا</option>' +
+          '<option value="middle"' +
+          (ty.verticalAlign === 'middle' ? ' selected' : '') +
+          '>وسط</option>' +
+          '<option value="bottom"' +
+          (ty.verticalAlign === 'bottom' ? ' selected' : '') +
+          '>پایین</option>' +
+          '</select>',
+      );
+      looks += field(
+        'چینش',
+        '<select title="تراز افقی متن. «دوطرفه» خطوط را با کشیدهٔ فارسی می‌کشد" data-prop="align">' +
+          '<option value="start"' +
+          ((ty.align || 'start') === 'start' ? ' selected' : '') +
+          '>ابتدا</option>' +
+          '<option value="center"' +
+          (ty.align === 'center' ? ' selected' : '') +
+          '>وسط</option>' +
+          '<option value="end"' +
+          (ty.align === 'end' ? ' selected' : '') +
+          '>انتها</option>' +
+          '<option value="justify"' +
+          (ty.align === 'justify' ? ' selected' : '') +
+          '>دوطرفه (کشیده)</option>' +
+          '</select>',
+      );
+      if (ty.align === 'justify') {
+        looks +=
+          '<p class="tinyhint">تراز دوطرفه با درجِ کشیده (ـ) کار می‌کند، پس روی متنِ ' +
+          '<b>فارسی/عربیِ چندخطی</b> دیده می‌شود؛ خطِ آخر و متنِ لاتین دست‌نخورده می‌مانند.</p>';
+      }
+      looks += field(
+        'فاصلهٔ حروف',
+        '<input type="number" step="0.1" ' +
+          'title="فاصلهٔ اضافه بعد از هر نویسه (pt) — متن را پهن‌تر می‌کند پس زودتر می‌شکند" ' +
+          'data-prop="letterSpacing" value="' +
+          (ty.letterSpacing == null ? '' : ty.letterSpacing) +
+          '" placeholder="0">',
+      );
+      looks += field(
+        'فاصلهٔ خطوط',
+        '<input type="number" min="0.8" max="4" step="0.1" ' +
+          'title="ضریبِ اندازهٔ فونت — ۱٫۲ پیش‌فرض. فقط روی متنِ چندخطی دیده می‌شود" ' +
+          'data-prop="lineHeight" value="' +
+          (ty.lineHeight == null ? '' : ty.lineHeight) +
+          '" placeholder="1.2">',
+      );
+    }
+    return looks;
+  }
+
+  // --- conditions -----------------------------------------------------------
+
+  /**
+   * Conditional visibility and one conditional style rule (ROADMAP ۲.۳).
+   *
+   * The engine has supported both for far longer than the UI did; this is the
+   * whole of that exposure, and it is a function of the element alone.
+   */
+  function conditionsHtml(el) {
+    var cond0 = (el.conditionalStyles || [])[0];
+    return (
+      '<div class="sec"><div class="sec-title">شرط‌ها</div>' +
+      field(
+        'نمایش اگر',
+        '<input dir="ltr" title="عبارت شرطی — خالی یعنی همیشه نمایش. مثل total > 0" data-prop="viswhen" value="' +
+          esc(el.visibleWhen ? el.visibleWhen.source : '') +
+          '">',
+      ) +
+      field(
+        'استایل اگر',
+        '<input dir="ltr" title="اگر این شرط برقرار شود، رنگ زیر اعمال می‌شود. مثل amount < 0" data-prop="condwhen" value="' +
+          esc(cond0 && cond0.when ? cond0.when.source : '') +
+          '">',
+      ) +
+      field(
+        'رنگ شرطی',
+        '<input type="color" title="رنگ متن وقتی شرط بالا برقرار است" data-prop="condcolor" value="' +
+          rgbToHex(
+            cond0 && cond0.typography && cond0.typography.color
+              ? cond0.typography.color
+              : rgb(214, 69, 69),
+          ) +
+          '">',
+      ) +
+      '</div>'
+    );
+  }
+
   return {
     field: field,
     options: options,
@@ -301,5 +477,8 @@
     bandBarHtml: bandBarHtml,
     bandSettingsHtml: bandSettingsHtml,
     boxHtml: boxHtml,
+    TEXTUAL: TEXTUAL,
+    appearanceHtml: appearanceHtml,
+    conditionsHtml: conditionsHtml,
   };
 });

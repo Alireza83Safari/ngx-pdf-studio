@@ -54,7 +54,6 @@
   // --- helpers -------------------------------------------------------------
   var rgb = M.rgb;
   var hexToRgb = M.hexToRgb;
-  var rgbToHex = M.rgbToHex;
   var base64ToBytes = M.base64ToBytes;
   var esc = M.esc;
   var faName = M.faName;
@@ -2810,8 +2809,7 @@
       return;
     }
     var el = loc.element,
-      b = el.bounds,
-      ty = el.typography || {};
+      b = el.bounds;
     var multi = selected.length > 1 ? ' · ' + selected.length + ' الِمان انتخاب شده' : '';
 
     var displayName =
@@ -3141,118 +3139,10 @@
     }
 
     // --- appearance ---------------------------------------------------------
-    var looks = '';
-    if (el.type === 'line') {
-      looks += field(
-        'رنگ خط',
-        '<input type="color" data-prop="stroke" value="' +
-          rgbToHex(el.stroke ? el.stroke.color : rgb(51, 65, 85)) +
-          '">',
-      );
-    }
-    if (
-      el.type === 'staticText' ||
-      el.type === 'dataField' ||
-      el.type === 'richText' ||
-      el.type === 'pageField'
-    ) {
-      looks += field(
-        'فونت',
-        '<select title="فونت‌های جاسازی‌شده در همین قالب — از تبِ لایه‌ها اضافه کن" data-prop="fontFamily">' +
-          availableFamilies(t)
-            .map(function (fam) {
-              return (
-                '<option value="' +
-                esc(fam) +
-                '"' +
-                ((ty.fontFamily || BUNDLED_FAMILY) === fam ? ' selected' : '') +
-                '>' +
-                esc(fam) +
-                '</option>'
-              );
-            })
-            .join('') +
-          '</select>',
-      );
-      looks += field(
-        'اندازه',
-        '<input type="number" data-prop="fontSize" value="' + (ty.fontSize || 12) + '">',
-      );
-      looks += field(
-        'رنگ',
-        '<input type="color" data-prop="color" value="' +
-          rgbToHex(ty.color || rgb(15, 23, 42)) +
-          '">',
-      );
-      // Style toggles share one row: three independent switches, each cheap.
-      looks +=
-        '<div class="row"><label>سبک</label><div class="tog-group">' +
-        '<label class="tog" title="ضخیم"><input type="checkbox" data-prop="bold"' +
-        (ty.fontWeight === 'bold' ? ' checked' : '') +
-        '><b>ض</b></label>' +
-        '<label class="tog" title="کج (ایتالیک)"><input type="checkbox" data-prop="italic"' +
-        (ty.fontStyle === 'italic' ? ' checked' : '') +
-        '><i>ک</i></label>' +
-        '<label class="tog" title="زیرخط"><input type="checkbox" data-prop="underline"' +
-        (ty.decoration === 'underline' ? ' checked' : '') +
-        '><u>ز</u></label>' +
-        '<label class="tog" title="خط‌خورده"><input type="checkbox" data-prop="strike"' +
-        (ty.decoration === 'line-through' ? ' checked' : '') +
-        '><s>خ</s></label>' +
-        '</div></div>';
-      looks += field(
-        'تراز عمودی',
-        '<select title="وقتی جعبه از متن بلندتر است، متن کجا بنشیند" data-prop="verticalAlign">' +
-          '<option value="top"' +
-          ((ty.verticalAlign || 'top') === 'top' ? ' selected' : '') +
-          '>بالا</option>' +
-          '<option value="middle"' +
-          (ty.verticalAlign === 'middle' ? ' selected' : '') +
-          '>وسط</option>' +
-          '<option value="bottom"' +
-          (ty.verticalAlign === 'bottom' ? ' selected' : '') +
-          '>پایین</option>' +
-          '</select>',
-      );
-      looks += field(
-        'چینش',
-        '<select title="تراز افقی متن. «دوطرفه» خطوط را با کشیدهٔ فارسی می‌کشد" data-prop="align">' +
-          '<option value="start"' +
-          ((ty.align || 'start') === 'start' ? ' selected' : '') +
-          '>ابتدا</option>' +
-          '<option value="center"' +
-          (ty.align === 'center' ? ' selected' : '') +
-          '>وسط</option>' +
-          '<option value="end"' +
-          (ty.align === 'end' ? ' selected' : '') +
-          '>انتها</option>' +
-          '<option value="justify"' +
-          (ty.align === 'justify' ? ' selected' : '') +
-          '>دوطرفه (کشیده)</option>' +
-          '</select>',
-      );
-      if (ty.align === 'justify') {
-        looks +=
-          '<p class="tinyhint">تراز دوطرفه با درجِ کشیده (ـ) کار می‌کند، پس روی متنِ ' +
-          '<b>فارسی/عربیِ چندخطی</b> دیده می‌شود؛ خطِ آخر و متنِ لاتین دست‌نخورده می‌مانند.</p>';
-      }
-      looks += field(
-        'فاصلهٔ حروف',
-        '<input type="number" step="0.1" ' +
-          'title="فاصلهٔ اضافه بعد از هر نویسه (pt) — متن را پهن‌تر می‌کند پس زودتر می‌شکند" ' +
-          'data-prop="letterSpacing" value="' +
-          (ty.letterSpacing == null ? '' : ty.letterSpacing) +
-          '" placeholder="0">',
-      );
-      looks += field(
-        'فاصلهٔ خطوط',
-        '<input type="number" min="0.8" max="4" step="0.1" ' +
-          'title="ضریبِ اندازهٔ فونت — ۱٫۲ پیش‌فرض. فقط روی متنِ چندخطی دیده می‌شود" ' +
-          'data-prop="lineHeight" value="' +
-          (ty.lineHeight == null ? '' : ty.lineHeight) +
-          '" placeholder="1.2">',
-      );
-    }
+    var looks = I.appearanceHtml(el, {
+      families: availableFamilies(t),
+      defaultFamily: BUNDLED_FAMILY,
+    });
     if (looks) {
       var looksTitle =
         selected.length > 1
@@ -3271,32 +3161,7 @@
     }
 
     // conditions (ROADMAP ۲.۳): engine-side visibleWhen + one style rule
-    var cond0 = (el.conditionalStyles || [])[0];
-    html +=
-      '<div class="sec"><div class="sec-title">شرط‌ها</div>' +
-      field(
-        'نمایش اگر',
-        '<input dir="ltr" title="عبارت شرطی — خالی یعنی همیشه نمایش. مثل total > 0" data-prop="viswhen" value="' +
-          esc(el.visibleWhen ? el.visibleWhen.source : '') +
-          '">',
-      ) +
-      field(
-        'استایل اگر',
-        '<input dir="ltr" title="اگر این شرط برقرار شود، رنگ زیر اعمال می‌شود. مثل amount < 0" data-prop="condwhen" value="' +
-          esc(cond0 && cond0.when ? cond0.when.source : '') +
-          '">',
-      ) +
-      field(
-        'رنگ شرطی',
-        '<input type="color" title="رنگ متن وقتی شرط بالا برقرار است" data-prop="condcolor" value="' +
-          rgbToHex(
-            cond0 && cond0.typography && cond0.typography.color
-              ? cond0.typography.color
-              : rgb(214, 69, 69),
-          ) +
-          '">',
-      ) +
-      '</div>';
+    html += I.conditionsHtml(el);
 
     html +=
       '<div class="sec"><div class="btnrow">' +

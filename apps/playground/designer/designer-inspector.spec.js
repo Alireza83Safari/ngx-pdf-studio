@@ -287,3 +287,172 @@ describe('boxHtml', () => {
     expect(control(html, 'boxPadding')).toContain('value=""');
   });
 });
+
+describe('appearanceHtml', () => {
+  const deps = { families: ['Vazirmatn', 'IRANSans'], defaultFamily: 'Vazirmatn' };
+  const text = (typography) => ({ type: 'staticText', typography });
+
+  it('gives a line its stroke colour and nothing else', () => {
+    // a line paints from `stroke`, so typography there would be decoration
+    const html = I.appearanceHtml({ type: 'line' }, deps);
+    expect(has(html, 'stroke')).toBe(true);
+    expect(has(html, 'fontSize')).toBe(false);
+  });
+
+  it('gives every textual type the full panel', () => {
+    for (const type of I.TEXTUAL) {
+      const html = I.appearanceHtml({ type }, deps);
+      for (const prop of [
+        'fontFamily',
+        'fontSize',
+        'color',
+        'bold',
+        'italic',
+        'underline',
+        'strike',
+        'verticalAlign',
+        'align',
+        'letterSpacing',
+        'lineHeight',
+      ]) {
+        expect([type, prop, has(html, prop)]).toEqual([type, prop, true]);
+      }
+    }
+  });
+
+  it('gives a type with no typography no panel at all', () => {
+    // an empty string is what the caller checks to decide whether to draw the
+    // section heading — returning a wrapper would print an empty box
+    expect(I.appearanceHtml({ type: 'table' }, deps)).toBe('');
+    expect(I.appearanceHtml({ type: 'qrcode' }, deps)).toBe('');
+  });
+
+  it('offers every embedded family and preselects the element’s own', () => {
+    const html = I.appearanceHtml(text({ fontFamily: 'IRANSans' }), deps);
+    expect(html).toContain('<option value="Vazirmatn"');
+    expect(html).toContain('<option value="IRANSans" selected>');
+  });
+
+  it('falls back to the bundled family when the element names none', () => {
+    const html = I.appearanceHtml(text({}), deps);
+    expect(html).toContain('<option value="Vazirmatn" selected>');
+  });
+
+  describe('the style toggles', () => {
+    // Four independent switches sharing one row. Each reads a different model
+    // field, and `underline`/`strike` read the *same* one — which is exactly
+    // where a copy-paste bug would land.
+    it('checks bold only for a bold element', () => {
+      expect(control(I.appearanceHtml(text({ fontWeight: 'bold' }), deps), 'bold')).toContain(
+        'checked',
+      );
+      expect(control(I.appearanceHtml(text({}), deps), 'bold')).not.toContain('checked');
+    });
+
+    it('checks italic only for an italic element', () => {
+      expect(control(I.appearanceHtml(text({ fontStyle: 'italic' }), deps), 'italic')).toContain(
+        'checked',
+      );
+      expect(control(I.appearanceHtml(text({}), deps), 'italic')).not.toContain('checked');
+    });
+
+    it('tells underline and strike-through apart, though both read `decoration`', () => {
+      const under = I.appearanceHtml(text({ decoration: 'underline' }), deps);
+      expect(control(under, 'underline')).toContain('checked');
+      expect(control(under, 'strike')).not.toContain('checked');
+
+      const struck = I.appearanceHtml(text({ decoration: 'line-through' }), deps);
+      expect(control(struck, 'strike')).toContain('checked');
+      expect(control(struck, 'underline')).not.toContain('checked');
+    });
+  });
+
+  it('defaults alignment to start and vertical alignment to top', () => {
+    const html = I.appearanceHtml(text({}), deps);
+    expect(html).toContain('<option value="start" selected>');
+    expect(html).toContain('<option value="top" selected>');
+  });
+
+  it('preselects the alignment the element has', () => {
+    const html = I.appearanceHtml(text({ align: 'center', verticalAlign: 'middle' }), deps);
+    expect(html).toContain('<option value="center" selected>');
+    expect(html).toContain('<option value="middle" selected>');
+    expect(html).not.toContain('<option value="start" selected>');
+  });
+
+  it('explains kashida justification only when justify is chosen', () => {
+    // the hint is about Persian shaping and is noise on every other setting
+    expect(I.appearanceHtml(text({ align: 'justify' }), deps)).toContain('کشیده');
+    expect(I.appearanceHtml(text({ align: 'center' }), deps)).not.toContain('tinyhint');
+  });
+
+  it('leaves spacing fields blank when unset, so the placeholder shows the default', () => {
+    const html = I.appearanceHtml(text({}), deps);
+    expect(control(html, 'letterSpacing')).toContain('value=""');
+    expect(control(html, 'lineHeight')).toContain('value=""');
+    expect(control(html, 'lineHeight')).toContain('placeholder="1.2"');
+  });
+
+  it('shows a spacing of zero as zero, not as blank', () => {
+    // 0 is a real setting and has to survive the null check
+    expect(control(I.appearanceHtml(text({ letterSpacing: 0 }), deps), 'letterSpacing')).toContain(
+      'value="0"',
+    );
+  });
+
+  it('escapes a font family rather than letting it close the attribute', () => {
+    const html = I.appearanceHtml(text({}), {
+      families: ['a" onx="1'],
+      defaultFamily: 'Vazirmatn',
+    });
+    expect(html).toContain('value="a&quot; onx=&quot;1"');
+    expect(html).not.toContain('value="a" onx="1"');
+  });
+});
+
+describe('conditionsHtml', () => {
+  it('always offers all three controls, whatever the element', () => {
+    const html = I.conditionsHtml({ type: 'staticText' });
+    expect(has(html, 'viswhen')).toBe(true);
+    expect(has(html, 'condwhen')).toBe(true);
+    expect(has(html, 'condcolor')).toBe(true);
+  });
+
+  it('shows the expressions the element carries', () => {
+    const html = I.conditionsHtml({
+      visibleWhen: { source: 'total > 0' },
+      conditionalStyles: [
+        {
+          when: { source: 'amount < 0' },
+          typography: { color: { space: 'rgb', r: 1, g: 2, b: 3 } },
+        },
+      ],
+    });
+    expect(control(html, 'viswhen')).toContain('value="total &gt; 0"');
+    expect(control(html, 'condwhen')).toContain('value="amount &lt; 0"');
+    expect(control(html, 'condcolor')).toContain('value="#010203"');
+  });
+
+  it('leaves both expressions empty on an element with no conditions', () => {
+    const html = I.conditionsHtml({ type: 'staticText' });
+    expect(control(html, 'viswhen')).toContain('value=""');
+    expect(control(html, 'condwhen')).toContain('value=""');
+  });
+
+  it('reads only the first style rule, which is all the UI edits', () => {
+    // the engine takes a list; this panel is documented as one rule, and
+    // silently showing the second would misreport what editing overwrites
+    const html = I.conditionsHtml({
+      conditionalStyles: [{ when: { source: 'first' } }, { when: { source: 'second' } }],
+    });
+    expect(control(html, 'condwhen')).toContain('value="first"');
+    expect(html).not.toContain('second');
+  });
+
+  it('escapes an expression instead of letting it break out of the attribute', () => {
+    // conditions arrive from imported templates, so they are untrusted
+    const html = I.conditionsHtml({ visibleWhen: { source: 'a" onx="1' } });
+    expect(html).toContain('value="a&quot; onx=&quot;1"');
+    expect(html).not.toContain('value="a" onx="1"');
+  });
+});
