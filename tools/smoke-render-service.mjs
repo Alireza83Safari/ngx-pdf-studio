@@ -81,13 +81,21 @@ try {
     cwd: work,
     stdio: 'ignore',
   });
-  for (const file of ['server.js', 'service.js']) {
+  for (const file of ['server.js', 'service.js', 'pool.js', 'render-worker.js']) {
     copyFileSync(join(root, 'apps/render-service', file), join(work, file));
   }
 
   child = spawn(process.execPath, ['server.js'], {
     cwd: work,
-    env: { ...process.env, PORT: String(PORT), MAX_BODY_BYTES: '2048', MAX_CONCURRENT: '2' },
+    env: {
+      ...process.env,
+      PORT: String(PORT),
+      // Big enough to carry the deliberately expensive template below, which is
+      // what proves the timeout is real; the 413 check sends more than this.
+      MAX_BODY_BYTES: '262144',
+      MAX_CONCURRENT: '2',
+      RENDER_TIMEOUT_MS: '4000',
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stderr.on('data', (d) => process.stderr.write('[service] ' + d));
@@ -187,9 +195,93 @@ try {
   check('an invalid template is 422', invalid.status === 422, 'got ' + invalid.status);
   check('and says what was wrong with it', Array.isArray(invalidBody.error.details));
 
-  // MAX_BODY_BYTES is 2048 for this run, so this is comfortably over.
-  const huge = await post({ template, data: { blob: 'x'.repeat(8192) } });
+  // MAX_BODY_BYTES is 256 KiB for this run, so this is comfortably over.
+  const huge = await post({ template, data: { blob: 'x'.repeat(400_000) } });
   check('an oversized body is 413', huge.status === 413, 'got ' + huge.status);
+
+  // The regression that matters most (§ render-service): layout and both
+  // painters are synchronous, so before the thread pool a single request held
+  // the event loop — the render timeout could not fire, `/healthz` could not
+  // answer, and the container's own liveness probe killed it. A promise race
+  // cannot preempt synchronous code; only terminating the thread can.
+  //
+  // `sum(slice($root.items, 0, $index + 1), …)` is the documented running-total
+  // idiom and is O(n²), so a body well under the limit buys minutes of work.
+  const rows = Array.from({ length: 2500 }, (_, i) => ({ n: i, p: i * 13 }));
+  const running = { source: "sum(slice($root.items, 0, $index + 1), 'p')" };
+  const heavy = {
+    schemaVersion: '1.0.0',
+    metadata: { name: 'runaway' },
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margins: { top: 36, right: 36, bottom: 36, left: 36 },
+      direction: 'rtl',
+      locale: { language: 'fa', digits: 'persian', calendar: 'jalali' },
+      unit: 'pt',
+    },
+    styles: [],
+    datasets: [{ name: 'items', source: { kind: 'path', path: 'items' } }],
+    parameters: [],
+    bands: [
+      {
+        id: 'd',
+        type: 'detail',
+        dataset: 'items',
+        height: { mode: 'fixed', value: 20 },
+        elements: [0, 1, 2].map((i) => ({
+          id: 'f' + i,
+          type: 'dataField',
+          bounds: { x: i * 160, y: 0, width: 150, height: 16 },
+          zIndex: 1,
+          value: running,
+        })),
+      },
+    ],
+    resources: { fonts: [], images: [] },
+  };
+
+  const runawayStarted = Date.now();
+  const runaway = post({ template: heavy, data: { items: rows } });
+  // Give the render a moment to be genuinely mid-layout, then ask the question
+  // the old service could not answer while it was busy.
+  await new Promise((r) => setTimeout(r, 750));
+  const probeStarted = Date.now();
+  const probe = await fetch(BASE + '/healthz');
+  const probeMs = Date.now() - probeStarted;
+  const probeBody = await probe.json();
+  check(
+    '/healthz answers while a runaway render is in flight',
+    probe.status === 200 && probeMs < 1000,
+    'took ' + probeMs + 'ms, status ' + probe.status,
+  );
+  check(
+    'and it reports the render as in flight rather than pretending to be idle',
+    probeBody.inFlight === 1,
+    'inFlight was ' + probeBody.inFlight,
+  );
+
+  const timedOut = await runaway;
+  const runawayMs = Date.now() - runawayStarted;
+  check(
+    'a render that overruns RENDER_TIMEOUT_MS is 504',
+    timedOut.status === 504,
+    'got ' + timedOut.status + ' after ' + runawayMs + 'ms',
+  );
+  check(
+    'and it is answered near the deadline, not when the layout happens to finish',
+    runawayMs < 12_000,
+    'took ' + runawayMs + 'ms for a 4000ms timeout',
+  );
+
+  // The killed thread must be replaced, or the pool leaks a slot per timeout
+  // and the service dies by attrition.
+  const afterTimeout = await post({ template, data: {} });
+  check(
+    'the service still renders after killing a runaway thread',
+    afterTimeout.status === 200,
+    'got ' + afterTimeout.status,
+  );
 
   const wrongMethod = await fetch(BASE + '/render');
   check('GET /render is 405, not 404', wrongMethod.status === 405, 'got ' + wrongMethod.status);

@@ -16,7 +16,8 @@
 const DEFAULTS = {
   maxBodyBytes: 1024 * 1024, // 1 MiB: templates are JSON, not media
   renderTimeoutMs: 15000,
-  maxConcurrent: 4,
+  maxConcurrent: 4, // render threads; see pool.js for why this is a thread count
+  maxQueue: 0, // shed load rather than queue — a queue that only grows is a slower fall
   port: 3000,
 };
 
@@ -30,12 +31,14 @@ const DEFAULTS = {
 function readConfig(env) {
   const source = env || {};
   const errors = [];
-  const num = (name, fallback) => {
+  const num = (name, fallback, floor) => {
     const raw = source[name];
     if (raw === undefined || raw === '') return fallback;
     const n = Number(raw);
-    if (!Number.isFinite(n) || n <= 0) {
-      errors.push(name + ' must be a positive number, got ' + JSON.stringify(raw));
+    const min = floor === undefined ? 1 : floor;
+    if (!Number.isFinite(n) || n < min) {
+      const bound = min === 0 ? 'a non-negative number' : 'a positive number';
+      errors.push(name + ' must be ' + bound + ', got ' + JSON.stringify(raw));
       return fallback;
     }
     return n;
@@ -45,6 +48,9 @@ function readConfig(env) {
       maxBodyBytes: num('MAX_BODY_BYTES', DEFAULTS.maxBodyBytes),
       renderTimeoutMs: num('RENDER_TIMEOUT_MS', DEFAULTS.renderTimeoutMs),
       maxConcurrent: num('MAX_CONCURRENT', DEFAULTS.maxConcurrent),
+      // Zero is the default and a meaningful value here, unlike every other
+      // knob: it means "do not queue at all".
+      maxQueue: num('MAX_QUEUE', DEFAULTS.maxQueue, 0),
       port: num('PORT', DEFAULTS.port),
     },
     errors,

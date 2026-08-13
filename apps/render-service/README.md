@@ -6,6 +6,13 @@ browser, generate on a server that need not be Node.
 Built on `node:http` with no framework — the surface is two routes and a body
 limit, so a dependency tree would cost more than it saves.
 
+Renders run on a **pool of worker threads**, never on the request thread. Layout
+and both painters are synchronous, so a render on the main thread holds the
+event loop for as long as it takes — and while it does, the timeout cannot fire,
+`/healthz` cannot answer, and the concurrency cap cannot shed anything. Only
+`worker.terminate()` bounds a synchronous render, and it is a thread-level
+operation. See [`pool.js`](pool.js).
+
 ## Run it
 
 ```bash
@@ -60,8 +67,12 @@ font or a failed expression shows up here, not as an error.
 
 ### `GET /healthz`
 
-`{ "ok": true, "inFlight": 0 }`. Answers `HEAD` too, which is what most probes
-actually send.
+`{ "ok": true, "inFlight": 0, "queued": 0, "size": 4 }`. Answers `HEAD` too,
+which is what most probes actually send.
+
+It answers **while renders are in flight**, because rendering happens on other
+threads. A liveness probe that only succeeds when the service is idle is a
+restart loop waiting for traffic.
 
 ## Failures
 
@@ -77,16 +88,22 @@ actually send.
 
 ## Configuration
 
-| variable            | default   | notes                                  |
-| ------------------- | --------- | -------------------------------------- |
-| `PORT`              | `3000`    |                                        |
-| `MAX_BODY_BYTES`    | `1048576` | 1 MiB — templates are JSON, not media  |
-| `RENDER_TIMEOUT_MS` | `15000`   |                                        |
-| `MAX_CONCURRENT`    | `4`       | over this, shed load rather than queue |
+| variable            | default   | notes                                                               |
+| ------------------- | --------- | ------------------------------------------------------------------- |
+| `PORT`              | `3000`    |                                                                     |
+| `MAX_BODY_BYTES`    | `1048576` | 1 MiB — templates are JSON, not media                               |
+| `RENDER_TIMEOUT_MS` | `15000`   | enforced by killing the render thread, not by a losing promise race |
+| `MAX_CONCURRENT`    | `4`       | render **threads** — real parallelism, one per concurrent render    |
+| `MAX_QUEUE`         | `0`       | jobs to hold when every thread is busy; `0` sheds with `503`        |
 
 A variable that is set but not a positive number stops the service at startup
 rather than silently falling back — being told `MAX_BODY_BYTES=0` and then
-accepting 1 MiB uploads is worse than refusing to run.
+accepting 1 MiB uploads is worse than refusing to run. `MAX_QUEUE` is the one
+knob where `0` is a real answer, so it accepts zero and rejects only negatives.
+
+**Sizing.** Each thread loads the bundled font once at startup, so `MAX_CONCURRENT`
+costs memory as well as CPU; match it to the container's cores rather than to
+expected traffic, and use `MAX_QUEUE` for bursts.
 
 ## Notes
 
@@ -103,6 +120,8 @@ accepting 1 MiB uploads is worse than refusing to run.
 
 ## Tests
 
-- `npx jest --selectProjects render-service` — the request rules.
+- `npx jest --selectProjects render-service` — the request rules and the pool's
+  decisions (dispatch, shedding, termination on timeout, thread replacement),
+  with injected fake threads so neither needs the engine.
 - `npm run smoke:render-service` — end-to-end: packs the dist, installs it,
   starts the server, talks HTTP to it. Run `npm run build:core` first.

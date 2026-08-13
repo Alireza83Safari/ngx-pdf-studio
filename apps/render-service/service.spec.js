@@ -116,6 +116,18 @@ describe('readConfig', () => {
   it('rejects a negative timeout, which would fire before the render began', () => {
     expect(readConfig({ RENDER_TIMEOUT_MS: '-1' }).errors).toHaveLength(1);
   });
+
+  it('accepts MAX_QUEUE=0, the one knob where zero is a real answer', () => {
+    // zero means "shed rather than queue", which is the default posture — so
+    // the positive-number rule the other knobs use would reject the intent
+    const { config, errors } = readConfig({ MAX_QUEUE: '0' });
+    expect(errors).toEqual([]);
+    expect(config.maxQueue).toBe(0);
+  });
+
+  it('still rejects a negative queue', () => {
+    expect(readConfig({ MAX_QUEUE: '-1' }).errors).toHaveLength(1);
+  });
 });
 
 describe('wantsJson', () => {

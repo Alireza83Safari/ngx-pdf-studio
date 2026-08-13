@@ -29,7 +29,10 @@ RUN npm init -y >/dev/null \
   && rm /tmp/core.tgz \
   && npm cache clean --force
 
-COPY apps/render-service/server.js apps/render-service/service.js ./
+# server + request rules + the render thread and its pool. `render-worker.js` is
+# spawned by path at runtime, so leaving it out breaks the image, not the build.
+COPY apps/render-service/server.js apps/render-service/service.js \
+     apps/render-service/pool.js apps/render-service/render-worker.js ./
 
 # Run unprivileged: the service reads no filesystem input and needs no writes.
 USER node

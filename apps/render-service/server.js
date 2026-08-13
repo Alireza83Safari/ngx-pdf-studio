@@ -7,14 +7,15 @@
  * a dependency tree to an image whose job is rendering PDFs would cost more
  * than it saves.
  *
- * Fonts load once at startup: without Vazirmatn embedded, Persian output — the
- * thing this library exists to get right — is silently broken.
+ * Rendering itself happens on a thread pool (`pool.js`), never here: layout and
+ * both painters are synchronous, so a render on this thread would hold the
+ * event loop and take the timeout, the concurrency cap and `/healthz` down with
+ * it. This file does socket work and nothing else that can take long.
  */
 'use strict';
 
 const { createServer } = require('node:http');
-const { loadBundledVazirmatn, renderToPdf } = require('@ngx-pdf-studio/core/node');
-const { importTemplate } = require('@ngx-pdf-studio/core');
+const { createPool } = require('./pool');
 const { errorBody, parseRenderBody, readConfig, route, wantsJson } = require('./service');
 
 const { config, errors } = readConfig(process.env);
@@ -23,8 +24,11 @@ if (errors.length) {
   process.exit(1);
 }
 
-const fonts = loadBundledVazirmatn();
-let inFlight = 0;
+const pool = createPool({
+  size: config.maxConcurrent,
+  timeoutMs: config.renderTimeoutMs,
+  maxQueue: config.maxQueue,
+});
 
 function send(res, status, type, body, headers) {
   res.writeHead(
@@ -71,48 +75,16 @@ function readBody(req, limit) {
   });
 }
 
-/** Answer rather than hang: a template can paginate or loop without end. */
-function withTimeout(promise, ms) {
-  let timer;
-  return Promise.race([
-    promise.finally(() => clearTimeout(timer)),
-    new Promise((_resolve, reject) => {
-      timer = setTimeout(
-        () => reject(Object.assign(new Error('render exceeded ' + ms + 'ms'), { status: 504 })),
-        ms,
-      );
-    }),
-  ]);
-}
-
 async function handleRender(req, res) {
-  // A queue that only grows is a slower way to fall over. Shed load and say so,
-  // so a caller can back off instead of guessing.
-  if (inFlight >= config.maxConcurrent) {
-    return send(
-      res,
-      503,
-      'application/json; charset=utf-8',
-      errorBody(503, 'too many concurrent renders'),
-      { 'retry-after': '1' },
-    );
-  }
-  inFlight++;
   try {
     const raw = await readBody(req, config.maxBodyBytes);
     const parsed = parseRenderBody(raw);
     if (!parsed.ok) return sendError(res, parsed.status, parsed.message);
 
-    // Validate through the engine's own schema. The template is untrusted
-    // input, and `importTemplate` is the single definition of what is valid —
-    // so the service never invents a second one to drift away from it.
-    const check = importTemplate(JSON.stringify(parsed.template));
-    if (!check.success) return sendError(res, 422, 'template failed validation', check.issues);
-
-    const result = await withTimeout(
-      renderToPdf(check.value, parsed.input, { pdf: { fonts: fonts } }),
-      config.renderTimeoutMs,
-    );
+    // Validation happens on the worker, not here: `importTemplate` walks a zod
+    // schema over untrusted JSON, which is unbounded work like the render it
+    // guards, and belongs on the side of the boundary that can be killed.
+    const result = await pool.render({ template: parsed.template, input: parsed.input });
     const diagnostics = result.diagnostics || [];
     if (wantsJson(req.headers.accept)) {
       return send(
@@ -138,6 +110,9 @@ async function handleRender(req, res) {
     const status = err && err.status ? err.status : 500;
     if (status === 500) console.error('render failed:', err && err.stack ? err.stack : err);
     if (res.writableEnded || res.destroyed) return undefined;
+    // 422 carries the engine's own validation issues; every other failure is a
+    // single message, so `details` is only ever set where it means something.
+    if (status === 422) return sendError(res, status, err.message, err.details);
     sendError(res, status, (err && err.message) || 'render failed');
     // An oversized body is answered first and hung up second. Destroying the
     // socket instead — the tempting shortcut — leaves the caller with a dropped
@@ -146,19 +121,26 @@ async function handleRender(req, res) {
     // disconnect, which would need a client that ignores the response.
     if (status === 413) res.on('finish', () => req.destroy());
     return undefined;
-  } finally {
-    inFlight--;
   }
 }
 
 const server = createServer((req, res) => {
   const r = route(req.method, req.url);
   if (r.kind === 'health') {
+    // Answerable while every thread is busy, which is the whole point of the
+    // pool: a liveness probe that only succeeds when the service is idle is a
+    // restart loop waiting for traffic.
+    const stats = pool.stats();
     return send(
       res,
       200,
       'application/json; charset=utf-8',
-      JSON.stringify({ ok: true, inFlight: inFlight }),
+      JSON.stringify({
+        ok: true,
+        inFlight: stats.inFlight,
+        queued: stats.queued,
+        size: stats.size,
+      }),
     );
   }
   if (r.kind === 'render') return handleRender(req, res);
@@ -178,15 +160,25 @@ server.listen(config.port, () => {
       config.maxBodyBytes +
       'B, timeout ' +
       config.renderTimeoutMs +
-      'ms, concurrency ' +
+      'ms, ' +
       config.maxConcurrent +
+      ' render threads, queue ' +
+      config.maxQueue +
       ')',
   );
 });
 
-// Container stop is a signal, not a kill: finish what is in flight first.
+// Container stop is a signal, not a kill: stop accepting, finish what is in
+// flight, then take the threads down — they are unref'd, so nothing else will.
 ['SIGTERM', 'SIGINT'].forEach((signal) => {
-  process.on(signal, () => server.close(() => process.exit(0)));
+  process.on(signal, () => {
+    server.close(() => {
+      pool.destroy().then(
+        () => process.exit(0),
+        () => process.exit(0),
+      );
+    });
+  });
 });
 
-module.exports = { server };
+module.exports = { server, pool };
