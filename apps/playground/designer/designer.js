@@ -21,6 +21,8 @@
   var U = window.DesignerUtil;
   // Its user-facing copy — help sections and tour steps (designer-ux 4.2).
   var C = window.DesignerContent;
+  // Reading and naming the model: colours, labels, box facts (designer-ux 4.2).
+  var M = window.DesignerModel;
   var zoom = 0.85; // a placeholder until the canvas has been measured (autoFit)
   var zoomTouched = false; // the user set the zoom themselves — stop fitting
   var fittedFor = null; // the page size the current fit was computed for
@@ -45,28 +47,16 @@
   };
 
   // --- helpers -------------------------------------------------------------
-  function rgb(r, g, b) {
-    return { space: 'rgb', r: r, g: g, b: b };
-  }
-  function hexToRgb(hex) {
-    var m = /^#?([0-9a-f]{6})$/i.exec(hex);
-    if (!m) return rgb(0, 0, 0);
-    var n = parseInt(m[1], 16);
-    return rgb((n >> 16) & 255, (n >> 8) & 255, n & 255);
-  }
-  function rgbToHex(c) {
-    if (!c || c.space !== 'rgb') return '#000000';
-    function h(v) {
-      return ('0' + Math.round(v).toString(16)).slice(-2);
-    }
-    return '#' + h(c.r) + h(c.g) + h(c.b);
-  }
-  function base64ToBytes(b64) {
-    var bin = window.atob(b64);
-    var out = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-  }
+  var rgb = M.rgb;
+  var hexToRgb = M.hexToRgb;
+  var rgbToHex = M.rgbToHex;
+  var base64ToBytes = M.base64ToBytes;
+  var esc = M.esc;
+  var faName = M.faName;
+  var typeIcon = M.typeIcon;
+  var layerLabel = M.layerLabel;
+  var labeledLabel = M.labeledLabel;
+  var labeledValue = M.labeledValue;
   /**
    * The faces every render path must agree on (designer-ux 1.12).
    *
@@ -111,63 +101,6 @@
   }
   function isSelected(id) {
     return selected.indexOf(id) !== -1;
-  }
-
-  // --- type metadata for the UI (§8) ---------------------------------------
-  var FA_NAMES = {
-    staticText: 'متن',
-    dataField: 'فیلد داده',
-    richText: 'متن غنی',
-    rectangle: 'مستطیل',
-    line: 'خط',
-    ellipse: 'بیضی',
-    image: 'تصویر',
-    barcode: 'بارکد',
-    qrcode: 'کد QR',
-    chart: 'چارت',
-    table: 'جدول',
-    list: 'لیست',
-    container: 'گروه',
-    toc: 'فهرست مطالب',
-    formField: 'فیلد فرم',
-    custom: 'المان سفارشی',
-    pageField: 'فیلد صفحه',
-    subreport: 'زیرگزارش',
-    crosstab: 'جدول محوری',
-  };
-  function faName(type) {
-    return FA_NAMES[type] || type;
-  }
-  var ICON_PATHS = {
-    staticText: '<path d="M4 5h12M10 5v10"/>',
-    dataField:
-      '<path d="M7.5 4C5.5 4 6.5 10 4 10c2.5 0 1.5 6 3.5 6"/><path d="M12.5 4c2 0 1 6 3.5 6-2.5 0-1.5 6-3.5 6"/>',
-    rectangle: '<rect x="3.5" y="5" width="13" height="10" rx="1.5"/>',
-    line: '<path d="M4 16 16 4"/>',
-    ellipse: '<ellipse cx="10" cy="10" rx="7" ry="5"/>',
-    image:
-      '<rect x="3.5" y="4" width="13" height="12" rx="2"/><circle cx="8" cy="8.5" r="1.4"/><path d="m4.5 14.5 4-4 3 3 2-2 2 2"/>',
-    barcode: '<path d="M4 5v10M7 5v10M9.5 5v10M13 5v10M16 5v10M11 5v6"/>',
-    qrcode:
-      '<rect x="3.5" y="3.5" width="5" height="5" rx="1"/><rect x="11.5" y="3.5" width="5" height="5" rx="1"/><rect x="3.5" y="11.5" width="5" height="5" rx="1"/><path d="M11.5 11.5h2v2h-2zM14.5 14.5h2v2h-2z"/>',
-    chart: '<path d="M4 4v12h12"/><path d="M7.5 13V9M11 13V6.5M14.5 13v-3"/>',
-    table: '<rect x="3.5" y="4" width="13" height="12" rx="1.5"/><path d="M3.5 8.5h13M8.5 4v12"/>',
-    toc: '<path d="M4 5h9M4 10h12M4 15h7"/><circle cx="16" cy="5" r="0.8"/>',
-    // a group: dashed frame around two stacked children
-    container:
-      '<path d="M3.5 6V4.5A1 1 0 0 1 4.5 3.5H6M14 3.5h1.5a1 1 0 0 1 1 1V6M16.5 14v1.5a1 1 0 0 1-1 1H14M6 16.5H4.5a1 1 0 0 1-1-1V14"/><rect x="6.5" y="6.5" width="7" height="7" rx="1"/>',
-  };
-  function typeIcon(type, size) {
-    var d = ICON_PATHS[type] || '<rect x="4" y="4" width="12" height="12" rx="2"/>';
-    return (
-      '<svg width="' +
-      size +
-      '" height="' +
-      size +
-      '" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-      d +
-      '</svg>'
-    );
   }
 
   /** Move native `title` attributes to the custom [data-tip] tooltips (§8A). */
@@ -758,40 +691,15 @@
       .pop();
     return FIELD_LABELS[last] || 'برچسب';
   }
-  // A labeled field is a container whose caption is its first staticText child
-  // and whose value is its first dataField child.
-  function labeledLabel(el) {
-    return (el.children || []).filter(function (c) {
-      return c.type === 'staticText';
-    })[0];
-  }
-  function labeledValue(el) {
-    return (el.children || []).filter(function (c) {
-      return c.type === 'dataField';
-    })[0];
-  }
   /**
-   * First free position (content-left, scanning downward) for a new element, so
-   * clicking a toolbox tool never drops a box on top of the title or other
-   * content. Falls back to the current active band's elements for collision.
+   * Where a new element goes: inside the group being edited if there is one,
+   * otherwise in the active band. Only the *choice of siblings* is stateful —
+   * the scan for free space is `M.nextSpot`.
    */
   function nextSpot(w, h) {
     var t0 = store.getState();
     var host = enteredGroup ? P.findElement(t0, enteredGroup) : null;
-    var els = host ? host.element.children : getActiveBand(t0).elements;
-    var W = w || 200,
-      H = h || 24,
-      x = 0,
-      y = 0,
-      guard = 0;
-    var hit = function (yy) {
-      return els.some(function (e) {
-        var b = e.bounds;
-        return !(x + W <= b.x || x >= b.x + b.width || yy + H <= b.y || yy >= b.y + b.height);
-      });
-    };
-    while (hit(y) && guard++ < 500) y += 8;
-    return { x: x, y: Math.round(y) };
+    return M.nextSpot(host ? host.element.children : getActiveBand(t0).elements, w, h);
   }
 
   /** Dispatch an element add, wiring table cell styles + dataset atomically. */
@@ -918,18 +826,7 @@
   // raw binding names on the canvas.
   var showValues = true;
   function displayTemplate(t) {
-    if (showValues) return t;
-    var clone = JSON.parse(JSON.stringify(t));
-    clone.bands.forEach(function (band) {
-      (band.elements || []).forEach(function (el) {
-        if (el.type === 'dataField' && el.value) {
-          el.type = 'staticText';
-          el.text = '{' + el.value.source + '}';
-          delete el.format;
-        }
-      });
-    });
-    return clone;
+    return M.displayTemplate(t, showValues);
   }
 
   // --- bands ----------------------------------------------------------------
@@ -1919,14 +1816,6 @@
 
   /** Layers panel: top-most first, click to select, shift-click to toggle. */
   var layersEl = document.getElementById('layers');
-  function layerLabel(el) {
-    if (el.name) return el.name; // author-given name always wins (§8A)
-    if (el.type === 'staticText' && el.text) return el.text;
-    if (el.value && el.value.source) return el.value.source;
-    if (el.type === 'chart') return faName(el.type) + ' · ' + (el.chartKind || '');
-    if (el.type === 'container') return faName(el.type) + ' · ' + el.children.length + ' الِمان';
-    return faName(el.type);
-  }
   var LOCK_ICON =
     '<svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
     '<rect x="4.5" y="9" width="11" height="7.5" rx="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg>';
@@ -3559,36 +3448,11 @@
     ['bottom', '↓', 'پایین'],
     ['left', '←', 'چپ'],
   ];
-  /**
-   * Read the border facts back out of the model. A `BorderSet` is either one
-   * `all` side or a mix of named sides, so the panel shows a single
-   * colour/width/style plus which edges are on — and `all` reads as all four.
-   */
+  /** Reading a `BorderSet` back out lives in the model util; padding needs the unit. */
   function borderFacts(el) {
-    var bx = el.box || {};
-    var bd = bx.border || {};
-    var ref = bd.all || bd.top || bd.right || bd.bottom || bd.left || null;
-    // Width is the on/off switch; the side toggles only choose which edges a
-    // border covers. With no border yet they default to all four, so typing a
-    // width alone produces the box the user expects — otherwise the width would
-    // have nowhere to live and would snap back to 0 on the next render.
-    var on = {};
-    BOX_SIDES.forEach(function (s) {
-      on[s[0]] = ref ? (bd.all ? true : !!bd[s[0]]) : true;
+    return M.borderFacts(el, function (pt) {
+      return toDisplay(pt);
     });
-    return {
-      hasFill: !!bx.fill,
-      fill: bx.fill ? rgbToHex(bx.fill.color) : '#f1f5f9',
-      color: ref ? rgbToHex(ref.color) : '#cbd5e1',
-      width: ref ? ref.width : 0,
-      style: (ref && ref.style) || 'solid',
-      on: on,
-      radius: bd.radius == null ? '' : bd.radius,
-      opacityPct: Math.round((bx.opacity == null ? 1 : bx.opacity) * 100),
-      // the model carries four sides; the panel edits them together, and reads
-      // back the top as representative
-      padding: bx.padding ? toDisplay(bx.padding.top || 0) : '',
-    };
   }
   function boxHtml(el) {
     var f = borderFacts(el);
@@ -3695,10 +3559,6 @@
       })
       .join('');
   }
-  function esc(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  }
-
   function wireInspector(el) {
     var id = el.id;
     inspectorEl.querySelectorAll('[data-bound]').forEach(function (inp) {
@@ -4345,11 +4205,6 @@
     var data = result.inferredData || {};
     var fields = (result.schema && result.schema.fields) || [];
     var tables = (result.schema && result.schema.tables) || [];
-    function esc(s) {
-      return String(s).replace(/[&<>]/g, function (c) {
-        return c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;';
-      });
-    }
     var chip =
       'display:inline-flex;gap:6px;align-items:baseline;margin:0 0 6px 6px;padding:4px 9px;' +
       'border:1px solid var(--border);border-radius:var(--r-pill);background:var(--field);font-size:var(--fs-xs)';
