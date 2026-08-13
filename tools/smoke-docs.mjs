@@ -4,8 +4,8 @@
  * translated, a highlighter that eats code, a direction that stops flipping,
  * a contents link pointing at a section someone renamed.
  *
- * jsdom arrives transitively via jest-environment-jsdom, the same way
- * `apps/playground/designer/smoke.js` gets it.
+ * jsdom is a declared devDependency, shared with
+ * `apps/playground/designer/smoke.js`.
  *
  * Run: npm run smoke:docs
  */

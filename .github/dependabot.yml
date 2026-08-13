@@ -1,0 +1,38 @@
+# Dependency updates.
+#
+# Grouped and monthly rather than one PR per bump: the runtime tree is six
+# packages and the rest is a test toolchain, so a stream of individual PRs would
+# be noise against a repo this size. `npm audit --omit=dev --audit-level=high`
+# already gates the published tree on every push, which is the part that cannot
+# wait for a schedule.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      # The six packages that ship to consumers. Small enough to review as one
+      # PR, and important enough that it should not arrive buried among test
+      # tooling bumps.
+      runtime:
+        dependency-type: production
+      # Everything else moves together; CI decides whether it is safe.
+      dev:
+        dependency-type: development
+    ignore:
+      # Angular is a *peer* here, and the package advertises 14 → latest. A
+      # bump of the local toolchain proves nothing about that range — the
+      # `angular-compat` and `angular-floor` jobs are what test it — and would
+      # quietly raise the floor `ng-packagr` stamps into the published bundle.
+      - dependency-name: '@angular/*'
+      - dependency-name: ng-packagr
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']

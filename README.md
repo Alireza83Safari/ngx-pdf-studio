@@ -236,6 +236,11 @@ No release has been cut yet (`version: 0.0.0`), which is why
 first tag lands, collapse that back to a plain
 `npm install @ngx-pdf-studio/core`.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) — in particular the invariants section,
+which lists the five things that are design decisions rather than preferences.
+
 ## License
 
 MIT (see [LICENSE](LICENSE)). The bundled Vazirmatn font is OFL-licensed

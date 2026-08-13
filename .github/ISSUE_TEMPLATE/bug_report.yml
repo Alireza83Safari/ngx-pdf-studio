@@ -1,0 +1,73 @@
+name: Bug report
+description: Something renders wrong, crashes, or does not match the preview.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do **not** report security problems here — see
+        [SECURITY.md](../blob/master/SECURITY.md) for private reporting.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - core — layout / pagination
+        - core — PDF painter
+        - core — SVG preview
+        - core — expressions
+        - core — RTL / Persian / fonts
+        - angular — render service or preview component
+        - designer (in-browser editor)
+        - render service (Docker / HTTP)
+        - build, packaging, or install
+        - something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: template
+    attributes:
+      label: The template and data that reproduce it
+      description: >
+        The smallest template JSON that still shows the problem, plus the data
+        you rendered it with. This is almost always the difference between a
+        bug that gets fixed this week and one that sits in the queue.
+      render: json
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >
+        Most failures are non-fatal by design and report themselves. Paste
+        `result.diagnostics` (or the designer's diagnostics panel) if there is
+        anything in it.
+      render: text
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: package version, Node, and Angular if relevant
+      placeholder: 'core 0.1.0, Node 20.11, Angular 17.3'
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: wysiwyg
+    attributes:
+      label: If the PDF and the preview disagree
+      description: >
+        One layout tree feeds both, so a difference between them is a specific
+        and unusually interesting kind of bug.
+      options:
+        - label: The SVG preview and the PDF show different results

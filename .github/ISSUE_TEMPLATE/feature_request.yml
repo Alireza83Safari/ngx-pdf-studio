@@ -1,0 +1,38 @@
+name: Feature request
+description: Something the engine or the designer should be able to do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        [ROADMAP.md](../blob/master/ROADMAP.md) and [TODO.md](../blob/master/TODO.md)
+        already track a long list — a quick look there may find this, with
+        notes on why it has not landed yet.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to produce?
+      description: >
+        The document, not the feature. "Official tax invoices that the tax
+        authority accepts" leads somewhere better than "add field X", because
+        the second answer is sometimes not the right one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: What do you do today instead?
+      description: A workaround, another tool, or nothing.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where would it live
+      options:
+        - core engine
+        - Angular bindings
+        - designer
+        - render service
+        - not sure
