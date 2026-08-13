@@ -5,6 +5,7 @@
  * engine never calls `new Date()` itself, §3), and a `diagnostics` sink for the
  * non-fatal error policy (§9).
  */
+import type { EvaluationBudget } from '../expression/budget';
 import { createDefaultFunctions, type FunctionRegistry } from '../expression/functions';
 import type { ExpressionDiagnostic } from '../expression/errors';
 
@@ -15,6 +16,12 @@ export interface RenderContext {
   /** Injected clock (epoch ms); `null` when unavailable. */
   now: () => number | null;
   diagnostics: ExpressionDiagnostic[];
+  /**
+   * Work budget shared by every expression in this render, attached by
+   * `paginate` from its {@link LayoutLimits}. Absent on a context built
+   * directly, so evaluating one expression by hand stays unbudgeted.
+   */
+  budget?: EvaluationBudget;
 }
 
 export interface RenderContextInput {

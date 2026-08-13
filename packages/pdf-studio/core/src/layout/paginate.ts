@@ -15,6 +15,7 @@ import { resolveLocale } from '../binding/effective-locale';
 import { evaluateExpr } from '../binding/evaluate';
 import { resolveDataset } from '../binding/dataset-resolver';
 import type { RenderContext } from '../binding/render-context';
+import type { EvaluationBudget } from '../expression/budget';
 import { Scope, type BuiltinVars } from '../expression/scope';
 import { buildGroupedFlow, type FlowItem } from './grouping';
 import { computeRowVariables } from './report-variables';
@@ -30,6 +31,7 @@ import type { PdfTemplate } from '../model/template';
 import type { EdgeInsets, Rect, Size } from '../model/units';
 import type { VariableDef } from '../model/variable';
 import { isVisible, layoutLeaf, type LeafDeps } from './leaf-layout';
+import { createBudget, LayoutLimitError, resolveLimits, type LayoutLimits } from './limits';
 import { layoutList } from './list-layout';
 import { SimpleTextMeasurer, type TextMeasurer } from './measure';
 import { pageSizeProblem, resolvePageSize } from './page-size';
@@ -59,6 +61,12 @@ export interface PaginateOptions {
   elements?: ElementRegistry;
   /** Subreport templates by `templateRef` (§5). */
   subreports?: Record<string, SubreportTemplate>;
+  /**
+   * Ceilings on total work — pages, rows per dataset, expression steps for the
+   * whole document. Generous by default so authored reports never meet them;
+   * tighten when rendering templates you did not author. See {@link LayoutLimits}.
+   */
+  limits?: LayoutLimits;
 }
 
 interface BandLayout {
@@ -77,33 +85,56 @@ export function paginate(
   ctx: RenderContext,
   options: PaginateOptions = {},
 ): PaginatedDocument {
+  const limits = resolveLimits(options.limits);
+  // One budget for the whole render, not one per pass: a two-pass ToC document
+  // must not be allowed to spend twice what a one-pass document may.
+  const budget = createBudget(limits.maxExpressionSteps);
+
   // Auto ToC needs page numbers, which need pagination: run a first pass with
   // no entries, then re-run with the collected bookmarks. ToC elements have
   // fixed bounds, so the second pass cannot shift any page break (§11A-D).
-  const first = paginatePass(template, ctx, options, []);
+  const first = paginatePass(template, ctx, options, [], limits, budget);
   if (!hasTocElement(template)) return first;
-  return paginatePass(template, ctx, options, first.bookmarks);
+  return paginatePass(template, ctx, options, first.bookmarks, limits, budget);
 }
 
 function paginatePass(
   template: PdfTemplate,
-  ctx: RenderContext,
+  outerCtx: RenderContext,
   options: PaginateOptions,
   tocEntries: BookmarkEntry[],
+  limits: Required<LayoutLimits>,
+  budget: EvaluationBudget,
 ): PaginatedDocument {
   const measurer = options.measurer ?? new SimpleTextMeasurer();
   const styles = new Map(template.styles.map((s) => [s.id, s] as const));
+  // A copy, so the budget rides along to every `evaluateExpr` below without
+  // mutating the context the caller handed in.
+  const ctx: RenderContext = { ...outerCtx, budget };
   const rootScope = Scope.create({ data: ctx.data, parameters: ctx.parameters });
   const shared: SharedDeps = {
     ctx,
+    limits,
     measurer,
     styles,
     rootScope,
     barcodes: options.barcodes ?? createDefaultBarcodes(),
     elements: options.elements ?? createDefaultElements(),
     images: new Map(template.resources.images.map((img) => [img.id, img] as const)),
-    resolveRows: (datasetName, scope) =>
-      resolveDataset(findDataset(template, datasetName, ctx), scope, ctx),
+    resolveRows: (datasetName, scope) => {
+      const rows = resolveDataset(findDataset(template, datasetName, ctx), scope, ctx);
+      // Checked here rather than in the resolver: this is the only place rows
+      // become layout work, and the resolver is also used for things that never
+      // reach a page.
+      if (rows.length > limits.maxRows) {
+        throw new LayoutLimitError(
+          'rows',
+          limits.maxRows,
+          `dataset '${datasetName}' resolved ${rows.length} rows`,
+        );
+      }
+      return rows;
+    },
     subreports: new Map(Object.entries(options.subreports ?? {})),
     variables: template.variables ?? [],
     tocEntries,
@@ -117,6 +148,11 @@ function paginatePass(
 
   const plans = sections.map((section) => planSection(section.page, section.bands, shared));
   const pageCount = plans.reduce((sum, plan) => sum + plan.bodies.length, 0);
+  // Each section was capped on its own way up; the document is the sum, and
+  // enough sections under the cap still add up to a document over it.
+  if (pageCount > limits.maxPages) {
+    throw new LayoutLimitError('pages', limits.maxPages, `document produced ${pageCount}`);
+  }
 
   // Numbering groups (§11A-E): a new group starts at the document and at every
   // section flagged `restartPageNumbers`. `$page`/`$pageCount` are local to the
@@ -172,6 +208,7 @@ function collectBookmarks(pages: LayoutPage[]): BookmarkEntry[] {
 
 interface SharedDeps {
   ctx: RenderContext;
+  limits: Required<LayoutLimits>;
   measurer: TextMeasurer;
   styles: Map<string, NamedStyle>;
   rootScope: Scope;
@@ -199,8 +236,18 @@ interface SectionPlan {
 
 /** Lay out a section into body pages (no global page numbers resolved yet). */
 function planSection(page: PageSetup, bands: Band[], shared: SharedDeps): SectionPlan {
-  const { ctx, measurer, styles, rootScope, barcodes, elements, images, resolveRows, subreports } =
-    shared;
+  const {
+    ctx,
+    limits,
+    measurer,
+    styles,
+    rootScope,
+    barcodes,
+    elements,
+    images,
+    resolveRows,
+    subreports,
+  } = shared;
   const sizeProblem = pageSizeProblem(page.size);
   if (sizeProblem) warnOnce(ctx, `${sizeProblem} — falling back to A4`);
   const size = resolvePageSize(page.size, page.orientation);
@@ -270,6 +317,12 @@ function planSection(page: PageSetup, bands: Band[], shared: SharedDeps): Sectio
   const newPage = (): void => {
     bodies.push(current);
     bodyBands.push(currentBands);
+    // The cheapest place to notice a runaway: a template that cannot make
+    // progress produces pages forever, and every other symptom of that (memory,
+    // time, an unresponsive process) shows up later and reads as something else.
+    if (bodies.length > limits.maxPages) {
+      throw new LayoutLimitError('pages', limits.maxPages, `section produced ${bodies.length}`);
+    }
     current = [];
     currentBands = [];
     col = 0;
@@ -286,6 +339,17 @@ function planSection(page: PageSetup, bands: Band[], shared: SharedDeps): Sectio
 
   const fullCapacity = availBottom - availTop;
   for (const item of flow) {
+    // A band boundary is where an exhausted expression budget becomes a
+    // decision. The evaluator only records that it ran out — it owes its caller
+    // a value, not an exception — so the check belongs here, where stopping
+    // still means "no document" rather than "half a document".
+    if (ctx.budget?.exhausted) {
+      throw new LayoutLimitError(
+        'expressionSteps',
+        limits.maxExpressionSteps,
+        `exhausted while laying out band '${item.band.id}'`,
+      );
+    }
     if (breaksBefore(item.band) && (col > 0 || current.length > 0)) newPage();
     const laid = layoutBand(item.band, item.scope);
     // A band taller than a whole empty page is split by rows, repeating its

@@ -27,6 +27,9 @@ export function evaluateExpr(
     digits,
     diagnostics: ctx.diagnostics,
     now: ctx.now,
+    // Present only when pagination set one; a bare `createRenderContext` is
+    // unbudgeted, so evaluating an expression on its own behaves as before.
+    ...(ctx.budget ? { budget: ctx.budget } : {}),
     ...(elementId ? { elementId } : {}),
   };
   return evaluateExpression(source, scope, evalCtx);

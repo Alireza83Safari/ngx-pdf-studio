@@ -17,6 +17,13 @@ export {
 } from './element-registry';
 export { paginate, type PaginateOptions } from './paginate';
 export {
+  DEFAULT_LAYOUT_LIMITS,
+  LayoutLimitError,
+  resolveLimits,
+  type LayoutLimitKind,
+  type LayoutLimits,
+} from './limits';
+export {
   layoutTable,
   resolveColumnWidths,
   type TableLayout,

@@ -25,10 +25,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const bundle = join(
-  root,
-  'dist/packages/pdf-studio/angular/fesm2022/ngx-pdf-studio-angular.mjs',
-);
+const bundle = join(root, 'dist/packages/pdf-studio/angular/fesm2022/ngx-pdf-studio-angular.mjs');
 if (!existsSync(bundle)) {
   console.error(`angular fesm bundle missing at ${bundle} — run \`npm run build:angular\` first`);
   process.exit(1);

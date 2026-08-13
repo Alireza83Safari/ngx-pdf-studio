@@ -12,6 +12,7 @@
  * - **Bounded.** A step counter caps total work against adversarial input.
  */
 import type { Expr } from './ast';
+import type { EvaluationBudget } from './budget';
 import type { ExpressionDiagnostic } from './errors';
 import type { ExpressionFunction, FnCallContext, FunctionRegistry } from './functions';
 import { Scope } from './scope';
@@ -34,6 +35,15 @@ export interface EvaluationContext {
   elementId?: string;
   /** Optional override for the step budget. */
   maxSteps?: number;
+  /**
+   * Work budget shared with every other expression in the same render.
+   *
+   * Separate from {@link maxSteps} because they answer different questions:
+   * `maxSteps` asks "is this one expression runaway?", the budget asks "has this
+   * document spent more than we are willing to spend?". A document can exhaust
+   * the second without any single expression coming near the first.
+   */
+  budget?: EvaluationBudget;
 }
 
 interface RunState {
@@ -90,12 +100,25 @@ export function evaluate(ast: Expr, scope: Scope, ctx: EvaluationContext): unkno
     return null;
   };
 
+  const budget = ctx.budget;
   const walk = (node: Expr, sc: Scope): unknown => {
     if (state.aborted) return null;
     if (++state.steps > max) {
       if (!state.aborted) {
         state.aborted = true;
         warn('Expression evaluation exceeded the step limit');
+      }
+      return null;
+    }
+    // The document-wide budget, when one was supplied. Exhausting it stops this
+    // expression the same way the per-expression cap does — no throw, because
+    // `evaluate` promises its caller a value — and leaves the flag set so
+    // whoever owns the budget can act on it at a boundary that makes sense.
+    if (budget && --budget.remaining <= 0) {
+      if (!state.aborted) {
+        state.aborted = true;
+        budget.exhausted = true;
+        warn('Render exceeded its total expression budget');
       }
       return null;
     }

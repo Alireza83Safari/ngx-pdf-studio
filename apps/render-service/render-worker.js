@@ -26,6 +26,19 @@ const { importTemplate } = require('@ngx-pdf-studio/core');
 // the thing this library exists to get right — is silently broken.
 const fonts = loadBundledVazirmatn();
 
+/**
+ * Tighter than the engine's defaults, because the templates here are the ones
+ * nobody vouched for. Terminating the thread bounds *wall clock*; these bound
+ * the work itself, so an expensive template is refused in milliseconds with a
+ * 422 that says which ceiling it hit, instead of burning a whole thread for the
+ * full timeout and answering 504.
+ */
+const LIMITS = {
+  maxPages: Number(process.env.MAX_PAGES || 500),
+  maxRows: Number(process.env.MAX_ROWS || 20_000),
+  maxExpressionSteps: Number(process.env.MAX_EXPRESSION_STEPS || 5_000_000),
+};
+
 parentPort.on('message', async (job) => {
   try {
     const check = importTemplate(JSON.stringify(job.template));
@@ -38,7 +51,10 @@ parentPort.on('message', async (job) => {
       });
       return;
     }
-    const result = await renderToPdf(check.value, job.input, { pdf: { fonts: fonts } });
+    const result = await renderToPdf(check.value, job.input, {
+      pdf: { fonts: fonts },
+      paginate: { limits: LIMITS },
+    });
     parentPort.postMessage({
       ok: true,
       bytes: result.bytes,
@@ -46,6 +62,18 @@ parentPort.on('message', async (job) => {
       diagnostics: result.diagnostics || [],
     });
   } catch (err) {
+    // A template too expensive to render is the caller's problem, not ours, so
+    // it gets 422 like any other unacceptable template — and says which ceiling
+    // it hit, because "too big" with no number is not something anyone can fix.
+    if (err && err.name === 'LayoutLimitError') {
+      parentPort.postMessage({
+        ok: false,
+        status: 422,
+        message: err.message,
+        details: [{ limit: err.limit, max: err.max }],
+      });
+      return;
+    }
     // A stack rides along so the server can log a real 500 rather than a
     // one-line message with no way back to the cause.
     parentPort.postMessage({

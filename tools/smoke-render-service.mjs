@@ -95,6 +95,14 @@ try {
       MAX_BODY_BYTES: '262144',
       MAX_CONCURRENT: '2',
       RENDER_TIMEOUT_MS: '4000',
+      // A low row ceiling, so one request can prove the engine's limits are
+      // wired through and answered as 422.
+      MAX_ROWS: '3000',
+      // …and effectively no step ceiling, so the *other* request gets far enough
+      // to prove the timeout. The limits stop expensive templates cheaply; the
+      // timeout is the last line of defence behind them, and it only gets
+      // exercised if nothing shorter fires first. Both matter, so both run.
+      MAX_EXPRESSION_STEPS: '10000000000',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -207,7 +215,8 @@ try {
   //
   // `sum(slice($root.items, 0, $index + 1), …)` is the documented running-total
   // idiom and is O(n²), so a body well under the limit buys minutes of work.
-  const rows = Array.from({ length: 2500 }, (_, i) => ({ n: i, p: i * 13 }));
+  const items = (n) => Array.from({ length: n }, (_, i) => ({ n: i, p: i * 13 }));
+  const rows = items(2500);
   const running = { source: "sum(slice($root.items, 0, $index + 1), 'p')" };
   const heavy = {
     schemaVersion: '1.0.0',
@@ -240,6 +249,22 @@ try {
     ],
     resources: { fonts: [], images: [] },
   };
+
+  // A template over the engine's work limits is refused like any other template
+  // the engine will not accept — quickly, and saying which ceiling it hit —
+  // rather than occupying a thread for the full timeout.
+  const tooManyRows = await post({ template: heavy, data: { items: items(5000) } });
+  const tooManyRowsBody = await tooManyRows.json();
+  check(
+    'a template over the row limit is 422, not a spent thread',
+    tooManyRows.status === 422,
+    'got ' + tooManyRows.status,
+  );
+  check(
+    'and it names the ceiling it hit',
+    tooManyRowsBody.error?.details?.[0]?.limit === 'rows',
+    JSON.stringify(tooManyRowsBody.error?.details),
+  );
 
   const runawayStarted = Date.now();
   const runaway = post({ template: heavy, data: { items: rows } });
