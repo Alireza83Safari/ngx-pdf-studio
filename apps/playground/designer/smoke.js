@@ -62,6 +62,7 @@ try {
   run('designer-util.js');
   run('designer-content.js');
   run('designer-model.js');
+  run('designer-inspector.js');
   run('designer.js');
 
   const doc = window.document;

@@ -21,6 +21,11 @@ import type { Config } from 'jest';
  * waits out its grace period and force-exits, which is harmless — the run has
  * already finished and reported.
  *
+ * Here it is deterministic: 5 runs, 5 warnings. Elsewhere it is not the same
+ * thing — the `designer` project (plain `node` environment, no preset) emitted
+ * it once under load and not once in five clean runs. Seeing it there is a
+ * loaded machine, not this; seeing it here is normal.
+ *
  * Deliberately **not** silenced with `forceExit: true`. That flag would hide
  * this message and every future real leak with it, and a real leak in these
  * tests is exactly the thing worth hearing about.

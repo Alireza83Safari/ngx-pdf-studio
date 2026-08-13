@@ -16,7 +16,16 @@ const { readFileSync } = require('fs');
 const { join } = require('path');
 
 const MODEL = join(__dirname, '../../../packages/pdf-studio/core/src/model/style.ts');
-const DESIGNER = join(__dirname, 'designer.js');
+/**
+ * Every file that may hold an inspector control.
+ *
+ * Scanning only `designer.js` used to be the same thing as scanning the
+ * inspector. It stopped being: designer-ux 4.2 moves panels out one at a time,
+ * and this gate would have gone quietly blind to each one as it left — passing
+ * because it no longer looked, which is the failure mode a coverage gate can
+ * least afford. A new panel file has to be added here.
+ */
+const SOURCES = ['designer.js', 'designer-inspector.js'].map((f) => join(__dirname, f));
 
 /** Field names declared by one `export interface Name { … }` block. */
 function fieldsOf(source, interfaceName) {
@@ -97,7 +106,7 @@ const EXPOSURE = {
 };
 
 const model = readFileSync(MODEL, 'utf8');
-const designer = readFileSync(DESIGNER, 'utf8');
+const designer = SOURCES.map((f) => readFileSync(f, 'utf8')).join('\n');
 
 /**
  * Is `name` wired to a control? Most are written out whole; the four border

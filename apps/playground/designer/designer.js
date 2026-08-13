@@ -23,6 +23,11 @@
   var C = window.DesignerContent;
   // Reading and naming the model: colours, labels, box facts (designer-ux 4.2).
   var M = window.DesignerModel;
+  // The inspector panels that are a function of the model alone (designer-ux 4.2).
+  var I = window.DesignerInspector;
+  var field = I.field;
+  var bandTypeName = I.bandTypeName;
+  var BOX_SIDES = I.BOX_SIDES;
   var zoom = 0.85; // a placeholder until the canvas has been measured (autoFit)
   var zoomTouched = false; // the user set the zoom themselves — stop fitting
   var fittedFor = null; // the page size the current fit was computed for
@@ -834,19 +839,6 @@
   // edits ONE band at a time. The canvas paints just the active band, isolated
   // at the top so the band-relative overlays line up; the Preview pane shows the
   // true multi-band paginated result.
-  var BAND_TYPES = [
-    { type: 'reportHeader', name: 'سربرگ گزارش' },
-    { type: 'pageHeader', name: 'سرصفحه' },
-    { type: 'detail', name: 'ردیف داده' },
-    { type: 'pageFooter', name: 'پاصفحه' },
-    { type: 'reportFooter', name: 'پابرگ گزارش' },
-  ];
-  function bandTypeName(type) {
-    var m = BAND_TYPES.filter(function (b) {
-      return b.type === type;
-    })[0];
-    return m ? m.name : type;
-  }
   function clampActiveBand(t) {
     if (activeBand >= t.bands.length) activeBand = t.bands.length - 1;
     if (activeBand < 0) activeBand = 0;
@@ -862,9 +854,6 @@
   function curBandId() {
     if (enteredGroup && P.findElement(store.getState(), enteredGroup)) return enteredGroup;
     return getActiveBand(store.getState()).id;
-  }
-  function isRowBand(band) {
-    return band.type === 'detail' || band.type === 'groupHeader' || band.type === 'groupFooter';
   }
   /**
    * The strip a band actually owns, mirroring the engine's own `bandHeight()`:
@@ -2707,121 +2696,21 @@
     if (b.dataset.emptyAction === 'add-text') addElement('staticText');
     else if (b.dataset.emptyAction === 'gallery') document.getElementById('openGallery').click();
   });
-  function field(label, inputHtml) {
-    return '<div class="row"><label>' + label + '</label>' + inputHtml + '</div>';
-  }
 
   // The band strip + active-band settings live at the top of the inspector.
   function bandBarHtml(t) {
-    var chips = t.bands
-      .map(function (band, i) {
-        return (
-          '<button class="band-chip' +
-          (i === activeBand ? ' active' : '') +
-          '" data-band="' +
-          i +
-          '" title="ویرایش این باند">' +
-          esc(bandTypeName(band.type)) +
-          '<small>' +
-          band.elements.length +
-          '</small></button>'
-        );
-      })
-      .join('');
-    return (
-      '<div class="sec"><div class="sec-title">باندها <small class="hint">· بخش‌های گزارش</small></div>' +
-      '<div class="band-bar">' +
-      chips +
-      '<button class="band-add" data-band-add title="افزودن باند ردیف داده">+</button>' +
-      '</div></div>'
-    );
+    return I.bandBarHtml(t, clampActiveBand(t));
   }
   function bandSettingsHtml(t) {
-    var band = getActiveBand(t);
-    var i = activeBand;
-    var h = band.height && band.height.mode === 'fixed' ? band.height.value : '';
-    var typeOpts = BAND_TYPES.map(function (bt) {
-      return (
-        '<option value="' +
-        bt.type +
-        '"' +
-        (bt.type === band.type ? ' selected' : '') +
-        '>' +
-        bt.name +
-        '</option>'
-      );
-    }).join('');
-    var s =
-      '<div class="sec head"><span class="el-ico">▤</span><div><b>' +
-      esc(bandTypeName(band.type)) +
-      '</b><small>باند · ' +
-      band.elements.length +
-      ' الِمان</small></div></div>';
-    s += '<div class="sec"><div class="sec-title">تنظیمات باند</div>';
-    s += field('نوع', '<select data-band-type>' + typeOpts + '</select>');
-    s += field(
-      'ارتفاع',
-      '<input type="number" step="any" min="0" data-band-height title="ارتفاع باند (' +
-        unitLabel(t) +
-        ')" value="' +
-        (h === '' ? '' : toDisplay(h, t)) +
-        '">',
-    );
-    if (isRowBand(band)) {
-      s += field(
-        'دیتاست ردیف',
-        '<input dir="ltr" data-band-dataset title="نام آرایهٔ داده که این باند به‌ازای هر عضو آن تکرار می‌شود" value="' +
-          esc(band.dataset || '') +
-          '">',
-      );
-    }
-    if (band.type === 'pageHeader' || band.type === 'pageFooter') {
-      var master = band.master || 'all';
-      var mOpts = [
-        ['all', 'همهٔ صفحات'],
-        ['first', 'فقط صفحهٔ اول'],
-        ['odd', 'صفحات فرد'],
-        ['even', 'صفحات زوج'],
-      ]
-        .map(function (o) {
-          return (
-            '<option value="' +
-            o[0] +
-            '"' +
-            (o[0] === master ? ' selected' : '') +
-            '>' +
-            o[1] +
-            '</option>'
-          );
-        })
-        .join('');
-      s += field(
-        'تکرار روی',
-        '<select title="این سرصفحه/پاصفحه روی کدام صفحات نمایش داده شود" data-band-master>' +
-          mOpts +
-          '</select>',
-      );
-    }
-    s +=
-      '<div class="btnrow">' +
-      '<button data-band-up title="جابه‌جایی به بالا"' +
-      (i === 0 ? ' disabled' : '') +
-      '>↑ بالا</button>' +
-      '<button data-band-down title="جابه‌جایی به پایین"' +
-      (i === t.bands.length - 1 ? ' disabled' : '') +
-      '>↓ پایین</button>' +
-      '<button data-band-del title="حذف این باند"' +
-      (t.bands.length <= 1 ? ' disabled' : '') +
-      '>حذف باند</button>' +
-      '</div></div>';
-    s +=
-      '<p class="empty"><span class="glyph">⬚</span>الِمانی انتخاب نشده<br>' +
-      'از جعبه‌ابزار روی این باند بکش، یا روی بوم کلیک کن.' +
-      '<span class="empty-cta">' +
-      '<button type="button" data-empty-action="add-text">+ افزودن متن</button>' +
-      '<button type="button" data-empty-action="gallery">شروع از قالب</button>' +
-      '</span></p>';
-    return s;
+    return I.bandSettingsHtml(t, {
+      activeBand: clampActiveBand(t),
+      toDisplay: function (pt) {
+        return toDisplay(pt, t);
+      },
+      unitLabel: function () {
+        return unitLabel(t);
+      },
+    });
   }
   function addBand() {
     var id = 'band-' + uid++;
@@ -3442,12 +3331,6 @@
     return U.unitLabel(currentUnit(t));
   }
 
-  var BOX_SIDES = [
-    ['top', '↑', 'بالا'],
-    ['right', '→', 'راست'],
-    ['bottom', '↓', 'پایین'],
-    ['left', '←', 'چپ'],
-  ];
   /** Reading a `BorderSet` back out lives in the model util; padding needs the unit. */
   function borderFacts(el) {
     return M.borderFacts(el, function (pt) {
@@ -3455,82 +3338,9 @@
     });
   }
   function boxHtml(el) {
-    var f = borderFacts(el);
-    var s = '';
-    s += field(
-      'پُری',
-      '<label class="chk"><input type="checkbox" data-prop="boxFillOn"' +
-        (f.hasFill ? ' checked' : '') +
-        '> دارد</label>' +
-        '<input type="color" title="رنگ پُری" data-prop="boxFill" value="' +
-        f.fill +
-        '">',
-    );
-    s += field(
-      'رنگ کادر',
-      '<input type="color" data-prop="boxBorderColor" value="' + f.color + '">',
-    );
-    s += field(
-      'ضخامت',
-      '<input type="number" min="0" step="0.5" title="ضخامتِ کادر (pt) — صفر یعنی بدون کادر" ' +
-        'data-prop="boxBorderWidth" value="' +
-        f.width +
-        '">',
-    );
-    s += field(
-      'سبک کادر',
-      '<select data-prop="boxBorderStyle">' +
-        '<option value="solid"' +
-        (f.style === 'solid' ? ' selected' : '') +
-        '>توپر</option>' +
-        '<option value="dashed"' +
-        (f.style === 'dashed' ? ' selected' : '') +
-        '>خط‌چین</option>' +
-        '<option value="dotted"' +
-        (f.style === 'dotted' ? ' selected' : '') +
-        '>نقطه‌چین</option>' +
-        '</select>',
-    );
-    s +=
-      '<div class="row"><label>اضلاع</label><div class="tog-group">' +
-      BOX_SIDES.map(function (sd) {
-        return (
-          '<label class="tog" title="' +
-          sd[2] +
-          '"><input type="checkbox" data-prop="boxSide-' +
-          sd[0] +
-          '"' +
-          (f.on[sd[0]] ? ' checked' : '') +
-          '>' +
-          sd[1] +
-          '</label>'
-        );
-      }).join('') +
-      '</div></div>';
-    s += field(
-      'گردی گوشه',
-      '<input type="number" min="0" step="1" title="شعاعِ گوشه (pt) — بیشتر از نصفِ ضلعِ کوتاه‌تر خودکار محدود می‌شود" ' +
-        'data-prop="boxRadius" value="' +
-        f.radius +
-        '" placeholder="0">',
-    );
-    s += field(
-      'شفافیت',
-      '<input type="number" min="0" max="100" step="5" title="۱۰۰ یعنی کاملاً مات" ' +
-        'data-prop="boxOpacity" value="' +
-        f.opacityPct +
-        '">',
-    );
-    // 1.11 — held back from the 1.2 panel until the engine actually honoured it
-    s += field(
-      'بالشتک',
-      '<input type="number" min="0" step="any" ' +
-        'title="فاصلهٔ محتوا از لبهٔ جعبه — عرضِ شکستِ خط را هم کم می‌کند" ' +
-        'data-prop="boxPadding" value="' +
-        f.padding +
-        '" placeholder="0">',
-    );
-    return s;
+    return I.boxHtml(el, function (pt) {
+      return toDisplay(pt);
+    });
   }
 
   var BOUND_TIPS = {
