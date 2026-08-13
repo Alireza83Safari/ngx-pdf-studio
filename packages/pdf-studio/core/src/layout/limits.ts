@@ -21,7 +21,7 @@
  */
 
 /** Which budget ran out. */
-export type LayoutLimitKind = 'pages' | 'rows' | 'expressionSteps';
+export type LayoutLimitKind = 'pages' | 'rows' | 'expressionSteps' | 'nesting';
 
 export interface LayoutLimits {
   /** Pages the document may produce. */
@@ -30,6 +30,16 @@ export interface LayoutLimits {
   maxRows?: number;
   /** Expression steps across the whole document, shared by every expression. */
   maxExpressionSteps?: number;
+  /**
+   * How deeply composite elements may nest — containers inside containers, and
+   * subreports embedding subreports.
+   *
+   * Unlike the others this is not really about cost. Layout recurses per level,
+   * and a subreport that reaches its own `templateRef` recurses forever: no
+   * budget catches it, because the stack gives way first and a `RangeError`
+   * arrives instead of a diagnostic.
+   */
+  maxNestingDepth?: number;
 }
 
 /**
@@ -41,6 +51,9 @@ export const DEFAULT_LAYOUT_LIMITS: Required<LayoutLimits> = {
   maxPages: 5_000,
   maxRows: 100_000,
   maxExpressionSteps: 20_000_000,
+  // Comfortably under `validation`'s own input-depth cap, and comfortably over
+  // any layout a person nests by hand.
+  maxNestingDepth: 32,
 };
 
 /** Thrown when a document exceeds one of its {@link LayoutLimits}. */

@@ -274,8 +274,13 @@ function planSection(page: PageSetup, bands: Band[], shared: SharedDeps): Sectio
     resolveRows,
     tocEntries: shared.tocEntries,
   };
+  const composite: CompositeDeps = {
+    resolveRows,
+    subreports,
+    maxNestingDepth: limits.maxNestingDepth,
+  };
   const layoutBand = (band: Band, scope: Scope): BandLayout =>
-    layoutBandImpl(band, scope, leafDeps, tableDeps, resolveRows, subreports);
+    layoutBandImpl(band, scope, leafDeps, tableDeps, composite);
 
   // Reserve the tallest master variant so the body never collides on any page.
   const headerHeight = Math.max(
@@ -644,13 +649,27 @@ function translate(el: LaidOutElement, dx: number, dy: number): LaidOutElement {
   return { ...el, bounds: { ...el.bounds, x: el.bounds.x + dx, y: el.bounds.y + dy } };
 }
 
+/**
+ * What composite elements need beyond a leaf: where rows come from, which
+ * subreports are registered, and how deep the nesting may go.
+ *
+ * Bundled rather than passed as three more positional arguments, because
+ * `layoutBandImpl → layoutElement → layoutSubreport → layoutBandImpl` is a
+ * cycle and every parameter added to it has to be threaded through all four.
+ */
+interface CompositeDeps {
+  resolveRows: (datasetName: string, scope: Scope) => Record<string, unknown>[];
+  subreports: Map<string, SubreportTemplate>;
+  maxNestingDepth: number;
+}
+
 function layoutBandImpl(
   band: Band,
   scope: Scope,
   leafDeps: LeafDeps,
   tableDeps: TableLayoutDeps,
-  resolveRows: (datasetName: string, scope: Scope) => Record<string, unknown>[],
-  subreports: Map<string, SubreportTemplate>,
+  composite: CompositeDeps,
+  depth = 0,
 ): BandLayout {
   const elements: LaidOutElement[] = [];
   let maxBottom = 0;
@@ -663,8 +682,8 @@ function layoutBandImpl(
       band.direction,
       leafDeps,
       tableDeps,
-      resolveRows,
-      subreports,
+      composite,
+      depth,
     );
     for (const le of laid) {
       elements.push(le);
@@ -722,19 +741,23 @@ function layoutElement(
   bandDirection: Band['direction'],
   leafDeps: LeafDeps,
   tableDeps: TableLayoutDeps,
-  resolveRows: (datasetName: string, scope: Scope) => Record<string, unknown>[],
-  subreports: Map<string, SubreportTemplate>,
+  composite: CompositeDeps,
+  depth: number,
 ): LaidOutElement[] {
   const locale = resolveLocale(leafDeps.pageLocale, bandLocale, el.locale);
   if (!isVisible(el, scope, locale, leafDeps.ctx)) return [];
 
   if (el.type === 'table') return layoutTable(el, scope, tableDeps).elements;
   if (el.type === 'crosstab') return layoutCrosstab(el, scope, tableDeps).elements;
-  if (el.type === 'list') return layoutList(el, scope, leafDeps, resolveRows).elements;
+  if (el.type === 'list') return layoutList(el, scope, leafDeps, composite.resolveRows).elements;
   if (el.type === 'subreport') {
-    return layoutSubreport(el, scope, locale.digits, leafDeps, tableDeps, subreports);
+    // Checked before descending, not after: a subreport that reaches its own
+    // `templateRef` never returns, so there is no "after".
+    guardDepth(depth, composite.maxNestingDepth, `subreport '${el.templateRef}'`);
+    return layoutSubreport(el, scope, locale.digits, leafDeps, tableDeps, composite, depth + 1);
   }
   if (el.type === 'container') {
+    guardDepth(depth, composite.maxNestingDepth, `container '${el.id}'`);
     const out: LaidOutElement[] = [layoutLeaf(el, scope, bandLocale, bandDirection, leafDeps)];
     for (const child of el.children) {
       for (const piece of layoutElement(
@@ -744,8 +767,8 @@ function layoutElement(
         bandDirection,
         leafDeps,
         tableDeps,
-        resolveRows,
-        subreports,
+        composite,
+        depth + 1,
       )) {
         out.push(translate(piece, el.bounds.x, el.bounds.y));
       }
@@ -753,6 +776,20 @@ function layoutElement(
     return out;
   }
   return [layoutLeaf(el, scope, bandLocale, bandDirection, leafDeps)];
+}
+
+/**
+ * Stop before the stack does.
+ *
+ * A `RangeError: Maximum call stack size exceeded` is not a diagnostic anyone
+ * can act on — it names no element and no template — and it arrives as a thrown
+ * host error in a module that promises structured failures. This is the same
+ * event, said usefully and one frame earlier.
+ */
+function guardDepth(depth: number, max: number, what: string): void {
+  if (depth >= max) {
+    throw new LayoutLimitError('nesting', max, `${what} nests deeper than the limit allows`);
+  }
 }
 
 /**
@@ -766,9 +803,10 @@ function layoutSubreport(
   digits: 'latn' | 'persian',
   leafDeps: LeafDeps,
   tableDeps: TableLayoutDeps,
-  subreports: Map<string, SubreportTemplate>,
+  composite: CompositeDeps,
+  depth: number,
 ): LaidOutElement[] {
-  const sub = subreports.get(el.templateRef);
+  const sub = composite.subreports.get(el.templateRef);
   if (!sub) {
     leafDeps.ctx.diagnostics.push({
       severity: 'warning',
@@ -788,6 +826,9 @@ function layoutSubreport(
     resolveDataset(findDatasetIn(sub.datasets ?? [], name, leafDeps.ctx), sc, leafDeps.ctx);
   const subLeaf: LeafDeps = { ...leafDeps, resolveRows: subResolveRows };
   const subTable: TableLayoutDeps = { ...tableDeps, resolveRows: subResolveRows };
+  // The subreport's own datasets, but the same registry and the same depth
+  // ceiling — a nested subreport is not a fresh budget.
+  const subComposite: CompositeDeps = { ...composite, resolveRows: subResolveRows };
 
   const byType = categorizeBands(sub.bands, leafDeps.ctx);
   const flow = buildBodyFlow(byType, subRoot, leafDeps.ctx, digits, subResolveRows, []);
@@ -795,14 +836,7 @@ function layoutSubreport(
   const out: LaidOutElement[] = [];
   let cursorY = 0;
   for (const item of flow) {
-    const laid = layoutBandImpl(
-      item.band,
-      item.scope,
-      subLeaf,
-      subTable,
-      subResolveRows,
-      subreports,
-    );
+    const laid = layoutBandImpl(item.band, item.scope, subLeaf, subTable, subComposite, depth);
     for (const le of laid.elements) out.push(translate(le, el.bounds.x, el.bounds.y + cursorY));
     cursorY += laid.height;
   }
