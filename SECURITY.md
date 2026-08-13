@@ -57,6 +57,23 @@ scheme-driven execution, not a hostile `https:` host. If you preview templates
 from untrusted users, you may still want to restrict image sources to hosts you
 control.
 
+### Rendering is bounded, but only if you set the bound
+
+`paginate` accepts `limits`: pages, rows per dataset resolution, expression steps
+across the whole document, and composite nesting depth. Exceeding one throws
+`LayoutLimitError` rather than returning a truncated document that looks whole.
+
+The defaults are generous — they exist to stop a runaway, not to shape documents
+— so **tighten them if you render templates you did not author**. A template is
+paid for by the row, not by the byte: `sum(slice($root.items, 0, $index + 1), …)`
+is the documented running-total idiom and is O(n²), so a few thousand rows of
+JSON, small enough to pass any request-size check, buys minutes of layout.
+
+Note that layout and both painters are **synchronous**. A timeout implemented as
+`Promise.race` cannot interrupt them; if you need a wall-clock bound, run the
+render on a worker thread and terminate it. `apps/render-service` does exactly
+that, and is the reference for how.
+
 ### The engine performs no network I/O
 
 Layout and both painters are pure: they never fetch, and an image `source` URL

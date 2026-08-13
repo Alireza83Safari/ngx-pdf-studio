@@ -4,10 +4,10 @@ A best-in-class Angular PDF **designer** and **generation engine** — a
 JasperReports / Stimulsoft-class report tool, rebuilt natively for TypeScript
 with first-class **RTL / Persian** support.
 
-**716 tests green** across the engine and the Angular package, at 93% statement
-coverage behind a CI gate. Byte-deterministic PDF output, WYSIWYG by construction
-(one layout tree feeds both the SVG preview and the PDF), and a working
-in-browser visual designer with a template gallery.
+Both published packages are gated at **≥90% statement coverage** in CI, on Node
+18/20/22 and against Angular 14 → latest. Byte-deterministic PDF output, WYSIWYG
+by construction (one layout tree feeds both the SVG preview and the PDF), and a
+working in-browser visual designer with a template gallery.
 
 ## Packages
 
@@ -112,7 +112,7 @@ npm run designer:build
   reaching past it is flagged before it collides with the band below.
 - **Toolbox (12)** — text, data field, rectangle, line, ellipse, image, barcode,
   QR, chart, table, labelled field, page field.
-- **Template gallery** (🗂) — 22 Persian/RTL templates across six categories
+- **Template gallery** (🗂) — 22 Persian/RTL templates across five categories
   (finance, office/HR, reporting, marketing, labels & cards), loaded with one
   click, with live engine-rendered thumbnails.
 - **Assets** — drop a PNG/JPEG on the canvas to embed a logo, or load a TTF/OTF
@@ -137,6 +137,11 @@ npm run designer:build
   functions (`sum`, `avg`, `slice`, `toWords`, …), scope chain (`$index`, `$page`,
   `$group`, `$vars`, `$root`, `$parameters`), non-fatal diagnostics. See
   [docs/expression-language.md](docs/expression-language.md).
+- **Bounded by construction** — `paginate` takes `limits` capping pages, rows per
+  dataset, document-wide expression steps, and nesting depth. Defaults sit far
+  above any authored report; tighten them when the templates are not yours. A
+  template is paid for by the row, not the byte, so a small one can still be
+  expensive. See [SECURITY.md](SECURITY.md).
 - **Pagination** — pure `(template, data) → Page[]`: repeating page header/footer,
   master pages (first/odd/even), sections with independent page setup + per-section
   page-number restart, multi-column flow, explicit page breaks, grouping with

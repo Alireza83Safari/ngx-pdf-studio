@@ -103,6 +103,34 @@ for (const el of document.querySelectorAll('[src], link[href]')) {
   if (url && /^(https?:)?\/\//.test(url)) fail.push(`external resource: ${url}`);
 }
 
+// --- the README's coverage claim is the gate that is actually enforced -----
+//
+// The README used to open with "716 tests green ... at 93% statement coverage".
+// Both had drifted — 912 and 94.09% by the time anyone checked — because a
+// count of tests changes on almost every commit and nothing compared it to
+// anything. An exact tally is a vanity number with no reader; the *threshold*
+// is the claim that means something, and it is a number that exists in the jest
+// configs, so it can be checked rather than trusted.
+const readme = readFileSync(join(root, 'README.md'), 'utf8');
+const claimed = /≥(\d+)% statement coverage/.exec(readme);
+if (!claimed) {
+  fail.push('README no longer states a statement-coverage gate');
+} else {
+  const configs = [
+    'packages/pdf-studio/core/jest.config.ts',
+    'packages/pdf-studio/angular/jest.config.ts',
+  ];
+  for (const config of configs) {
+    const source = readFileSync(join(root, config), 'utf8');
+    const enforced = /statements:\s*(\d+)/.exec(source);
+    if (!enforced) {
+      fail.push(`${config} has no statement threshold, but the README claims one`);
+    } else if (enforced[1] !== claimed[1]) {
+      fail.push(`README claims ≥${claimed[1]}% statements, ${config} enforces ${enforced[1]}%`);
+    }
+  }
+}
+
 if (fail.length) {
   console.error('docs smoke FAILED:');
   for (const problem of fail) console.error(`  - ${problem}`);
