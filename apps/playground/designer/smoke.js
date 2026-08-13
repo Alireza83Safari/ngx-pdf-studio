@@ -2,16 +2,34 @@
    toolbox, and assert the WYSIWYG canvas + overlays + store behave. */
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
-const { JSDOM } = require('jsdom');
+const { JSDOM, VirtualConsole } = require('jsdom');
 
 const dir = __dirname;
 const html = readFileSync(join(dir, 'designer.html'), 'utf8');
+
+/**
+ * jsdom implements no navigation, so every "download" the designer performs —
+ * an `<a download href="blob:">` that gets clicked — reports a `jsdomError` with
+ * a stack, in the middle of a passing run. It read like a failure and hid the
+ * line that said whether anything actually broke.
+ *
+ * Filtered by message, not silenced: any other `jsdomError` is a real problem
+ * (a script that threw, a resource that failed) and still gets printed. A
+ * virtual console that swallows everything is worse than the noise it removes.
+ */
+const virtualConsole = new VirtualConsole();
+virtualConsole.sendTo(console, { omitJSDOMErrors: true });
+virtualConsole.on('jsdomError', (err) => {
+  if (/Not implemented: navigation/.test(err.message)) return;
+  console.error(err.stack || err.message);
+});
 
 const vm = require('node:vm');
 const dom = new JSDOM(html.replace(/<script src="[^"]*"><\/script>/g, ''), {
   runScripts: 'outside-only',
   pretendToBeVisual: true,
   url: 'file://' + dir + '/',
+  virtualConsole,
 });
 const { window } = dom;
 

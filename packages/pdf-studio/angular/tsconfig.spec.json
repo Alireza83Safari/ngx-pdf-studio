@@ -4,6 +4,12 @@
     "outDir": "../../../dist/out-tsc/angular-spec",
     "module": "CommonJS",
     "esModuleInterop": true,
+    // Transpile-only, and declared here because ts-jest deprecated the transform
+    // option of the same name (it is removed in v30). The engine sources reached
+    // through `moduleNameMapper` are already fully type-checked in core's own
+    // project, and the bindings' own types are checked by ng-packagr, so
+    // re-checking them here buys nothing but time.
+    "isolatedModules": true,
     "types": ["jest", "node"],
     "lib": ["ES2020", "DOM"]
   },

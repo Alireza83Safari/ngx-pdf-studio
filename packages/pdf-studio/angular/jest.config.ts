@@ -18,12 +18,9 @@ const config: Config = {
     '^.+\\.(ts|mjs|js|html)$': [
       'jest-preset-angular',
       {
+        // `isolatedModules` (transpile-only) lives in that tsconfig now: ts-jest
+        // deprecated the transform option and removes it in v30.
         tsconfig: '<rootDir>/tsconfig.spec.json',
-        // Transpile-only: the engine sources imported from `@ngx-pdf-studio/core`
-        // are already fully type-checked in core's own project, so we don't
-        // re-type-check them here (and avoid needing core's ambient .d.ts in this
-        // program). The Angular library's own types are checked by ng-packagr.
-        isolatedModules: true,
         stringifyContentPathRegex: '\\.(html|svg)$',
       },
     ],
