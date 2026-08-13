@@ -16,7 +16,31 @@ permissions:
   id-token: write # npm --provenance
 
 jobs:
+  # Every gate `ci.yml` runs, on every Node it supports — a tag must not be able
+  # to publish something master's CI would have rejected, and a publish cannot
+  # be taken back. `publish` waits on this rather than repeating it.
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high -w @ngx-pdf-studio/core
+      - run: npx eslint "packages/**/*.ts"
+      - run: npx prettier --check "packages/**/*.{ts,md,json}" "*.{json,js,md}" "docs/**/*.md"
+      - run: npx tsc -p packages/pdf-studio/core/tsconfig.lib.json --noEmit
+      - run: npx jest --coverage
+      - run: npm run designer:smoke
+      - run: npm run smoke:docs
+
   publish:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,10 +50,6 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
-      - run: npx eslint "packages/**/*.ts"
-      - run: npx tsc -p packages/pdf-studio/core/tsconfig.lib.json --noEmit
-      - run: npx jest --coverage
-      - run: npm audit --omit=dev --audit-level=high -w @ngx-pdf-studio/core
       # Both packages are cut from the same tag and share a version line: the
       # Angular bindings compile against a specific core API, so shipping them
       # out of lockstep is what `prepare-angular-dist.mjs` pins against.
@@ -41,12 +61,30 @@ jobs:
       - run: npm run build:core
       - run: npm run build:angular
       - run: npm run smoke:tarball
+      # The service ships from the same dist, so a packaging mistake that only
+      # shows up at runtime should stop the release too, not just the CI run.
+      - run: npm run smoke:render-service
       # Prove the artifact against the *oldest* Angular the package advertises
-      # before anything reaches the registry — a publish cannot be taken back,
-      # and a wrong `peerDependencies` floor installs fine and breaks at build.
+      # before anything reaches the registry — a wrong `peerDependencies` floor
+      # installs fine and breaks at build.
       - run: node tools/smoke-angular-linker.mjs 14
       # Type-check a pristine consumer against the freshly stamped tarballs.
       - run: node tools/smoke-angular-consumer.mjs latest
+      # …and from below: Angular 13 must still reject the bundle, with the
+      # linker's own version diagnostic rather than any other failure. If this
+      # ever passes, the advertised floor is wrong and the tag must not ship
+      # with `>=14.0.0` in `peerDependencies`.
+      - name: Angular 13 must reject the published bundle
+        run: |
+          if node tools/smoke-angular-linker.mjs 13 > floor.log 2>&1; then
+            echo "::error::Angular 13 linked the bundle — the advertised floor is wrong for this tag"
+            exit 1
+          fi
+          if ! grep -q "requires Angular version" floor.log; then
+            echo "::error::Angular 13 failed, but not with the linker's version diagnostic — the probe is broken, not the claim"
+            cat floor.log
+            exit 1
+          fi
       - name: Publish @ngx-pdf-studio/core
         run: npm publish packages/pdf-studio/core/dist --provenance --access public
         env:
