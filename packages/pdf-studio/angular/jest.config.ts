@@ -4,6 +4,26 @@ import type { Config } from 'jest';
  * Angular package tests run under jsdom with jest-preset-angular (TestBed).
  * `@ngx-pdf-studio/core` resolves to its workspace source so the engine and
  * bindings are tested together.
+ *
+ * ## The "worker process has failed to exit gracefully" warning
+ *
+ * This project prints it whenever Jest uses a worker (two or more spec files).
+ * It is **not** a leak in this repo, and chasing it in these tests is wasted
+ * time — that was established rather than assumed:
+ *
+ *  - `--detectOpenHandles` reports nothing, and it forces `--runInBand`, where
+ *    the warning cannot appear at all;
+ *  - dropping in two spec files containing nothing but `expect(1).toBe(1)` —
+ *    no TestBed, no component, no engine, no timer — reproduces it exactly.
+ *
+ * So it comes from the environment the preset installs: `setupZoneTestEnv()`
+ * patches the globals, and the worker does not unwind cleanly afterwards. Jest
+ * waits out its grace period and force-exits, which is harmless — the run has
+ * already finished and reported.
+ *
+ * Deliberately **not** silenced with `forceExit: true`. That flag would hide
+ * this message and every future real leak with it, and a real leak in these
+ * tests is exactly the thing worth hearing about.
  */
 const config: Config = {
   displayName: 'angular',
