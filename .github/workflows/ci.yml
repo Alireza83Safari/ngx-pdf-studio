@@ -33,6 +33,29 @@ jobs:
       - run: npm run build:angular
       - run: npm run smoke:tarball
 
+  # The designer and the docs page, in their own job because both need the
+  # esbuild bundle and neither belongs in the Node matrix — they exercise a
+  # browser, and the browser does not vary with the Node version.
+  #
+  # These two ran only on someone's laptop until now, which made the designer —
+  # the flagship surface of this repo, and its largest single file — the one
+  # part of the product no gate defended. `npx jest` covers the designer's
+  # extracted pure logic; `smoke.js` is what covers the shell it lives in.
+  designer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run designer:smoke
+      # The docs page is self-contained and loads nothing over the network, so
+      # jsdom can run the real thing: translations, links, and the code samples
+      # it tells people to copy.
+      - run: npm run smoke:docs
+
   # The render service (designer-ux 5.3), in its own job because it needs the
   # built dist and Docker, and neither should slow the main gate down.
   #
